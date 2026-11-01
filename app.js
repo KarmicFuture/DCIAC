@@ -1550,14 +1550,14 @@ function login() {
     { id: "colo.readonly", title: "Read only", hint: "Look around. Power stays locked.", start: false },
   ];
   const roles = choices.map((choice) => '<button type="button" class="role' + (choice.start ? " primary" : "") +
-    '" data-act="login" data-user="' + esc(choice.id) + '">' +
+    '" data-act="login" data-user="' + esc(choice.id) + '"><span class="role-copy">' +
     (choice.start ? '<span class="role-kicker">Start here</span>' : "") +
-    '<span class="role-title">' + esc(choice.title) + '</span><span class="role-hint">' + esc(choice.hint) +
-    "</span></button>").join("");
+    '<span class="role-title">' + esc(choice.title) + '</span><span class="role-hint">' +
+    esc(choice.hint) + '</span></span><span class="role-go">Sign in</span></button>').join("");
   return '<div class="login-wrap" data-screen="login"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +
-    '<div class="login-body"><h1>Who is signing in?</h1><p class="sub">Choose a role to enter the rack.</p>' +
-    '<div class="role-list">' + roles + '</div><p class="fine login-note">A company login replaces this screen in production.</p></div></div></div>';
+    '<div class="login-body"><h1>Sign in</h1><p class="sub">No password on this demo. Choose a role.</p>' +
+    '<div class="role-list">' + roles + "</div></div></div></div>";
 }
 
 const LOAD_SEED = {
