@@ -57,7 +57,7 @@ const devices = [
   device("tray-07", "GPU Tray 07", "GPU tray", 28, "tray-07", 9, 10, "Tray-07"),
   device("tray-08", "GPU Tray 08", "GPU tray", 26, "tray-08", 10, 11, "Tray-08"),
   device("sn2201", "SN2201", "Switch", 22, "sn2201", 4, 4, "SN2201"),
-  device("pshelf", "Power shelf", "Power shelf", 6, "pshelf", 5, 5, "PowerShelf"),
+  device("pshelf", "DC power shelf", "Power shelf", 6, "pshelf", 5, 5, "PowerShelf"),
 ];
 
 const ACS_PORTS = 48;
@@ -117,6 +117,9 @@ const state = {
     podId: "pod-a",
     rackId: "A14",
     serverId: "",
+    rowId: "",
+    feedId: "",
+    partId: "",
     pitch: 56,
     yaw: -40,
     zoom: 0.78,
@@ -146,6 +149,10 @@ const state = {
   focusSession: "",
   focusTerm: "",
   highlightOutlet: 0,
+  plan: { maker: "All", selected: "", preview: "", seq: 1, placements: [] },
+  horizon: "now",
+  manage: { layer: "bmc", device: "tray-01" },
+  containment: "hac",
 };
 
 function device(id, name, kind, u, shortName, port, outlet, redfishId, usb) {
@@ -435,9 +442,17 @@ function signIn(id) {
   const user = USERS.find((u) => u.id === id);
   if (!user) return;
   state.user = user;
-  state.view = "floor";
-  state.floor.level = "hall";
+    state.view = "floor";
+  state.floor.level = "site";
+  state.floor.zoom = 0.72;
+  state.floor.panX = 0;
+  state.floor.panY = 0;
+  state.floor.pitch = 56;
+  state.floor.yaw = -40;
   state.floor.serverId = "";
+  state.floor.rowId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
   state.selected = state.selected || "tray-01";
   userAudit("sign in", { detail: "DSVS identity", wo: "" });
   render();
@@ -862,11 +877,18 @@ function saveAsset() {
 function resetWorld() {
   applyCapacitySeed();
   outlets.forEach((o) => { o.power = "on"; });
-  state.floor.level = "hall";
+  state.floor.level = "site";
+  state.floor.podId = "pod-a";
+  state.floor.rackId = "A14";
   state.floor.serverId = "";
+  state.floor.rowId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
   state.floor.pitch = 56;
   state.floor.yaw = -40;
-  state.floor.zoom = 0.78;
+  state.floor.zoom = 0.72;
+  state.floor.panX = 0;
+  state.floor.panY = 0;
   state.floor.chassisPitch = 12;
   state.floor.chassisYaw = -18;
   state.floor.chassisZoom = 1;
@@ -885,6 +907,13 @@ function resetWorld() {
   state.assetTag = "ACS-A14";
   state.assetTagDraft = "ACS-A14";
   state.wo = "";
+  state.plan.placements = [];
+  state.plan.selected = "";
+  state.plan.preview = "";
+  state.plan.seq = 1;
+  state.horizon = "now";
+  state.manage = { layer: "bmc", device: "tray-01" };
+  state.containment = "hac";
   state.toast = "Simulated world reset. BMC paths are up and RM1048 is healthy.";
   audit({
     user: "lab",
@@ -938,7 +967,8 @@ function rail() {
     '<div class="product-name">Access</div>' +
     '<p class="rack-id">DSVS · ACS 8000 · MPU<br>Rack A14 only</p>' +
     "<nav>" +
-    navButton("floor", "Overview", "Level 1 · hall") +
+    navButton("floor", "Overview", "Outside and hall") +
+    navButton("manage", "Manage", "Grid to chip") +
     navButton("rack", "Rack", "Level 2 · devices") +
     navButton("map", "Port map", "48 serial ports") +
     navButton("control", "Control", "Level 3 · outlets") +
@@ -997,6 +1027,86 @@ function launcher(d, path, type, label, caption, medium, extraClass) {
     esc(caption) + "</small></button>";
 }
 
+function thermalReading(entity) {
+  const load = (entity && entity.load) || { temp: 48, power: 40 };
+  const hac = state.containment !== "cac";
+  const u = entity && entity.u ? entity.u : 20;
+  const top = u >= 36 ? (hac ? 1.1 : 2.6) : (u >= 28 ? 0.5 : 0.2);
+  const loadRise = Math.max(0, (load.temp || 48) - 52) * (hac ? 0.08 : 0.18);
+  const inlet = 20.5 + top + loadRise;
+  const exhaust = inlet + 11 + (load.power || 40) * 0.06;
+  const ret = hac ? Math.min(39, Math.max(35, 34 + (load.power || 40) * 0.04)) : (24 + (exhaust - inlet) * 0.35);
+  let envelope = "In the 21–24 °C inlet band";
+  let pri = 0;
+  if (inlet > 27) {
+    envelope = "Above the ASHRAE recommended inlet range";
+    pri = 2;
+  } else if (inlet > 24) {
+    envelope = "Above the study inlet band, still under 27 °C";
+    pri = 3;
+  }
+  return {
+    supply: 20.5,
+    inlet: inlet,
+    exhaust: exhaust,
+    ret: ret,
+    hac: hac,
+    envelope: envelope,
+    pri: pri,
+    recirculation: !hac && u >= 36,
+  };
+}
+
+function containSwitch() {
+  const hac = state.containment !== "cac";
+  return '<div class="horizon" role="group" aria-label="Containment"><button type="button" data-act="contain" data-mode="hac"' +
+    (hac ? ' aria-pressed="true"' : "") + '>Hot aisle containment</button><button type="button" data-act="contain" data-mode="cac"' +
+    (hac ? "" : ' aria-pressed="true"') + ">Cold aisle containment</button></div>";
+}
+
+function thermalCard(entity) {
+  const t = thermalReading(entity);
+  const mark = t.pri ? '<b class="pri-mark pri-' + t.pri + '">' + t.pri + "</b> " : "";
+  const mode = t.hac
+    ? "Hot aisle containment. Exhaust is captured and returned near " + t.ret.toFixed(0) + " °C. The room outside the hood stays the cold aisle."
+    : "Cold aisle containment. Supply is enclosed at the intake. Exhaust spills into the hall, and the top U can recirculate.";
+  return '<div class="thermal-card"><div class="thermal-read">' +
+    '<div><b>' + t.supply.toFixed(1) + ' °C</b><span>Supply</span></div>' +
+    '<div><b>' + t.inlet.toFixed(1) + ' °C</b><span>Rack inlet</span></div>' +
+    '<div><b>' + t.exhaust.toFixed(1) + ' °C</b><span>Rear exhaust</span></div>' +
+    '<div><b>' + t.ret.toFixed(1) + ' °C</b><span>' + (t.hac ? "Return" : "Room") + "</span></div></div>" +
+    "<p>" + mark + esc(t.envelope) + "</p><p class=\"fine\">" + mode +
+    (t.recirculation ? " This U is high in the rack, where cold-aisle containment showed recirculation." : "") +
+    ' Targets follow the <a href="https://www.linkedin.com/pulse/optimizing-thermal-performance-data-centers-analysis-hot-bhushan-vwrqf">HAC and CAC comparison</a>: supply 20.5 °C, HAC return about 37 °C, CAC inlets 21–24 °C.</p></div>';
+}
+
+function faceplate(entity, pressed, act) {
+  const tone = conditionTone(entity);
+  const kind = entity.kind === "Switch" ? "net" : (entity.kind === "Power shelf" || entity.kind === "Powershelf" ? "shelf" : "gpu");
+  const bmc = entity.bmc === "down" ? " dark" : "";
+  const action = act || "select";
+  return '<button type="button" class="face ' + kind + bmc + (pressed ? " on" : "") + '" data-act="' + action + '" data-device="' +
+    entity.id + '" data-server="' + entity.id + '"' + (pressed ? ' aria-pressed="true"' : "") + '><i class="u-tick">' + (entity.u ? entity.u : "") +
+    '</i><span class="perf" aria-hidden="true"></span><span class="face-name">' + esc(entity.short || entity.name) +
+    '</span><i class="bay-led" style="background:' + tone.color + '"></i></button>';
+}
+
+function cabinetHtml(list) {
+  const rows = list.slice().sort((a, b) => (b.u || 0) - (a.u || 0));
+  return '<div class="cabinet" aria-label="Rack A14 front, cold aisle"><div class="cab-rail" aria-hidden="true"></div><div class="cab-bay">' +
+    rows.map((entity) => faceplate(entity, state.selected === entity.id)).join("") +
+    '</div><div class="cab-rail" aria-hidden="true"></div></div>';
+}
+
+function deviceFaces(d) {
+  const t = thermalReading(d);
+  return '<div class="device-faces"><figure class="server-face"><figcaption>Front · cold aisle intake</figcaption><div class="bezel front"><span class="perf tall"></span><span class="bezel-meta"><b>' +
+    esc(d.short || d.name) + '</b><span>Intake</span></span><i class="bay-led" style="background:' +
+    (d.bmc === "down" ? "#8a3030" : "#1f6b45") + '"></i></div><p class="fine">Servers pull ' + t.supply.toFixed(1) +
+    " °C supply. Inlet here is " + t.inlet.toFixed(1) + ' °C.</p></figure><figure class="server-face"><figcaption>Rear · hot aisle exhaust</figcaption><div class="bezel rear"><span class="psu"></span><span class="psu"></span><span class="nic"></span><span class="exhaust"></span></div><p class="fine">Exhaust leaves at ' +
+    t.exhaust.toFixed(0) + " °C" + (t.hac ? " into the contained hot aisle." : " into the open hall.") + "</p></figure></div>";
+}
+
 function deviceDetail(d) {
   const outlet = outletByN(d.outlet);
   const leak = onLeak(d.id) ? "On the DI-1 rope" : "Not on the DI-1 rope";
@@ -1017,7 +1127,7 @@ function deviceDetail(d) {
     (d.usb ? '<dt>USB console</dt><dd class="mono">' + esc(d.usb) + "</dd>" : "") +
     '<dt>KVM</dt><dd class="mono">MPU port ' + d.mpu + "</dd><dt>Outlet</dt><dd>Outlet " + d.outlet +
     " · " + esc(outlet.power) + "</dd><dt>Leak</dt><dd>" + esc(leak) + "</dd></dl>";
-  return "<h3>" + esc(d.name) + "</h3><p class=\"fine\">" + esc(d.kind) + " · " + uLabel(d.u) +
+  return deviceFaces(d) + thermalCard(d) + "<h3>" + esc(d.name) + "</h3><p class=\"fine\">" + esc(d.kind) + " · " + uLabel(d.u) +
     "</p>" + failoverBanner(d) + '<div class="launch-grid">' +
     launcher(d, "acs", "serial", "ACS serial", d.tty + " · port " + d.port + " · out of band", "rs232", acsClass) +
     launcher(d, "acs", "kvm", "ACS KVM", "MPU port " + d.mpu + " · HTML5", "", acsClass) +
@@ -1029,30 +1139,15 @@ function deviceDetail(d) {
 }
 
 function elevation() {
-  let html = "";
-  for (let u = 42; u >= 1; u--) {
-    const d = devices.find((item) => item.u === u);
-    if (!d) {
-      html += '<div class="u empty"><span>' + uLabel(u) + "</span></div>";
-      continue;
-    }
-    const pressed = state.selected === d.id ? ' aria-pressed="true"' : "";
-    const extra = d.bmc !== "down" ? "" : (waiting(d)
-      ? ' · ACS <span data-countdown-for="' + d.id + '"><span data-countdown-num>' +
-        Math.ceil(Math.max(0, d.serialReadyAt - Date.now()) / 1000) + "</span>s</span>"
-      : " · ACS");
-    html += '<button type="button" class="u" data-act="select" data-device="' + d.id + '"' + pressed +
-      "><span>" + uLabel(u) + "</span><span>" + esc(d.name) + extra + "</span></button>";
-  }
-  return html;
+  return cabinetHtml(devices.filter((item) => item.u));
 }
 
 function renderRack() {
   const d = deviceById(state.selected);
   return '<div class="page-head"><div class="top"><div><h1>Rack A14</h1>' +
-    "<p class=\"sub\">One ACS instance for this rack. A dark BMC fails over to ACS serial and ACS KVM. RM1048 is the in-band plane. ACS-A14 is not an OCPRackManagerController.</p></div></div>" +
-    pills() + "</div>" +
-    '<div class="rack-wrap"><section class="panel"><h2>Elevation</h2><div class="elevation">' + elevation() +
+    "<p class=\"sub\">Front faces the cold aisle. Rear exhausts into the hot aisle. Inlet temperature is the reading that has to stay in band.</p></div></div>" +
+    pills() + "</div>" + containSwitch() +
+    '<div class="rack-wrap"><section class="panel"><h2>Cold aisle front</h2><div class="elevation">' + elevation() +
     '</div></section><section class="panel"><h2>Device</h2><div class="detail">' +
     (d ? deviceDetail(d) : '<p class="empty">Select a device.</p>') +
     '</div></section></div><section class="panel"><h2>ACS FRU</h2>' + fruSummary(false) + "</section>";
@@ -1577,34 +1672,97 @@ const neighbors = [];
 const infra = [];
 const PODS = [
   {
-    id: "pod-a", name: "AI Pod A", letter: "A", x: -380, y: -200, w: 320, h: 270, managed: true,
+    id: "pod-a", name: "AI Pod A", letter: "A", x: -470, y: -310, w: 400, h: 214, managed: true,
     racks: [
-      { id: "A14", name: "Rack A14", kind: "GPU", x: 22, y: 46, w: 56, d: 44, h: 124, servers: ["tray-01", "tray-02", "tray-03", "tray-04", "tray-05", "tray-06", "tray-07", "tray-08"] },
-      { id: "A14-net", name: "Network", kind: "Network", x: 100, y: 46, w: 44, d: 44, h: 80, servers: ["sn2201"] },
-      { id: "A14-pwr", name: "Power", kind: "Power", x: 164, y: 46, w: 48, d: 44, h: 62, servers: ["pshelf"] },
+      { id: "A13", name: "Rack A13", kind: "GPU", row: "row-a-n", x: 16, y: 34, w: 52, d: 44, h: 116, servers: [] },
+      { id: "A14", name: "Rack A14", kind: "GPU", row: "row-a-n", x: 78, y: 34, w: 56, d: 44, h: 124, servers: ["tray-01", "tray-02", "tray-03", "tray-04", "tray-05", "tray-06", "tray-07", "tray-08"] },
+      { id: "A15", name: "Rack A15", kind: "GPU", row: "row-a-s", x: 16, y: 128, w: 52, d: 44, h: 116, servers: [] },
+      { id: "A14-net", name: "Network", kind: "Network", row: "row-a-s", x: 78, y: 130, w: 48, d: 40, h: 80, servers: ["sn2201"] },
+      { id: "A14-pwr", name: "DC power shelf", kind: "Power", row: "row-a-s", x: 136, y: 132, w: 72, d: 36, h: 46, servers: ["pshelf"] },
     ],
     boxes: [
-      { id: "cdu-a", x: 22, y: 186, w: 90, d: 46, h: 30 },
-      { id: "bus-a", x: 236, y: 46, w: 20, d: 170, h: 14 },
+      { id: "cdu-a", x: 318, y: 86, w: 68, d: 36, h: 28 },
     ],
+    fit: {
+      aisles: [
+        { id: "cold-a1", tone: "cold", label: "Cold aisle", x: 12, y: 6, w: 290, h: 22 },
+        { id: "hot-a", tone: "hot", label: "Hot aisle", x: 12, y: 84, w: 280, h: 32 },
+        { id: "cold-a2", tone: "cold", label: "Cold aisle", x: 12, y: 180, w: 290, h: 22 },
+      ],
+      rows: [
+        { id: "row-a-n", name: "North row", y: 34, cold: "cold-a1", hot: "hot-a" },
+        { id: "row-a-s", name: "South row", y: 128, cold: "cold-a2", hot: "hot-a" },
+      ],
+      containment: { id: "hac-a", x: 20, y: 86, w: 250, d: 28, h: 28 },
+      busbar: { id: "bus-a", x: 16, y: 94, w: 260, d: 12, h: 8 },
+    },
   },
   {
-    id: "pod-b", name: "AI Pod B", letter: "B", x: 30, y: -210, w: 300, h: 250, managed: false,
+    id: "pod-b", name: "AI Pod B", letter: "B", x: 30, y: -310, w: 380, h: 214, managed: false,
     racks: [
-      { id: "B02", name: "Rack B02", kind: "GPU", x: 24, y: 44, w: 52, d: 42, h: 116, servers: [] },
-      { id: "B03", name: "Rack B03", kind: "GPU", x: 96, y: 44, w: 52, d: 42, h: 116, servers: [] },
+      { id: "B02", name: "Rack B02", kind: "GPU", row: "row-b-n", x: 16, y: 34, w: 52, d: 44, h: 116, servers: [] },
+      { id: "B03", name: "Rack B03", kind: "GPU", row: "row-b-n", x: 78, y: 34, w: 52, d: 44, h: 116, servers: [] },
+      { id: "B04", name: "Rack B04", kind: "GPU", row: "row-b-s", x: 16, y: 128, w: 52, d: 44, h: 116, servers: [] },
+      { id: "B05", name: "Rack B05", kind: "GPU", row: "row-b-s", x: 78, y: 128, w: 52, d: 44, h: 116, servers: [] },
     ],
-    boxes: [{ id: "cdu-b", x: 24, y: 176, w: 90, d: 44, h: 30 }],
+    boxes: [
+      { id: "shelf-b", x: 146, y: 132, w: 68, d: 36, h: 44 },
+      { id: "cdu-b", x: 300, y: 86, w: 64, d: 34, h: 28 },
+    ],
+    fit: {
+      aisles: [
+        { id: "cold-b1", tone: "cold", label: "Cold aisle", x: 12, y: 6, w: 270, h: 22 },
+        { id: "hot-b", tone: "hot", label: "Hot aisle", x: 12, y: 84, w: 260, h: 32 },
+        { id: "cold-b2", tone: "cold", label: "Cold aisle", x: 12, y: 180, w: 270, h: 22 },
+      ],
+      rows: [
+        { id: "row-b-n", name: "North row", y: 34, cold: "cold-b1", hot: "hot-b" },
+        { id: "row-b-s", name: "South row", y: 128, cold: "cold-b2", hot: "hot-b" },
+      ],
+      containment: { id: "hac-b", x: 18, y: 86, w: 230, d: 28, h: 28 },
+      busbar: { id: "bus-b", x: 16, y: 94, w: 240, d: 12, h: 8 },
+    },
   },
   {
-    id: "pod-c", name: "AI Pod C", letter: "C", x: -120, y: 90, w: 300, h: 240, managed: false,
+    id: "pod-c", name: "AI Pod C", letter: "C", x: -170, y: 10, w: 380, h: 214, managed: false,
     racks: [
-      { id: "C05", name: "Rack C05", kind: "GPU", x: 24, y: 42, w: 52, d: 42, h: 116, servers: [] },
-      { id: "C06", name: "Rack C06", kind: "GPU", x: 96, y: 42, w: 52, d: 42, h: 116, servers: [] },
+      { id: "C05", name: "Rack C05", kind: "GPU", row: "row-c-n", x: 16, y: 34, w: 52, d: 44, h: 116, servers: [] },
+      { id: "C06", name: "Rack C06", kind: "GPU", row: "row-c-n", x: 78, y: 34, w: 52, d: 44, h: 116, servers: [] },
+      { id: "C07", name: "Rack C07", kind: "GPU", row: "row-c-s", x: 16, y: 128, w: 52, d: 44, h: 116, servers: [] },
+      { id: "C08", name: "Rack C08", kind: "GPU", row: "row-c-s", x: 78, y: 128, w: 52, d: 44, h: 116, servers: [] },
     ],
-    boxes: [{ id: "cdu-c", x: 180, y: 150, w: 84, d: 44, h: 30 }],
+    boxes: [
+      { id: "shelf-c", x: 146, y: 132, w: 68, d: 36, h: 44 },
+      { id: "cdu-c", x: 300, y: 86, w: 64, d: 34, h: 28 },
+    ],
+    fit: {
+      aisles: [
+        { id: "cold-c1", tone: "cold", label: "Cold aisle", x: 12, y: 6, w: 270, h: 22 },
+        { id: "hot-c", tone: "hot", label: "Hot aisle", x: 12, y: 84, w: 260, h: 32 },
+        { id: "cold-c2", tone: "cold", label: "Cold aisle", x: 12, y: 180, w: 270, h: 22 },
+      ],
+      rows: [
+        { id: "row-c-n", name: "North row", y: 34, cold: "cold-c1", hot: "hot-c" },
+        { id: "row-c-s", name: "South row", y: 128, cold: "cold-c2", hot: "hot-c" },
+      ],
+      containment: { id: "hac-c", x: 18, y: 86, w: 230, d: 28, h: 28 },
+      busbar: { id: "bus-c", x: 16, y: 94, w: 240, d: 12, h: 8 },
+    },
   },
 ];
+
+const YARD = [
+  { id: "grid-1", name: "Utility grid", kind: "Grid", x: -530, y: -90, w: 110, d: 78, h: 64, power: 80, temp: 28, klass: "grid-yard" },
+  { id: "xfmr-1", name: "MV transformer", kind: "Power module", x: -500, y: -20, w: 84, d: 58, h: 50, power: 62, temp: 40, klass: "xfmr-yard" },
+  { id: "pwr-mod", name: "Power module", kind: "Power module", x: -490, y: 70, w: 112, d: 76, h: 60, power: 74, temp: 44, klass: "module-yard" },
+  { id: "batt-1", name: "Battery skid", kind: "Power module", x: -360, y: 86, w: 96, d: 52, h: 42, power: 46, temp: 32, klass: "battery-yard" },
+  { id: "heat-1", name: "Heat rejection", kind: "Heat rejection", x: 390, y: -120, w: 170, d: 72, h: 46, power: 68, temp: 38, klass: "cooler-yard" },
+  { id: "heat-2", name: "Trim cooler", kind: "Heat rejection", x: 410, y: 10, w: 150, d: 60, h: 38, power: 42, temp: 33, klass: "cooler-yard" },
+  { id: "hydro-1", name: "Hydro skid", kind: "Cooling", x: 400, y: 130, w: 140, d: 58, h: 36, power: 54, temp: 30, klass: "hydro-yard" },
+  { id: "core-1", name: "OneCore", kind: "Core", x: -80, y: -188, w: 160, d: 72, h: 50, power: 36, temp: 28, klass: "core-block" },
+];
+
+const SHELL = { x: -210, y: -48, w: 420, d: 230, h: 76 };
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -1638,23 +1796,142 @@ function fillPod(podId, rackId, gpus) {
   });
 }
 
-function addInfra(id, name, kind, pod, power, temp, drift) {
+function addInfra(id, name, kind, pod, power, temp, drift, yard) {
   const entity = {
-    id, name, kind, pod, managed: false, bmc: "up",
+    id, name, kind, pod, yard: !!yard, managed: false, bmc: "up",
     load: { gpu: 0, mem: 0, power, temp, drift, failover: false },
   };
   entity.seed = Object.assign({}, entity.load);
   infra.push(entity);
 }
 
+function isFacility(entity) {
+  if (!entity) return false;
+  return ["Cooling", "Busway", "Containment", "Aisle", "Powershelf", "Power module", "Heat rejection", "Core", "Grid", "Pipe"].indexOf(entity.kind) >= 0;
+}
+
+fillPod("pod-a", "A13", [62, 58, 71, 44, 66, 53]);
+fillPod("pod-a", "A15", [48, 77, 55, 63, 41, 59]);
 fillPod("pod-b", "B02", [88, 83, 61, 44, 71, 57]);
 fillPod("pod-b", "B03", [49, 76, 66, 52, 91, 47]);
+fillPod("pod-b", "B04", [54, 63, 47, 72, 58, 41]);
+fillPod("pod-b", "B05", [67, 52, 74, 45, 60, 81]);
 fillPod("pod-c", "C05", [73, 69, 55, 48, 80, 63]);
 fillPod("pod-c", "C06", [42, 58, 64, 51, 46, 70]);
+fillPod("pod-c", "C07", [59, 66, 43, 71, 54, 48]);
+fillPod("pod-c", "C08", [77, 50, 62, 68, 45, 57]);
 addInfra("cdu-a", "CDU A", "Cooling", "pod-a", 64, 33, 0.04);
-addInfra("bus-a", "Busway A", "Busway", "pod-a", 58, 36, 0.03);
+addInfra("bus-a", "Bus bar A", "Busway", "pod-a", 58, 36, 0.03);
+addInfra("hac-a", "Hot aisle containment A", "Containment", "pod-a", 40, 38, 0.02);
+addInfra("cold-a1", "Cold aisle A", "Aisle", "pod-a", 22, 24, 0.01);
+addInfra("hot-a", "Hot aisle A", "Aisle", "pod-a", 72, 48, 0.04);
+addInfra("cold-a2", "Cold aisle A return", "Aisle", "pod-a", 26, 25, 0.01);
 addInfra("cdu-b", "CDU B", "Cooling", "pod-b", 84, 41, 0.06);
+addInfra("bus-b", "Bus bar B", "Busway", "pod-b", 61, 34, 0.03);
+addInfra("hac-b", "Hot aisle containment B", "Containment", "pod-b", 48, 40, 0.03);
+addInfra("cold-b1", "Cold aisle B", "Aisle", "pod-b", 24, 26, 0.01);
+addInfra("hot-b", "Hot aisle B", "Aisle", "pod-b", 70, 46, 0.04);
+addInfra("cold-b2", "Cold aisle B return", "Aisle", "pod-b", 28, 27, 0.01);
+addInfra("shelf-b", "DC power shelf B", "Powershelf", "pod-b", 66, 42, 0.03);
 addInfra("cdu-c", "CDU C", "Cooling", "pod-c", 54, 31, 0.02);
+addInfra("bus-c", "Bus bar C", "Busway", "pod-c", 49, 32, 0.02);
+addInfra("hac-c", "Hot aisle containment C", "Containment", "pod-c", 38, 36, 0.02);
+addInfra("cold-c1", "Cold aisle C", "Aisle", "pod-c", 20, 24, 0.01);
+addInfra("hot-c", "Hot aisle C", "Aisle", "pod-c", 64, 44, 0.03);
+addInfra("cold-c2", "Cold aisle C return", "Aisle", "pod-c", 24, 25, 0.01);
+addInfra("shelf-c", "DC power shelf C", "Powershelf", "pod-c", 58, 40, 0.02);
+YARD.forEach((item) => addInfra(item.id, item.name, item.kind, "yard", item.power, item.temp, 0.02, true));
+addInfra("pipe-sup", "Supply piping", "Pipe", "yard", 22, 18, 0.01, true);
+addInfra("pipe-ret", "Return piping", "Pipe", "yard", 36, 34, 0.01, true);
+
+const LIBRARY = [
+  spec("vertiv-rack", "Vertiv", "VR Rack 42U", "Enclosure", "floor", 42, 0, 0, "415 V", 2, 0, [600, 1200, 1998], [56, 48, 124], "Two power feeds into an empty 42U enclosure."),
+  spec("vertiv-busbar", "Vertiv", "PowerBar busway", "Busway", "floor", 0, 0, 400, "415 V", 0, 0, [2400, 180, 220], [220, 14, 96], "Overhead track busway. Runs above the hot aisle."),
+  spec("vertiv-hac", "Vertiv", "Hot aisle containment", "Containment", "floor", 0, 0, 0, "—", 0, 0, [2400, 1200, 2200], [220, 40, 72], "Hood over the hot aisle. Cold aisles stay open."),
+  spec("vertiv-powermod", "Vertiv", "Power module", "Power module", "yard", 0, 1500000, 1800, "MV", 4, 2, [3000, 2200, 3200], [120, 78, 64], "Sits outside the building, with the transformer and battery skid."),
+  spec("vertiv-heat", "Vertiv", "Heat rejection", "Heat rejection", "yard", 0, 40000, 80, "480 V", 2, 1, [6000, 2400, 2800], [180, 70, 48], "Chiller or dry cooler in the yard. Rejects the hall heat outside the shell."),
+  spec("vertiv-shelf", "Vertiv", "DC power shelf", "Powershelf", "rack", 2, 80000, 1600, "50 VDC", 4, 2, [530, 750, 88], [68, 36, 44], "50 V DC shelf for the rack. ORv3-style, fed from the overhead bus bar."),
+  spec("vertiv-ups", "Vertiv", "Liebert EXL UPS", "UPS", "floor", 0, 500000, 696, "415 V", 4, 2, [1400, 900, 2000], [88, 64, 118], "Floor UPS. Four output breakers and a network card."),
+  spec("vertiv-crac", "Vertiv", "Liebert DSE CRAC", "Cooling", "floor", 0, 18000, 22, "480 V", 1, 1, [1800, 900, 2000], [96, 58, 110], "150 kW cooling capacity. Faceplate power is the fan and control load."),
+  spec("vertiv-pdu", "Vertiv", "Geist rPDU", "PDU", "rack", 0, 0, 32, "230 V", 24, 2, [56, 80, 1730], [18, 14, 90], "Zero-U monitored PDU. 24 power outlets, 2 network ports. Rated current is the faceplate value."),
+  spec("hp-dl380", "HP", "ProLiant DL380", "Server", "rack", 2, 800, 3.5, "230 V", 2, 4, [448, 750, 87], [48, 28, 16], "2U rack server. Two power supplies and four network ports."),
+  spec("hp-dl360", "HP", "ProLiant DL360", "Server", "rack", 1, 500, 2.2, "230 V", 2, 4, [434, 750, 43], [48, 26, 10], "1U rack server."),
+  spec("hp-cx8325", "HP", "Aruba CX 8325", "Switch", "rack", 1, 400, 1.8, "230 V", 2, 48, [442, 510, 44], [48, 22, 10], "1U switch. Two power supplies and 48 network ports."),
+  spec("dell-r760", "Dell", "PowerEdge R760", "Server", "rack", 2, 900, 3.9, "230 V", 2, 4, [482, 800, 87], [50, 30, 16], "2U rack server."),
+  spec("dell-r660", "Dell", "PowerEdge R660", "Server", "rack", 1, 700, 3.1, "230 V", 2, 4, [482, 780, 43], [50, 28, 10], "1U rack server."),
+  spec("dell-s5248", "Dell", "PowerSwitch S5248", "Switch", "rack", 1, 350, 1.5, "230 V", 2, 48, [434, 460, 44], [48, 20, 10], "1U switch."),
+  spec("ibm-s1022", "IBM", "Power S1022", "Server", "rack", 2, 1400, 6.1, "230 V", 2, 4, [482, 770, 87], [50, 30, 18], "2U Power server."),
+  spec("ibm-fs5300", "IBM", "FlashSystem 5300", "Storage", "rack", 1, 800, 3.5, "230 V", 2, 8, [483, 850, 44], [50, 32, 10], "1U storage. Two power supplies and eight network ports."),
+  spec("ibm-rack", "IBM", "Enterprise Rack 42U", "Enclosure", "floor", 42, 0, 0, "415 V", 2, 0, [605, 1092, 2015], [56, 46, 124], "Empty 42U enclosure with two power feeds."),
+];
+
+function spec(id, maker, name, kind, place, u, watts, amps, volts, powerPorts, netPorts, mm, box, note) {
+  return {
+    id: id,
+    maker: maker,
+    name: name,
+    kind: kind,
+    place: place,
+    u: u,
+    uCapacity: place === "floor" && u ? u : 0,
+    watts: watts,
+    amps: amps,
+    volts: volts,
+    powerPorts: powerPorts,
+    netPorts: netPorts,
+    mm: mm,
+    box: { w: box[0], d: box[1], h: box[2] },
+    note: note,
+    powerLabel: watts >= 1000 ? (watts / 1000).toFixed(watts >= 10000 ? 0 : 1) + " kW" : watts + " W",
+    ampLabel: amps + " A",
+  };
+}
+
+function catalogById(id) {
+  return LIBRARY.find((item) => item.id === id);
+}
+
+function placementById(id) {
+  return state.plan.placements.find((item) => item.id === id);
+}
+
+function findRack(id) {
+  let found = null;
+  PODS.forEach((pod) => {
+    pod.racks.forEach((rack) => {
+      if (rack.id === id) found = rack;
+    });
+  });
+  return found;
+}
+
+function hostCapacity(hostId) {
+  const placed = placementById(hostId);
+  if (placed) return catalogById(placed.catalogId).uCapacity || 0;
+  return findRack(hostId) ? 42 : 0;
+}
+
+function usedU(hostId) {
+  const rack = findRack(hostId);
+  let used = 0;
+  if (rack) {
+    rackEntities(rack).forEach((entity) => {
+      if (entity.kind === "Switch") used += 1;
+      else if (entity.kind === "Power shelf") used += 4;
+      else if (entity.kind !== "Cooling" && entity.kind !== "Busway") used += 2;
+    });
+  }
+  state.plan.placements.forEach((item) => {
+    if (item.place === "rack" && item.host === hostId) used += catalogById(item.catalogId).u || 0;
+  });
+  return used;
+}
+
+function freeU(hostId) {
+  return hostCapacity(hostId) - usedU(hostId);
+}
+
+let dragToken = "";
 
 function entityById(id) {
   return deviceById(id) || neighbors.find((n) => n.id === id) || infra.find((item) => item.id === id);
@@ -1662,7 +1939,7 @@ function entityById(id) {
 
 function entityScore(entity) {
   if (!entity || !entity.load) return 0;
-  if (entity.kind === "Cooling" || entity.kind === "Busway") return entity.load.power;
+  if (isFacility(entity)) return entity.load.power;
   const load = entity.load;
   return load.gpu * 0.5 + load.mem * 0.2 + load.power * 0.2 + load.temp * 0.1;
 }
@@ -1691,7 +1968,7 @@ function nudge(entity) {
   if (!load || entity.bmc === "down") return;
   const drift = load.drift || 0;
   const jitter = (Math.random() - 0.5) * 0.45;
-  if (entity.kind === "Cooling" || entity.kind === "Busway") {
+  if (isFacility(entity)) {
     load.power = clamp(load.power + drift + jitter, 8, 98);
     load.temp = clamp(load.temp + drift * 0.08, 20, 80);
     return;
@@ -1782,9 +2059,7 @@ function conditionTone(entity) {
   if (!entity) return { color: "#c8c4bc", pri: 0, word: "Nominal" };
   if (entity.bmc === "down") return { color: "#8a3030", pri: 1, word: "BMC" };
   if (entity.rdp === "down") return { color: "#c45c26", pri: 2, word: "RDP" };
-  const score = entity.kind === "Cooling" || entity.kind === "Busway"
-    ? (entity.load ? entity.load.power : 0)
-    : entityScore(entity);
+  const score = isFacility(entity) ? (entity.load ? entity.load.power : 0) : entityScore(entity);
   if (score >= 90) return { color: "#c45c26", pri: 2, word: "Hot" };
   if (score >= 75) return { color: "#8a6a12", pri: 3, word: "Rise" };
   return { color: "#c8c4bc", pri: 0, word: "Nominal" };
@@ -1853,6 +2128,68 @@ function refreshSerialWatch() {
   });
 }
 
+function plantAlarms() {
+  const list = [];
+  outlets.forEach((outlet) => {
+    if (!outlet.deviceId || outlet.power !== "off") return;
+    const mapped = deviceById(outlet.deviceId);
+    if (!mapped) return;
+    const shelf = outlet.deviceId === "pshelf";
+    list.push({
+      id: "feed-" + outlet.n,
+      pri: shelf ? 1 : 2,
+      asset: mapped.name,
+      text: shelf
+        ? "Outlet " + outlet.n + " is open. The 50 V shelf is de-energized, so the row behind it is dark."
+        : "Outlet " + outlet.n + " is open. The DC whip to " + mapped.name + " is de-energized.",
+      go: "control",
+      device: mapped.id,
+      response: "Open control",
+    });
+  });
+  devices.forEach((mapped) => {
+    if (!mapped.u || !mapped.load || mapped.serialOnly) return;
+    const heat = thermalReading(mapped);
+    if (heat.pri) {
+      list.push({
+        id: "inlet-" + mapped.id,
+        pri: heat.pri,
+        asset: mapped.name,
+        text: "Rack inlet " + heat.inlet.toFixed(1) + " °C. " + heat.envelope + ".",
+        act: "floor-part",
+        device: mapped.id,
+        part: "inlet",
+        response: "Open inlet",
+      });
+    }
+    if (heat.recirculation) {
+      list.push({
+        id: "recirc-" + mapped.id,
+        pri: 3,
+        asset: mapped.name,
+        text: "Cold-aisle containment. Supply is recirculating at the top of the rack.",
+        act: "floor-part",
+        device: mapped.id,
+        part: "inlet",
+        response: "Open inlet",
+      });
+    }
+  });
+  neighbors.forEach((entity) => {
+    if (heatBand(entity) !== "critical") return;
+    list.push({
+      id: "cap-" + entity.id,
+      pri: 2,
+      asset: entity.name,
+      text: "Simulated load is critical. This rack is outside ACS-A14.",
+      act: "floor-server",
+      device: entity.id,
+      response: "Open server",
+    });
+  });
+  return list;
+}
+
 function activeAlarms() {
   const list = [];
   devices.forEach((d) => {
@@ -1869,6 +2206,7 @@ function activeAlarms() {
       response: watch.response,
     });
   });
+  plantAlarms().forEach((alarm) => list.push(alarm));
   return list.sort((a, b) => a.pri - b.pri || a.asset.localeCompare(b.asset));
 }
 
@@ -1901,13 +2239,14 @@ function goAlarm(id) {
   if (alarm.go) go(alarm.go);
   else if (alarm.act === "floor-serial") floorSerial(alarm.device);
   else if (alarm.act === "rdp-failover") failRdpToKvm(alarm.device);
+  else if (alarm.act === "floor-part") openPart(alarm.device, alarm.part);
   else if (alarm.act === "floor-server") openFloorServer(alarm.device);
 }
 
 function entityHeat(entity) {
   if (!entity || !entity.load) return 18;
   if (entity.bmc === "down") return 98;
-  if (entity.kind === "Cooling" || entity.kind === "Busway") return entity.load.power;
+  if (isFacility(entity)) return entity.load.power;
   return entityScore(entity);
 }
 
@@ -2002,6 +2341,7 @@ let orbit = null;
 
 function onPointerDown(event) {
   if (!state.user || state.view !== "floor" || event.button !== 0) return;
+  if (event.target.closest(".lib, [data-plan]")) return;
   const scene = event.target.closest(".scene");
   if (!scene || event.target.closest(".hud, .legend, button, a, input, select")) return;
   orbit = {
@@ -2072,17 +2412,74 @@ function deviceRackId(id) {
 }
 
 function goFloor(level) {
-  if (level === "hall") {
+  if (level === "site") {
+    state.floor.level = "site";
+    state.floor.serverId = "";
+    state.floor.rowId = "";
+    state.floor.feedId = "";
+    state.floor.partId = "";
+    state.floor.zoom = Math.min(state.floor.zoom, 0.84);
+  } else if (level === "hall") {
+    if (state.floor.level === "site") state.floor.zoom = Math.max(state.floor.zoom, 0.9);
     state.floor.level = "hall";
     state.floor.serverId = "";
+    state.floor.rowId = "";
+    state.floor.feedId = "";
+    state.floor.partId = "";
   } else if (level === "pod") {
     state.floor.level = "pod";
     state.floor.serverId = "";
+    state.floor.rowId = "";
+    state.floor.feedId = "";
+    state.floor.partId = "";
+  } else if (level === "row") {
+    state.floor.level = state.floor.rowId ? "row" : "pod";
+    state.floor.serverId = "";
+    state.floor.feedId = "";
+    state.floor.partId = "";
   } else if (level === "rack") {
     state.floor.level = state.floor.rackId ? "rack" : "pod";
     state.floor.serverId = "";
+    state.floor.partId = "";
   }
   render();
+}
+
+function openRow(podId, rowId) {
+  if (state.floor.level === "hall" || state.floor.level === "site") state.floor.zoom = Math.max(state.floor.zoom, 1.15);
+  state.floor.podId = podId;
+  state.floor.rowId = rowId;
+  state.floor.level = "row";
+  state.floor.serverId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
+  state.view = "floor";
+  render();
+}
+
+function openFeed(podId, feedId) {
+  state.view = "floor";
+  state.floor.feedId = feedId;
+  state.floor.partId = "";
+  state.floor.serverId = "";
+  state.floor.level = "feed";
+  state.floor.podId = podId || "";
+  render();
+}
+
+function placeServer(id) {
+  const entity = entityById(id);
+  if (!entity) return;
+  if (deviceById(id) && !entity.serialOnly) {
+    state.floor.podId = "pod-a";
+    state.floor.rackId = deviceRackId(id);
+  } else if (entity.pod && entity.pod !== "yard") {
+    state.floor.podId = entity.pod;
+    state.floor.rackId = entity.rack || "";
+  }
+  const pod = podById(state.floor.podId);
+  const rack = rackById(pod, state.floor.rackId);
+  if (rack && rack.row) state.floor.rowId = rack.row;
 }
 
 function openPod(id) {
@@ -2090,6 +2487,9 @@ function openPod(id) {
   state.floor.podId = id;
   state.floor.level = "pod";
   state.floor.serverId = "";
+  state.floor.rowId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
   render();
 }
 
@@ -2098,6 +2498,9 @@ function openRack(podId, rackId) {
   state.floor.rackId = rackId;
   state.floor.level = "rack";
   state.floor.serverId = "";
+  state.floor.partId = "";
+  const rack = rackById(podById(podId), rackId);
+  if (rack && rack.row) state.floor.rowId = rack.row;
   render();
 }
 
@@ -2106,14 +2509,32 @@ function openFloorServer(id) {
   if (!entity) return;
   state.view = "floor";
   state.floor.serverId = id;
-  state.floor.level = "server";
-  if (deviceById(id)) {
-    state.floor.podId = "pod-a";
-    state.floor.rackId = deviceRackId(id);
-  } else if (entity.pod) {
-    state.floor.podId = entity.pod;
-    state.floor.rackId = entity.rack || "";
+  state.floor.partId = "";
+  state.floor.feedId = "";
+  if (entity.yard) {
+    state.floor.level = "site";
+    render();
+    return;
   }
+  state.floor.level = "server";
+  placeServer(id);
+  render();
+}
+
+function openPart(id, part) {
+  const entity = entityById(id);
+  if (!entity) return;
+  state.view = "floor";
+  state.floor.serverId = id;
+  state.floor.partId = part || "inlet";
+  state.floor.feedId = "";
+  if (entity.yard) {
+    state.floor.level = "site";
+    render();
+    return;
+  }
+  state.floor.level = "part";
+  placeServer(id);
   render();
 }
 
@@ -2144,53 +2565,373 @@ function boxHtml(item, band, act, extra) {
   const heatAttr = extra.server
     ? '" data-heat-box="' + extra.server
     : '" data-heat-rack="' + (extra.rack || "");
-  return '<div class="rackbox" role="button" tabindex="0" data-act="' + act + '" data-band="' + band + heatAttr +
+  const face = extra.face || "";
+  const cap = extra.cap ? '<span class="cap-label">' + esc(extra.cap) + "</span>" : "";
+  const planAttr = extra.plan ? ' data-plan="' + extra.plan + '" draggable="true"' : "";
+  const attrs = extra.attrs || "";
+  return '<div class="rackbox' + (extra.plan ? " planned" : "") + (extra.klass ? " " + extra.klass : "") + '" role="button" tabindex="0" data-act="' + act + '" data-band="' + band + heatAttr +
     '" style="--x:' + item.x + "px;--y:" + item.y + "px;--w:" + item.w + "px;--d:" + item.d + "px;--h:" + item.h +
-    "px;--heat:" + tone.color + '" data-pod="' + (extra.pod || "") + '" data-rack="' + (extra.rack || "") +
-    '" data-server="' + (extra.server || "") + '"><i class="ftop"></i><i class="ffront">' + mark + leds + '</i><i class="fside"></i></div>';
+    "px;--heat:" + (extra.color || tone.color) + '" data-pod="' + (extra.pod || "") + '" data-rack="' + (extra.rack || "") +
+    '" data-server="' + (extra.server || "") + '"' + planAttr + attrs + '><i class="ftop">' + cap + '</i><i class="ffront">' + mark + leds + face +
+    '</i><i class="fside"></i></div>';
 }
 
 function hudHtml() {
   const alarms = activeAlarms();
-  const level = state.floor.level === "hall" ? "Level 1 · Overview" : (state.floor.level === "pod" ? "Level 2 · Pod" : "Level 3 · Rack");
+  const levelName = {
+    site: "Outside the building",
+    hall: "Level 1 · Hall",
+    pod: "Level 2 · Pod",
+    row: "Level 2 · Row",
+    rack: "Level 3 · Rack",
+    server: "Level 3 · Device",
+    part: "Level 4 · Inside the device",
+    feed: "Power feed",
+  };
+  const level = levelName[state.floor.level] || "Hall";
   return '<div class="hud"><div class="hud-score"><b data-abnormal>' + alarms.length +
     '</b><span>Abnormal</span></div><p class="hud-mission">' + esc(level) +
-    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-zoom"><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="reset">Reset view</button></div></div>';
+    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-zoom"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button><button type="button" data-act="floor-go" data-level="site">Outside</button><button type="button" data-act="floor-go" data-level="hall">Hall</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="reset">Reset view</button></div></div>';
+}
+
+function makerColor(maker) {
+  if (maker === "HP") return "#0b6e5a";
+  if (maker === "Dell") return "#0a4f86";
+  if (maker === "IBM") return "#0f3f8a";
+  return "#3a342e";
+}
+
+function portPips(count, kind) {
+  const shown = Math.min(count, 6);
+  let marks = "";
+  for (let i = 0; i < shown; i += 1) marks += '<i class="pip ' + kind + '"></i>';
+  if (count > shown) marks += "<b>+" + (count - shown) + "</b>";
+  if (!count) marks = '<i class="pip none"></i>';
+  return '<span class="pips" aria-label="' + count + " " + kind + ' ports">' + marks + "</span>";
+}
+
+function faceplateHtml(spec) {
+  return '<span class="faceplate"><b>' + esc(spec.powerLabel) + "</b><b>" + esc(spec.ampLabel) + "</b>" +
+    portPips(spec.powerPorts, "power") + "</span>";
+}
+
+function mini3d(spec) {
+  const height = spec.place === "floor" ? 46 : Math.max(22, Math.min(40, (spec.u || 1) * 16));
+  return '<span class="mini-slot"><span class="mini-view"><span class="mini3d" style="--mc:' + makerColor(spec.maker) + ";--mh:" + height +
+    'px"><i class="mtop"></i><i class="mfront">' + portPips(Math.min(spec.powerPorts, 4), "power") +
+    '</i><i class="mside"></i></span></span></span>';
+}
+
+function placeWord(place) {
+  if (place === "yard") return "Outside";
+  if (place === "floor") return "Floor";
+  return "Rack";
+}
+
+function planBoxes(place) {
+  return state.plan.placements.filter((item) => item.place === place).map((item) => {
+    const spec = catalogById(item.catalogId);
+    return boxHtml(
+      { x: item.x, y: item.y, w: spec.box.w, d: spec.box.d, h: spec.box.h },
+      "ok",
+      "plan-select",
+      { plan: item.id, color: makerColor(spec.maker), face: faceplateHtml(spec) }
+    );
+  }).join("");
+}
+
+function planBlade(item) {
+  const spec = catalogById(item.catalogId);
+  const selected = state.plan.selected === item.id ? " selected" : "";
+  const units = spec.u || 1;
+  return '<button type="button" class="ru' + selected + '" data-act="plan-select" data-plan="' + item.id +
+    '" style="--u:' + units + ";--mc:" + makerColor(spec.maker) + '"><span class="ru-u">' + (spec.u ? spec.u + "U" : "0U") +
+    '</span><span class="ru-body"><b>' + esc(item.name) + "</b><span>" + esc(spec.powerLabel) + " · " + esc(spec.ampLabel) +
+    "</span></span><span class=\"ru-ports\">" + portPips(spec.powerPorts, "power") + portPips(spec.netPorts, "net") +
+    "</span></button>";
+}
+
+function planBlades(hostId) {
+  return state.plan.placements.filter((item) => item.place === "rack" && item.host === hostId).map(planBlade).join("");
+}
+
+function dims(spec) {
+  return spec.mm[0] + " × " + spec.mm[1] + " × " + spec.mm[2] + " mm";
+}
+
+function faceSheet(spec, title, extra) {
+  return '<div class="face-sheet"><div class="face-sheet-top">' + mini3d(spec) + "<div><p class=\"kicker\">" + esc(spec.maker) +
+    "</p><h2>" + esc(title) + '</h2><span class="place-badge ' + spec.place + '">' + placeWord(spec.place) +
+    "</span></div></div><div class=\"stat-row\"><div class=\"stat\"><b>" + esc(spec.powerLabel) +
+    "</b><span>Power</span></div><div class=\"stat\"><b>" + esc(spec.ampLabel) + "</b><span>Current</span></div><div class=\"stat\"><b>" +
+    esc(spec.volts) + "</b><span>Voltage</span></div></div><p class=\"dim-bar\">Dimensions " + esc(dims(spec)) +
+    "</p><div class=\"port-row\"><span>Power ports " + spec.powerPorts + "</span>" + portPips(spec.powerPorts, "power") +
+    "</div><div class=\"port-row\"><span>Network ports " + spec.netPorts + "</span>" + portPips(spec.netPorts, "net") +
+    "</div>" + (spec.uCapacity ? '<p class="fine">Rack space ' + spec.uCapacity + "U</p>" : "") +
+    (spec.place === "rack" ? '<p class="fine">Height ' + (spec.u ? spec.u + "U" : "0U") + "</p>" : "") +
+    '<p class="fine">' + esc(spec.note) + "</p>" + (extra || "") + "</div>";
+}
+
+function libCard(specItem) {
+  const on = state.plan.preview === specItem.id ? " on" : "";
+  return '<div class="lib-card' + on + " " + specItem.place + '" draggable="true" data-catalog="' + specItem.id +
+    '" data-act="plan-preview" tabindex="0" style="--mc:' + makerColor(specItem.maker) + '"><span class="grip" aria-hidden="true"></span>' +
+    mini3d(specItem) + '<span class="lib-copy"><span class="place-badge ' + specItem.place + '">' +
+    placeWord(specItem.place) + "</span><strong>" + esc(specItem.name) +
+    "</strong><span class=\"lib-maker\">" + esc(specItem.maker) + "</span></span><span class=\"lib-stats\"><b>" +
+    esc(specItem.powerLabel) + "</b><b>" + esc(specItem.ampLabel) + "</b><b>" + specItem.powerPorts + " P · " +
+    specItem.netPorts + " N</b></span></div>";
+}
+
+function renderLibrary() {
+  const makers = ["All", "Vertiv", "HP", "Dell", "IBM"];
+  const filters = makers.map((maker) => {
+    const dot = maker === "All" ? "" : '<i class="maker-dot" style="background:' + makerColor(maker) + '"></i>';
+    return '<button type="button" data-act="plan-maker" data-maker="' + maker + '"' +
+      (state.plan.maker === maker ? ' aria-pressed="true"' : "") + ">" + dot + maker + "</button>";
+  }).join("");
+  const list = LIBRARY.filter((specItem) => state.plan.maker === "All" || specItem.maker === state.plan.maker);
+  const groups = [
+    ["Outside the building", list.filter((specItem) => specItem.place === "yard")],
+    ["On the floor", list.filter((specItem) => specItem.place === "floor")],
+    ["In a rack", list.filter((specItem) => specItem.place === "rack")],
+  ].map((group) => {
+    if (!group[1].length) return "";
+    return '<h3>' + group[0] + "</h3>" + group[1].map(libCard).join("");
+  }).join("");
+  let watts = 0;
+  let amps = 0;
+  state.plan.placements.forEach((item) => {
+    const specItem = catalogById(item.catalogId);
+    watts += specItem.watts;
+    amps += specItem.amps;
+  });
+  const power = watts >= 1000 ? (watts / 1000).toFixed(1) + " kW" : watts + " W";
+  return '<aside class="lib"><h2>Device library</h2><p class="fine">Drag a tile. Outside gear lands in the yard. Floor gear lands in the hall. Rack gear mounts in an enclosure.</p><div class="lib-filters">' +
+    filters + "</div>" + groups + '<p class="lib-total"><b>' + state.plan.placements.length + '</b><span>placed</span><b>' +
+    power + "</b><b>" + amps.toFixed(1) + " A</b></p></aside>";
+}
+
+function renderPlanChassis(item) {
+  const blades = planBlades(item.id);
+  const free = freeU(item.id);
+  return '<div class="scene chassis-scene thermal">' + hudHtml() + '<div class="chassis-wrap"><div class="rack-frame" data-plan-host="' +
+    item.id + '" style="transform:rotateX(' + state.floor.chassisPitch + "deg) rotateY(" + state.floor.chassisYaw +
+    "deg) scale(" + state.floor.chassisZoom + ')"><div class="rack-rail"><span>' + esc(item.name) + "</span><b>" + free +
+    'U free</b></div><div class="rack-bay">' + (blades || "") + "</div></div></div><p class=\"legend chassis-hint\">The open bay is the drop target. Drag the frame to turn it.</p></div>";
+}
+
+function itemPoint(item) {
+  const depth = item.d || item.h || 20;
+  return { x: item.x + item.w / 2, y: item.y + depth / 2 };
+}
+
+function outletForDevice(id) {
+  return outlets.find((outlet) => outlet.deviceId === id);
+}
+
+function whipMode(id) {
+  const outlet = outletForDevice(id);
+  if (!outlet) return "live";
+  if (outlet.power === "off") return "open";
+  if (outlet.power === "cycling") return "partial";
+  return "live";
+}
+
+function shelfLive(pod) {
+  if (!pod) return "live";
+  if (pod.id === "pod-a") return whipMode("pshelf");
+  return "live";
+}
+
+function rackEnergized(pod, rack) {
+  const shelf = shelfLive(pod);
+  if (!rack) return shelf;
+  if (rack.kind === "Power") return shelf;
+  if (shelf === "open") return "open";
+  const bound = (rack.servers || []).filter((id) => outletForDevice(id));
+  if (!bound.length) return shelf;
+  const modes = bound.map(whipMode);
+  if (modes.every((mode) => mode === "open")) return "open";
+  if (modes.some((mode) => mode !== "live") || shelf === "partial") return "partial";
+  return "live";
+}
+
+function feedMode(id) {
+  if (!id) return "live";
+  if (id.indexOf("whip-") === 0) {
+    const rackId = id.slice(5);
+    const pod = PODS.find((item) => item.racks.some((rack) => rack.id === rackId));
+    const rack = pod && pod.racks.find((item) => item.id === rackId);
+    return rackEnergized(pod, rack);
+  }
+  if (id.indexOf("bus-") === 0) return shelfLive(podById(id.slice(4)));
+  return "live";
+}
+
+function feedHtml(from, to, mode, id, podId, extraClass) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.max(12, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  const on = state.floor.feedId === id ? " on" : "";
+  const word = mode === "open" ? "De-energized" : (mode === "partial" ? "Partly energized" : "Energized");
+  return '<button type="button" class="feed ' + mode + on + (extraClass ? " " + extraClass : "") + '" data-act="floor-feed" data-feed="' + id + '" data-pod="' +
+    (podId || "") + '" style="--x:' + from.x.toFixed(1) + "px;--y:" + from.y.toFixed(1) + "px;--len:" + len.toFixed(1) +
+    "px;--ang:" + ang.toFixed(1) + 'deg" aria-label="' + word + " feed\"></button>";
+}
+
+function pipeHtml(from, to, kind) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.max(12, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  const id = kind === "return" ? "pipe-ret" : "pipe-sup";
+  const word = kind === "return" ? "Return pipe" : "Supply pipe";
+  return '<button type="button" class="pipe ' + kind + '" data-act="floor-server" data-server="' + id +
+    '" style="--x:' + from.x.toFixed(1) + "px;--y:" + from.y.toFixed(1) + "px;--len:" + len.toFixed(1) +
+    "px;--ang:" + ang.toFixed(1) + 'deg" aria-label="' + word + '"></button>';
+}
+
+function podShelf(pod) {
+  return pod.racks.find((rack) => rack.kind === "Power") || (pod.boxes || []).find((box) => {
+    const entity = entityById(box.id);
+    return entity && entity.kind === "Powershelf";
+  });
+}
+
+function podFeeds(pod) {
+  const shelf = podShelf(pod);
+  const bus = pod.fit && pod.fit.busbar;
+  if (!shelf || !bus) return "";
+  const shelfPt = itemPoint(shelf);
+  let html = feedHtml(itemPoint(bus), shelfPt, shelfLive(pod), "bus-" + pod.id, pod.id);
+  pod.racks.forEach((rack) => {
+    if (rack.id === shelf.id) return;
+    html += feedHtml(shelfPt, itemPoint(rack), rackEnergized(pod, rack), "whip-" + rack.id, pod.id);
+  });
+  (pod.boxes || []).forEach((box) => {
+    if (box.id === shelf.id) return;
+    const entity = entityById(box.id);
+    if (!entity || entity.kind !== "Powershelf") return;
+    html += feedHtml(itemPoint(bus), itemPoint(box), "live", "bus-" + pod.id, pod.id);
+  });
+  return html;
+}
+
+function yardById(id) {
+  const gear = {};
+  YARD.forEach((item) => { gear[item.id] = item; });
+  return gear[id];
+}
+
+function siteFeedHtml() {
+  const grid = itemPoint(yardById("grid-1"));
+  const xfmr = itemPoint(yardById("xfmr-1"));
+  const modulePt = itemPoint(yardById("pwr-mod"));
+  const battery = itemPoint(yardById("batt-1"));
+  const wall = { x: SHELL.x - 2, y: SHELL.y + 96 };
+  let html = feedHtml(grid, xfmr, "live", "grid-xfmr", "", "cable") +
+    feedHtml(xfmr, modulePt, "live", "xfmr-mod", "", "cable") +
+    feedHtml(battery, modulePt, "live", "batt-mod", "", "cable") +
+    feedHtml(modulePt, wall, "live", "mod-hall", "", "cable");
+  if (futureOn()) html += feedHtml(grid, { x: -420, y: 200 }, "live", "grid-future", "", "cable");
+  return html;
+}
+
+function sitePipesHtml() {
+  const trunkS = SHELL.x + SHELL.w + 26;
+  const trunkR = trunkS + 18;
+  const y0 = SHELL.y + 16;
+  const y1 = SHELL.y + SHELL.d - 10;
+  let html = pipeHtml({ x: trunkS, y: y0 }, { x: trunkS, y: y1 }, "supply") +
+    pipeHtml({ x: trunkR, y: y0 }, { x: trunkR, y: y1 }, "return");
+  ["heat-1", "heat-2", "hydro-1"].forEach((id) => {
+    const gear = itemPoint(yardById(id));
+    html += pipeHtml({ x: trunkS, y: gear.y }, { x: gear.x - 4, y: gear.y }, "supply");
+    html += pipeHtml({ x: trunkR, y: gear.y + 12 }, { x: gear.x - 4, y: gear.y + 12 }, "return");
+  });
+  return html;
+}
+
+function rowRecord(pod, rowId) {
+  if (!pod || !pod.fit || !pod.fit.rows) return null;
+  return pod.fit.rows.find((row) => row.id === rowId) || null;
+}
+
+function fitHtml(pod) {
+  const fit = pod.fit;
+  if (!fit) return "";
+  const aisles = (fit.aisles || []).map((band) => '<div class="aisle ' + band.tone + '" data-act="floor-server" data-server="' +
+    band.id + '" style="--x:' + band.x + "px;--y:" + band.y + "px;--w:" + band.w + "px;--h:" + band.h + 'px"><span>' +
+    esc(band.label) + "</span></div>").join("");
+  const containment = fit.containment ? boxHtml(fit.containment, heatBand(entityById(fit.containment.id)), "floor-server", {
+    pod: pod.id, server: fit.containment.id, klass: "containment", cap: "Containment", leds: [],
+  }) : "";
+  const bus = fit.busbar ? boxHtml(fit.busbar, heatBand(entityById(fit.busbar.id)), "floor-server", {
+    pod: pod.id, server: fit.busbar.id, klass: "busbar", cap: "Bus bar", leds: [],
+  }) : "";
+  const rows = (fit.rows || []).map((row) => '<button type="button" class="row-tag" data-act="floor-row" data-pod="' +
+    pod.id + '" data-row="' + row.id + '" style="--y:' + row.y + 'px">' + esc(row.name) + "</button>").join("");
+  return aisles + containment + bus + rows;
 }
 
 function renderHall() {
   const pods = PODS.map((pod) => {
-    const racks = pod.racks.map((rack) => boxHtml(rack, worstBand(rackEntities(rack)), "floor-rack", {
-      pod: pod.id, rack: rack.id, leds: rackEntities(rack),
-    })).join("");
+    const racks = pod.racks.map((rack) => {
+      const facing = (rack.row || "").slice(-1) === "s" ? "face-south" : "face-north";
+      const power = rack.kind === "Power";
+      return boxHtml(rack, worstBand(rackEntities(rack)), "floor-rack", {
+        pod: pod.id, rack: rack.id, leds: rackEntities(rack),
+        klass: (power ? "powershelf " : "") + facing,
+        cap: power ? "50 VDC" : "Front",
+      });
+    }).join("");
     const boxes = (pod.boxes || []).map((box) => {
       const entity = entityById(box.id);
-      return boxHtml(box, heatBand(entity), "floor-server", { pod: pod.id, server: box.id, leds: [] });
+      const shelf = entity && entity.kind === "Powershelf";
+      return boxHtml(box, heatBand(entity), "floor-server", {
+        pod: pod.id, server: box.id, leds: [],
+        klass: shelf ? "powershelf" : "",
+        cap: shelf ? "50 VDC" : "",
+      });
     }).join("");
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
     return '<div class="pod' + current + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + racks + boxes + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod) + racks + boxes + podFeeds(pod) + "</div>";
   }).join("");
-  return '<div class="scene thermal">' + hudHtml() + '<div class="world" style="transform:' + cameraTransform() +
-    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods +
-    '</div><div class="legend"><span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span><span class="legend-hint">Drag to orient · scroll to zoom</span></div></div>';
+  return '<div class="scene thermal">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + futureHallHtml() + planBoxes("floor") +
+    '</div></div><div class="legend"><span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span><span class="legend-hint">' +
+    (state.horizon === "future" ? "Future state. Hall 2 is planned and drawn with the live hall." : "A rack row stands between every cold aisle and hot aisle. Green traces are energized.") +
+    "</span></div></div>";
+}
+
+function renderSite() {
+  const shell = boxHtml(SHELL, "ok", "floor-go", {
+    klass: "building", color: "#d9d2c8", cap: "Compute hall", attrs: ' data-level="hall"', leds: [],
+  });
+  const gear = YARD.map((item) => boxHtml(item, heatBand(entityById(item.id)), "floor-server", {
+    server: item.id, klass: item.klass, cap: item.name, color: item.klass === "heat-yard" ? "#2f4a3c" : (item.klass === "core-block" ? "#1c1c1c" : "#3a342e"), leds: [],
+  })).join("");
+  return '<div class="scene thermal site-scene">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab yard-slab"></div>' + shell + gear + futureYardHtml() + planBoxes("yard") +
+    siteFeedHtml() + sitePipesHtml() + '</div></div><div class="legend"><span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span><span class="legend-hint">Feeder and piping stay outside the hall</span></div></div>';
 }
 
 function renderChassis(rack, pod) {
-  const blades = rackEntities(rack).map((entity) => {
-    const tone = conditionTone(entity);
-    const selected = state.floor.serverId === entity.id ? " selected" : "";
-    const score = Math.round(entityScore(entity));
-    return '<button type="button" class="blade' + selected + '" data-act="floor-server" data-server="' + entity.id +
-      '" data-load-for="' + entity.id + '" style="background:' + (tone.pri ? tone.color : "#e7e2da") + ';color:#1a1a1a"><span>' +
-      (tone.pri ? '<b class="pri-mini">' + tone.pri + " " + esc(tone.word) + "</b> " : "") + esc(entity.name) + '</span><span class="blade-meter"><i data-part="gpu" style="width:' +
-      Math.round(entity.load.gpu || entity.load.power) + '%"></i></span><b data-score>' + score + "%</b></button>";
-  }).join("");
-  return '<div class="scene chassis-scene thermal">' + hudHtml() + '<div class="chassis-wrap"><div class="chassis" style="transform:rotateX(' +
+  const blades = rackEntities(rack).map((entity) => faceplate(entity, state.floor.serverId === entity.id, "floor-server")).join("") + planBlades(rack.id);
+  const sample = rackEntities(rack)[0];
+  const note = sample ? thermalCard(sample) : "";
+  return '<div class="scene chassis-scene thermal">' + hudHtml() + '<div class="chassis-wrap"><div class="chassis cabinet-chassis" data-rack-host="' +
+    rack.id + '" style="transform:rotateX(' +
     state.floor.chassisPitch + "deg) rotateY(" + state.floor.chassisYaw + "deg) scale(" + state.floor.chassisZoom +
     ')"><div class="chassis-top">' +
-    esc(pod.name) + " · " + esc(rack.name) + '</div>' + blades + '</div></div><p class="legend chassis-hint">Drag to turn the rack · scroll to zoom · color is simulated heat</p></div>';
+    esc(pod.name) + " · " + esc(rack.name) + " · cold aisle front · " + freeU(rack.id) + 'U free</div><div class="cabinet in-scene"><div class="cab-rail"></div><div class="cab-bay">' +
+    blades + '</div><div class="cab-rail"></div></div></div></div><div class="legend chassis-hint">Intake on this face. Exhaust is the hot aisle behind the row.' +
+    (state.containment === "cac" ? " Cold aisle is enclosed." : " Hot aisle is enclosed.") + "</div>" +
+    (note ? '<div class="chassis-thermal">' + note + "</div>" : "") + "</div>";
 }
 
 function gaugeRow(entity, key, label) {
@@ -2199,11 +2940,28 @@ function gaugeRow(entity, key, label) {
     value + '%"></span></div><b>' + value + "%</b></div>";
 }
 
+function yardArt(entity) {
+  const placed = YARD.find((gear) => gear.id === entity.id);
+  const klass = placed ? placed.klass : (entity.id === "pipe-ret" ? "pipe-return" : "pipe-supply");
+  const caption = {
+    "grid-yard": "Gantry with three bushings. The lines arrive from the utility grid.",
+    "xfmr-yard": "Tank, radiator fins, and the high-voltage bushings.",
+    "module-yard": "Louvered cabinet. The feeder from the transformer lands here.",
+    "battery-yard": "Cell racks on a skid, cabled to the power module.",
+    "cooler-yard": "Fan deck. This is where the hall heat leaves the site.",
+    "hydro-yard": "Two pumps and a manifold, sitting on the yard pipes.",
+    "pipe-supply": "Cool supply. It runs along the outside of the east wall.",
+    "pipe-return": "Warm return. It runs beside the supply and stays outside the hall.",
+  };
+  return '<div class="yard-sheet ' + klass + '"><div class="yard-art" aria-hidden="true"></div><p class="fine">' +
+    esc(caption[klass] || "") + "</p></div>";
+}
+
 function serverInspector(entity) {
   const band = heatBand(entity);
   const managed = !!deviceById(entity.id);
   const score = Math.round(entityScore(entity));
-  const parts = entity.kind === "Cooling" || entity.kind === "Busway"
+  const parts = isFacility(entity)
     ? gaugeRow(entity, "power", "Load") + gaugeRow(entity, "temp", "Temperature")
     : gaugeRow(entity, "gpu", "GPU") + gaugeRow(entity, "mem", "Memory") + gaugeRow(entity, "power", "Power") + gaugeRow(entity, "temp", "Temperature");
   let action = "";
@@ -2220,13 +2978,134 @@ function serverInspector(entity) {
   } else if (managed) {
     action = "<p class=\"fine\">BMC is still up. ACS serial is the out-of-band wire if this BMC drops.</p>" +
       '<button type="button" class="act" data-act="floor-serial" data-device="' + entity.id + '">Open ACS serial</button>';
-  } else if (entity.kind === "Cooling" || entity.kind === "Busway") {
-    action = "<p class=\"fine\">Facility infrastructure. Simulated from the same BMC-style load, not an ACS serial target.</p>";
+  } else if (entity.kind === "Grid") {
+    action = yardArt(entity) + "<p>The utility grid lands on a gantry outside the shell. One feeder is closed through the transformer and the power module, and it stops at the hall wall.</p>" +
+      '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr">Open the feeder</button>';
+  } else if (entity.kind === "Pipe") {
+    const supply = entity.id === "pipe-sup";
+    action = yardArt(entity) + "<p>" + (supply
+      ? "Supply piping carries cool fluid from the heat rejection and hydro skid to the outside of the shell."
+      : "Return piping carries warm fluid from the shell wall back to the heat rejection. It never crosses the compute floor.") + "</p>";
+  } else if (entity.kind === "Heat rejection") {
+    action = yardArt(entity) + "<p class=\"fine\">Dry cooler outside the hall. Fan decks reject the heat the pipes bring out of the shell.</p>";
+  } else if (entity.kind === "Cooling" && entity.yard) {
+    action = yardArt(entity) + "<p class=\"fine\">Hydro skid. Pumps sit on the yard manifold, on the supply and return pipes.</p>";
+  } else if (entity.kind === "Power module" && entity.yard) {
+    action = yardArt(entity) + "<p class=\"fine\">This stays outside the building. The feeder from the grid is the conductor you can follow to the hall wall.</p>" +
+      '<button type="button" class="act" data-act="floor-go" data-level="hall">Enter the hall</button>';
+  } else if (entity.kind === "Core") {
+    action = "<p class=\"fine\">The OneCore block holds shared interconnect, utility distribution, and controls. Compute halls scale around it.</p>" +
+      '<button type="button" class="act" data-act="floor-go" data-level="hall">Enter the hall</button>';
+  } else if (entity.yard) {
+    action = "<p class=\"fine\">This stays outside the building. The hall is entered separately. ACS-A14 does not open a session here.</p>" +
+      '<button type="button" class="act" data-act="floor-go" data-level="hall">Enter the hall</button>';
+  } else if (entity.kind === "Busway") {
+    const home = PODS.find((item) => item.fit && item.fit.busbar && item.fit.busbar.id === entity.id);
+    action = "<p class=\"fine\">Overhead bus bar along the hot aisle. The trace to the DC shelf is energized while that shelf feed is closed.</p>" +
+      (home ? '<button type="button" class="act" data-act="floor-feed" data-pod="' + home.id + '" data-feed="bus-' + home.id + '">Open the feed</button>' : "");
+  } else if (entity.kind === "Containment") {
+    action = "<p class=\"fine\">Hot aisle containment. The hood closes the exhaust aisle. A rack row stands on each side, between this aisle and the cold aisles.</p>";
+  } else if (entity.kind === "Aisle") {
+    const home = podById(entity.pod);
+    const beside = home && home.fit && home.fit.rows ? home.fit.rows.filter((row) => row.cold === entity.id || row.hot === entity.id) : [];
+    const hotAisle = entity.name.indexOf("Hot") === 0;
+    action = "<p class=\"fine\">" + (hotAisle ? "Exhaust aisle. A rack row stands on each side, so this aisle never touches a cold aisle." : "Supply aisle. The row beside it faces this air.") + "</p>" +
+      beside.map((row) => '<button type="button" class="floor-row" data-act="floor-row" data-pod="' + home.id + '" data-row="' + row.id + '"><span>' +
+        esc(row.name) + "</span><b>Row</b></button>").join("");
+  } else if (entity.kind === "Powershelf") {
+    const home = podById(entity.pod);
+    action = "<p class=\"fine\">50 V DC power shelf in the row. Fed from the overhead bus bar.</p>" +
+      (home ? '<button type="button" class="act" data-act="floor-feed" data-pod="' + home.id + '" data-feed="bus-' + home.id + '">Open the feed</button>' : "");
+  } else if (isFacility(entity)) {
+    action = "<p class=\"fine\">Facility equipment. Simulated load, not an ACS serial target.</p>";
   } else {
     action = "<p class=\"fine\">Outside rack A14. ACS-A14 does not open a serial session here.</p>";
   }
+  const heatNote = !isFacility(entity) && entity.load ? thermalCard(entity) : "";
+  const inside = !isFacility(entity) && entity.load ? deviceParts(entity) : "";
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + " · simulated BMC</p>" + parts + action + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + heatNote + parts + inside + action + "</div>";
+}
+
+function deviceParts(entity) {
+  const parts = [["inlet", "Inlet"], ["exhaust", "Exhaust"], ["bmc", "BMC"], ["feed", "DC feed"]];
+  return '<h3>Inside</h3><div class="part-row">' + parts.map((part) => '<button type="button" class="act" data-act="floor-part" data-server="' +
+    entity.id + '" data-part="' + part[0] + '">' + part[1] + "</button>").join("") + "</div>";
+}
+
+function energWord(mode) {
+  if (mode === "open") return "De-energized";
+  if (mode === "partial") return "Partly energized";
+  return "Energized";
+}
+
+function partPanel(entity) {
+  const part = state.floor.partId || "inlet";
+  const heat = thermalReading(entity);
+  const outlet = outletForDevice(entity.id);
+  const mode = outlet ? whipMode(entity.id) : "live";
+  if (part === "exhaust") {
+    return "<h2>Rear exhaust</h2><p>Exhaust leaves at <b>" + heat.exhaust.toFixed(1) + " °C</b> into the " +
+      (heat.hac ? "contained hot aisle." : "open hall.") + "</p><p class=\"fine\">The rear of this device faces the hot aisle. The row in front of it faces the cold aisle.</p>";
+  }
+  if (part === "bmc") {
+    const down = entity.bmc === "down";
+    const local = deviceById(entity.id) && !entity.serialOnly;
+    return "<h2>BMC</h2><p>" + (down ? "This path is dark. Failover is ACS serial, out of band." : "The manager is up. ACS serial stays the out-of-band wire.") + "</p>" +
+      (local ? '<button type="button" class="act primary" data-act="' + (down ? "floor-serial" : "launch") + '" data-device="' + entity.id +
+        '" data-path="' + (down ? "" : "rm") + '" data-type="' + (down ? "" : "kvm") + '">' + (down ? "Open ACS serial" : "Open BMC console") + "</button>" : '<p class="fine">Outside ACS-A14. The reading is simulated.</p>');
+  }
+  if (part === "feed") {
+    const where = outlet ? " Outlet " + outlet.n + " is " + outlet.power + "." : " This device follows the row shelf.";
+    return "<h2>DC feed</h2><p><b>" + energWord(mode) + ".</b>" + esc(where) + " The trace on the floor uses this same reading.</p>" +
+      (outlet ? '<button type="button" class="act" data-act="nav" data-view="control">Open control</button>' : "");
+  }
+  const mark = heat.pri ? '<b class="pri-mark pri-' + heat.pri + '">' + heat.pri + "</b> " : "";
+  return "<h2>Rack inlet</h2><p>" + mark + "<b>" + heat.inlet.toFixed(1) + " °C</b>. " + esc(heat.envelope) + ".</p>" +
+    (heat.recirculation ? "<p>This U is high in the rack. Cold-aisle containment is recirculating supply air here.</p>" : "") +
+    '<p class="fine">Supply is 20.5 °C at the cold-aisle face. An inlet past the study band raises an alarm on its own.</p>';
+}
+
+function feedPanel() {
+  const id = state.floor.feedId;
+  const mode = feedMode(id);
+  let copy = "This segment is " + energWord(mode).toLowerCase() + ". The state is read from the gear on the path.";
+  let next = "";
+  if (id.indexOf("whip-") === 0) {
+    const rackId = id.slice(5);
+    const pod = PODS.find((item) => item.racks.some((rack) => rack.id === rackId));
+    const rack = pod && pod.racks.find((item) => item.id === rackId);
+    copy = (rack ? rack.name : "This rack") + " is fed from the DC shelf. " + copy;
+    if (pod && rack) {
+      next = '<button type="button" class="act" data-act="floor-rack" data-pod="' + pod.id + '" data-rack="' + rack.id + '">Open ' + esc(rack.name) + "</button>";
+    }
+  } else if (id.indexOf("bus-") === 0) {
+    copy = "Bus bar to the DC shelf. " + copy + (mode === "open" ? " The shelf outlet is open, so the row behind it is dark." : " The shelf outlet is closed.");
+  } else if (id === "grid-xfmr") {
+    copy = "Utility feeder from the grid gantry to the MV transformer. Energized. The conductor stays in the yard.";
+    next = '<button type="button" class="act" data-act="floor-server" data-server="grid-1">Open the grid</button>';
+  } else if (id === "grid-future") {
+    copy = "Second feeder to the planned power module. It is drawn with the future state, beside the feeder that is closed today.";
+  } else if (id === "xfmr-mod") {
+    copy = "Medium-voltage transformer to the power module. Energized.";
+  } else if (id === "batt-mod") {
+    copy = "Battery skid onto the power module. Energized for ride-through.";
+  } else if (id === "mod-hall") {
+    copy = "Power module to the outside of the compute hall. Energized. The feeder ends at the shell.";
+  }
+  return "<h2>" + energWord(mode) + "</h2><p>" + esc(copy) + "</p>" + next;
+}
+
+function rowPanel(pod, row) {
+  const cold = entityById(row.cold);
+  const hot = entityById(row.hot);
+  const racks = pod.racks.filter((rack) => rack.row === row.id);
+  return "<h2>" + esc(row.name) + "</h2><p class=\"fine\">This row stands between " + esc(cold ? cold.name : "the cold aisle") +
+    " and " + esc(hot ? hot.name : "the hot aisle") + ". Fronts face the cold aisle. Backs exhaust into the hot aisle.</p><h3>Racks</h3>" +
+    racks.map((rack) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' + pod.id + '" data-rack="' + rack.id + '">' +
+      ledDot(rackEntities(rack)) + "<span>" + esc(rack.name) + "</span><b>" + energWord(rackEnergized(pod, rack)) + "</b></button>").join("") +
+    '<h3>Aisles</h3><button type="button" class="floor-row" data-act="floor-server" data-server="' + row.cold + '"><span>Cold aisle</span><b>Supply</b></button>' +
+    '<button type="button" class="floor-row" data-act="floor-server" data-server="' + row.hot + '"><span>Hot aisle</span><b>Exhaust</b></button>';
 }
 
 function ledDot(entityOrList) {
@@ -2244,49 +3123,128 @@ function renderInspector() {
   const level = state.floor.level;
   const pod = podById(state.floor.podId);
   const rack = rackById(pod, state.floor.rackId);
-  const crumbs = ['<button type="button" data-act="floor-go" data-level="hall">Hall</button>'];
-  if (level !== "hall" && pod) {
+  const row = rowRecord(pod, state.floor.rowId);
+  const crumbs = ['<button type="button" data-act="floor-go" data-level="site">Outside</button>'];
+  if (level !== "site" && !(level === "feed" && !pod)) crumbs.push('<button type="button" data-act="floor-go" data-level="hall">Hall</button>');
+  if (pod && ["pod", "row", "rack", "server", "part", "feed"].indexOf(level) >= 0) {
     crumbs.push('<button type="button" data-act="floor-go" data-level="pod">' + esc(pod.name) + "</button>");
   }
-  if ((level === "rack" || level === "server") && rack) {
+  if (row && ["row", "rack", "server", "part"].indexOf(level) >= 0) {
+    crumbs.push('<button type="button" data-act="floor-go" data-level="row">' + esc(row.name) + "</button>");
+  }
+  if (rack && ["rack", "server", "part"].indexOf(level) >= 0) {
     crumbs.push('<button type="button" data-act="floor-go" data-level="rack">' + esc(rack.name) + "</button>");
   }
+  if ((level === "server" || level === "part") && state.floor.serverId && entityById(state.floor.serverId)) {
+    const current = entityById(state.floor.serverId);
+    crumbs.push('<button type="button" data-act="floor-server" data-server="' + current.id + '">' + esc(current.name) + "</button>");
+  }
+  if (level === "part") crumbs.push("<span>" + esc(state.floor.partId || "inlet") + "</span>");
+  if (level === "feed") crumbs.push("<span>Feed</span>");
+  const planOpen = placementById(state.floor.rackId);
+  if ((level === "rack" || level === "server") && planOpen && !rack) {
+    crumbs.push('<button type="button" data-act="plan-open" data-plan="' + planOpen.id + '">' + esc(planOpen.name) + "</button>");
+  }
   let body = "";
-  if (level === "server") {
+  const sheet = planSheet();
+  if (level === "site" && state.floor.serverId && entityById(state.floor.serverId)) {
+    body = serverInspector(entityById(state.floor.serverId));
+  } else if (level === "site") {
+    body = "<h2>Outside the building</h2><p class=\"fine\">The grid feeder, transformer, and power module stay west of the shell. Supply and return pipes stay east of it. Neither run enters the compute hall.</p>" +
+      '<button type="button" class="act primary" data-act="floor-go" data-level="hall">Enter the compute hall</button><h3>Yard</h3>' +
+      infra.filter((item) => item.yard).map(rowButton).join("");
+  } else if (level === "part") {
+    const entity = entityById(state.floor.serverId);
+    body = entity ? partPanel(entity) : '<p class="fine">Select a device.</p>';
+  } else if (level === "feed") {
+    body = feedPanel();
+  } else if (level === "row" && pod && row) {
+    body = rowPanel(pod, row);
+  } else if (level === "server") {
     const entity = entityById(state.floor.serverId);
     body = entity ? serverInspector(entity) : '<p class="fine">Select a server.</p>';
   } else if (level === "rack" && rack) {
     body = "<h2>" + esc(rack.name) + "</h2><p class=\"fine\">" + esc(pod.name) + " · " + esc(rack.kind) +
       "</p>" + rackEntities(rack).map(rowButton).join("");
+  } else if (level === "rack" && planOpen && !rack) {
+    const gear = state.plan.placements.filter((item) => item.host === planOpen.id);
+    body = "<h2>" + esc(planOpen.name) + "</h2><p class=\"fine\">" + freeU(planOpen.id) + "U free. Drop servers, switches, and PDUs into the enclosure.</p>" +
+      (gear.map((item) => {
+        const specItem = catalogById(item.catalogId);
+        return '<button type="button" class="floor-row" data-act="plan-select" data-plan="' + item.id + '"><span>' +
+          esc(item.name) + "</span><b>" + esc(specItem.powerLabel) + "</b></button>";
+      }).join("") || '<p class="fine">Nothing in this enclosure yet.</p>');
   } else if (level === "pod" && pod) {
     const servers = pod.racks.reduce((all, item) => all.concat(rackEntities(item)), []);
-    body = "<h2>" + esc(pod.name) + "</h2><p class=\"fine\">" + (pod.managed ? "ACS-A14 serves this pod's rack." : "Neighbor pod. Capacity is simulated.") +
-      "</p><h3>Racks</h3>" + pod.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' +
+    body = "<h2>" + esc(pod.name) + "</h2><p class=\"fine\">" + (pod.managed ? "ACS-A14 serves rack A14 in the north row." : "Neighbor pod. Capacity is simulated.") +
+      " A rack row stands between every cold aisle and hot aisle.</p><h3>Rows</h3>" +
+      (pod.fit.rows || []).map((item) => '<button type="button" class="floor-row" data-act="floor-row" data-pod="' + pod.id + '" data-row="' + item.id + '"><span>' +
+        esc(item.name) + "</span><b>Between aisles</b></button>").join("") +
+      "<h3>Racks</h3>" + pod.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' +
       pod.id + '" data-rack="' + item.id + '">' + ledDot(rackEntities(item)) + '<span>' + esc(item.name) +
       "</span><b>" + rackEntities(item).length + "</b></button>").join("") +
       "<h3>Infrastructure</h3>" + infra.filter((item) => item.pod === pod.id).map(rowButton).join("") +
       "<h3>Nearing capacity</h3>" + (servers.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical").map(rowButton).join("") || '<p class="fine">None right now.</p>');
   } else {
     const managed = devices.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical" || heatBand(entity) === "failover");
-    body = "<h2>AI Hall 1</h2><p class=\"fine\">Three AI pods. Rack A14 is on ACS-A14. A dark BMC fails over to ACS serial.</p>" +
+    body = "<h2>AI Hall 1</h2><p class=\"fine\">Each pod is cold aisle, rack row, hot aisle, rack row, cold aisle. Green traces are energized feeds. Rack A14 fails over to ACS serial.</p>" +
       PODS.map((item) => {
         const servers = item.racks.reduce((all, rack) => all.concat(rackEntities(rack)), []);
         return '<button type="button" class="floor-row" data-act="floor-pod" data-pod="' + item.id + '">' +
           ledDot(servers) + '<span>' + esc(item.name) + "</span><b>" + servers.length + " servers</b></button>";
       }).join("") +
-      "<h3>Infrastructure</h3>" + infra.map(rowButton).join("") +
+      "<h3>Infrastructure</h3>" + infra.filter((item) => !item.yard && item.kind !== "Aisle").map(rowButton).join("") +
       "<h3>Watch list</h3>" + (managed.map(rowButton).join("") || '<p class="fine">All rack A14 servers are nominal.</p>');
   }
-  return '<aside class="inspector"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + body + "</aside>";
+  return '<aside class="inspector"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
+}
+
+function planSheet() {
+  const placed = placementById(state.plan.selected);
+  if (placed) {
+    const specItem = catalogById(placed.catalogId);
+    const host = placed.host ? (placementById(placed.host) || findRack(placed.host)) : null;
+    const where = placed.place === "yard" ? "Outside the building." : (placed.place === "floor" ? "On the hall floor." : "Inside " + (host && host.name ? host.name : placed.host) + ".");
+    let actions = '<div class="plan-actions"><button type="button" class="act" data-act="plan-remove" data-plan="' + placed.id + '">Remove</button>';
+    if (specItem.uCapacity) {
+      actions += '<button type="button" class="act primary" data-act="plan-open" data-plan="' + placed.id + '">Open enclosure</button>';
+    }
+    if (placed.place === "floor" || placed.place === "yard") {
+      actions += '<button type="button" class="act" data-act="plan-nudge" data-plan="' + placed.id + '" data-dir="left">Left</button>' +
+        '<button type="button" class="act" data-act="plan-nudge" data-plan="' + placed.id + '" data-dir="right">Right</button>' +
+        '<button type="button" class="act" data-act="plan-nudge" data-plan="' + placed.id + '" data-dir="up">Up</button>' +
+        '<button type="button" class="act" data-act="plan-nudge" data-plan="' + placed.id + '" data-dir="down">Down</button>';
+    }
+    actions += "</div>";
+    const space = specItem.uCapacity ? '<p class="fine">' + freeU(placed.id) + "U free of " + specItem.uCapacity + "U.</p>" : "";
+    return faceSheet(specItem, placed.name, "<p class=\"fine\">" + esc(where) + "</p>" + space + actions);
+  }
+  if (state.plan.preview) {
+    const specItem = catalogById(state.plan.preview);
+    if (!specItem) return "";
+    const hint = specItem.place === "yard" ? "Drag this card onto the yard, outside the building." : (specItem.place === "floor" ? "Drag this card onto the hall." : "Drag this card onto a rack, or open an enclosure and drop it there.");
+    return faceSheet(specItem, specItem.name, '<p class="fine">' + hint + "</p>");
+  }
+  return "";
 }
 
 function renderFloor() {
-  const chassis = (state.floor.level === "rack" || state.floor.level === "server") && state.floor.rackId;
+  const planOpen = placementById(state.floor.rackId);
+  const deep = state.floor.level === "rack" || state.floor.level === "server" || state.floor.level === "part";
+  const openedPlan = deep && planOpen && catalogById(planOpen.catalogId).uCapacity;
+  const chassis = !openedPlan && deep && state.floor.rackId;
   const pod = podById(state.floor.podId);
   const rack = rackById(pod, state.floor.rackId);
-  const scene = chassis && rack ? renderChassis(rack, pod) : renderHall();
-  return '<div class="page-head"><div class="top"><div><h1>Level 1 · AI Hall</h1><p class="sub">acs.watch logs in on every ACS serial port. An alarm is a rejected login, or a successful login that read a condition needing a response. Gray equipment is nominal.</p></div></div>' +
-    pills() + '</div><div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div>" + watchTable();
+  const onSite = state.floor.level === "site" || (state.floor.level === "feed" && !pod);
+  const scene = onSite ? renderSite() : (openedPlan ? renderPlanChassis(planOpen) : (chassis && rack ? renderChassis(rack, pod) : renderHall()));
+  const outside = state.floor.level === "site";
+  const future = state.horizon === "future";
+  const title = future ? (outside ? "Future · outside the building" : "Future · compute halls") : (outside ? "Outside the building" : "Level 1 · AI Hall");
+  const sub = future
+    ? "Future state of the whole system. Live control is unchanged. Hall 2, the second feeder, and restored BMC paths are shown as planned."
+    : (outside ? "Follow the feeder from the grid to the hall wall. Follow the pipes from the coolers back to the shell. Enter the hall for the rows." : "Drag from the device library. Floor gear lands on the hall. Servers, switches, and PDUs land in a rack or enclosure.");
+  return '<div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div></div>" +
+    pills() + '</div><div class="plan-layout">' + renderLibrary() + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable();
 }
 
 function watchResult(login) {
@@ -2304,11 +3262,198 @@ function watchTable() {
       (watch.pri ? "P" + watch.pri : "Clear") + "</td><td>" + esc(watch.text) + "</td></tr>";
   }).join("");
   return '<section class="panel watch-panel"><div class="panel-head"><h2>Serial watch</h2><p class="fine">Identity acs.watch. One automatic login per ACS port. The banner above is this table, kept to conditions that need a response.</p></div>' +
-    '<div class="table-wrap"><table><thead><tr><th>Last login</th><th>Port</th><th>Device</th><th>Result</th><th>Alarm</th><th>What the console read</th></tr></thead><tbody>' +
+    '<p class="fine">Inlet temperature and an open outlet raise their own alarms. Those are determined from the reading, alongside this table.</p><div class="table-wrap"><table><thead><tr><th>Last login</th><th>Port</th><th>Device</th><th>Result</th><th>Alarm</th><th>What the console read</th></tr></thead><tbody>' +
     rows + "</tbody></table></div></section>";
 }
 
+function futureOn() {
+  return state.horizon === "future";
+}
+
+function managedDevices() {
+  return devices.filter((d) => !d.serialOnly);
+}
+
+function shownBmc(d) {
+  if (!d) return "up";
+  if (futureOn() && d.bmc === "down") return "up";
+  return d.bmc || "up";
+}
+
+function shownLoad(d) {
+  const load = (d && d.load) || { gpu: 0, mem: 0, power: 0, temp: 46 };
+  if (!futureOn()) return load;
+  return {
+    gpu: Math.min(62, load.gpu || 40),
+    mem: Math.min(60, load.mem || 40),
+    power: Math.min(64, load.power || 40),
+    temp: Math.min(58, Math.max(42, (load.temp || 50) - 6)),
+  };
+}
+
+function manageDevice() {
+  return deviceById(state.manage.device) || managedDevices()[0];
+}
+
+function futureHallHtml() {
+  if (!futureOn()) return "";
+  return '<div class="pod future" data-act="horizon-focus" style="--x:250px;--y:78px;--w:250px;--h:180px"><i class="pod-plate"></i><span class="pod-letter">2</span>' +
+    '<div class="aisle cold" style="--x:12px;--y:8px;--w:220px;--h:18px"><span>Cold aisle</span></div>' +
+    '<span class="row-slot" style="--y:32px">North row</span>' +
+    '<div class="aisle hot" style="--x:12px;--y:72px;--w:220px;--h:22px"><span>Hot aisle</span></div>' +
+    '<span class="row-slot" style="--y:104px">South row</span>' +
+    '<div class="aisle cold" style="--x:12px;--y:148px;--w:220px;--h:18px"><span>Cold aisle</span></div>' +
+    '<span class="future-tag">Hall 2 · planned</span></div>';
+}
+
+function futureYardHtml() {
+  if (!futureOn()) return "";
+  const pieces = [
+    { x: -360, y: 180, w: 100, d: 64, h: 52, cap: "Power module 2" },
+    { x: 400, y: 210, w: 150, d: 56, h: 38, cap: "Heat rejection 2" },
+  ];
+  return pieces.map((item) => boxHtml(item, "ok", "horizon-focus", {
+    klass: "future-gear", cap: item.cap, leds: [], color: "#8a9a84",
+  })).join("");
+}
+
+function stackNodes() {
+  const d = manageDevice();
+  const load = shownLoad(d);
+  const bmc = shownBmc(d);
+  const hot = load.temp >= 75 || load.gpu >= 90;
+  return [
+    { id: "grid", name: "Grid", detail: futureOn() ? "2 feeders · 4.8 MW" : "1 feeder · 2.4 MW" },
+    { id: "mv", name: "Substation", detail: "Medium voltage" },
+    { id: "xfmr", name: "Transformer", detail: "MV transformer" },
+    { id: "module", name: "Power module", detail: futureOn() ? "Live module + planned skid" : "Power module" },
+    { id: "battery", name: "Battery", detail: "Ride-through skid" },
+    { id: "bus", name: "Bus bar", detail: "Overhead PowerBar" },
+    { id: "shelf", name: "DC shelf", detail: "50 VDC" },
+    { id: "rack", name: "Rack", detail: "A14" },
+    { id: "tray", name: "Tray", detail: d.name },
+    { id: "bmc", name: "BMC", detail: bmc === "down" ? "Path dark" : "Manager up", pri: bmc === "down" ? 1 : 0 },
+    { id: "chip", name: "Chip", detail: hot ? "GPU high" : "GPU", pri: hot ? 2 : 0 },
+  ];
+}
+
+function chainHtml() {
+  return '<div class="chain">' + stackNodes().map((node, index) => {
+    const on = state.manage.layer === node.id ? " on" : "";
+    const mark = node.pri ? '<b class="pri-mark pri-' + node.pri + '">' + node.pri + "</b>" : "";
+    const arrow = index ? '<i aria-hidden="true">→</i>' : "";
+    return arrow + '<button type="button" class="chain-node' + on + '" data-act="manage-layer" data-layer="' + node.id + '">' +
+      mark + "<strong>" + esc(node.name) + "</strong><small>" + esc(node.detail) + "</small></button>";
+  }).join("") + "</div>";
+}
+
+function horizonHtml() {
+  return '<div class="horizon" role="group" aria-label="System horizon"><button type="button" data-act="horizon" data-horizon="now"' +
+    (futureOn() ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' +
+    (futureOn() ? ' aria-pressed="true"' : "") + ">Future</button></div>";
+}
+
+function sensorCell(label, value) {
+  return '<div class="sensor"><b>' + esc(value) + "</b><span>" + esc(label) + "</span></div>";
+}
+
+function bmcPanel(d) {
+  const live = d.bmc;
+  const shown = shownBmc(d);
+  const load = shownLoad(d);
+  const outlet = outletByN(d.outlet);
+  const locked = state.user.role === "ReadOnly";
+  const power = outlet && outlet.power === "off" ? "Off" : "On";
+  const firmware = futureOn() ? "2.4.1" : "1.8.4";
+  const note = futureOn()
+    ? "<p class=\"fine\">Future reading. Live control still uses the BMC that is installed now." +
+      (live === "down" ? " Today this path is dark and ACS serial is the out-of-band manager." : "") + "</p>"
+    : (live === "down"
+      ? "<p>BMC path is dark. Out-of-band management is ACS serial. RM1048 does not take this failover.</p>"
+      : "<p class=\"fine\">BMC is up. RM1048 is the in-band manager. ACS serial stays the out-of-band wire.</p>");
+  const openLive = live === "down"
+    ? '<button type="button" class="act primary" data-act="floor-serial" data-device="' + d.id + '">Open ACS serial</button>'
+    : '<button type="button" class="act primary" data-act="launch" data-device="' + d.id + '" data-path="rm" data-type="kvm">Open BMC console</button>' +
+      '<button type="button" class="act" data-act="launch" data-device="' + d.id + '" data-path="acs" data-type="serial" data-medium="rs232">Open ACS serial</button>';
+  const cycle = d.outlet
+    ? '<button type="button" class="act" data-act="outlet" data-outlet="' + d.outlet + '" data-op="cycle" data-source="manage"' +
+      (locked ? " disabled" : "") + ">Cycle outlet " + d.outlet + "</button>"
+    : "";
+  return note + '<div class="sensor-row">' +
+    sensorCell("Manager", shown === "down" ? "Dark" : "Up") +
+    sensorCell("Firmware", firmware) +
+    sensorCell("Power", power) +
+    sensorCell("Inlet", Math.round(load.temp - 8) + " °C") +
+    sensorCell("GPU", Math.round(load.temp) + " °C") +
+    sensorCell("Tray power", Math.round(load.power) + "%") +
+    sensorCell("Fans", Math.round(40 + load.power * 0.4) + "%") +
+    sensorCell("Redfish", d.redfishId || "—") +
+    "</div><div class=\"actions\">" + openLive + cycle + "</div>";
+}
+
+function chipPanel(d) {
+  const load = shownLoad(d);
+  if (d.kind !== "GPU tray") {
+    return "<p class=\"fine\">" + esc(d.name) + " has no GPU package. The chip layer is the accelerator on a GPU tray.</p>";
+  }
+  const dies = [0, 1, 2, 3, 4, 5, 6, 7].map((index) => {
+    const temp = Math.round(load.temp + ((index % 3) - 1) * 2);
+    const watts = Math.round(90 + load.power * 1.4 + index);
+    return '<div class="die"><b>GPU ' + (index + 1) + "</b><span>" + temp + " °C</span><span>" + watts + " W</span></div>";
+  }).join("");
+  return "<p class=\"fine\">Eight GPUs on " + esc(d.name) + ". Package power follows the tray BMC sensors.</p><div class=\"die-row\">" + dies + "</div>";
+}
+
+function layerCopy(id, d) {
+  const future = futureOn();
+  if (id === "grid") return "<p>Utility feed into the OneCore yard.</p><p class=\"fine\">" + (future ? "A second feeder is reserved. Nameplate rises from 2.4 MW to 4.8 MW." : "One feeder is in service at 2.4 MW.") + "</p>";
+  if (id === "mv") return "<p>Medium-voltage substation between the grid and the transformer.</p><p class=\"fine\">Protection and metering sit here, before the power module.</p>";
+  if (id === "xfmr") return "<p>MV transformer in the yard, ahead of the power module.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="xfmr-1">Show it outside</button>';
+  if (id === "module") return "<p>Power module rectifies and holds the hall.</p><p class=\"fine\">" + (future ? "A second module is planned beside the live skid." : "One module is installed.") + "</p>" + '<button type="button" class="act" data-act="floor-server" data-server="pwr-mod">Show it outside</button>';
+  if (id === "battery") return "<p>Battery skid rides through a utility dip. It does not replace the BMC path.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="batt-1">Show it outside</button>';
+  if (id === "bus") return "<p>Overhead bus bar along the hot aisle. It feeds the 50 V DC shelves.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="bus-a">Show bus bar A</button>';
+  if (id === "shelf") return "<p>DC power shelf in rack A14. 50 V to the trays.</p>" + '<button type="button" class="act" data-act="select" data-device="pshelf">Open the shelf</button>';
+  if (id === "rack") return "<p>Rack A14 is the ACS domain. One ACS, 48 serial ports.</p>" + '<button type="button" class="act" data-act="floor-rack" data-pod="pod-a" data-rack="A14">Open the rack</button>';
+  if (id === "tray") return "<p>" + esc(d.name) + " · " + esc(d.kind) + " · U" + d.u + " · " + esc(d.tty) + ".</p>" + '<button type="button" class="act" data-act="select" data-device="' + d.id + '">Open on the rack</button>';
+  if (id === "bmc") return bmcPanel(d);
+  if (id === "chip") return chipPanel(d);
+  return "";
+}
+
+function futureBrief() {
+  const list = managedDevices();
+  const dark = list.filter((d) => d.bmc === "down").length;
+  const placed = state.plan.placements.length;
+  const rows = [
+    ["Grid", "2.4 MW · 1 feeder", "4.8 MW · 2 feeders"],
+    ["Halls", "1 compute hall", "2 halls"],
+    ["BMC paths", dark ? dark + " dark" : "All up", "All up"],
+    ["Library plan", placed + " placed", placed ? placed + " built" : "None waiting"],
+  ];
+  const changes = ["Hall 2 is added, with a cold aisle, a contained hot aisle, and a bus bar."];
+  if (dark) changes.push("Dark BMC paths are restored. ACS serial remains the out-of-band wire.");
+  changes.push("A second feeder, power module, and heat-rejection skid land in the yard.");
+  if (placed) changes.push(placed + " library " + (placed === 1 ? "piece is" : "pieces are") + " treated as built.");
+  return '<aside class="future-card"><h2>' + (futureOn() ? "Future state" : "Now") + '</h2><p class="fine">The whole system, grid to chip. Switching horizon does not change live power or sessions.</p><table><tbody>' +
+    rows.map((row) => "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td><td>" + esc(row[2]) + "</td></tr>").join("") +
+    "</tbody></table><h3>What the future adds</h3><ul>" + changes.map((line) => "<li>" + esc(line) + "</li>").join("") + "</ul>" +
+    '<button type="button" class="act" data-act="nav" data-view="floor">Show this on the floor</button></aside>';
+}
+
+function renderManage() {
+  const d = manageDevice();
+  const picker = managedDevices().map((item) => '<button type="button" data-act="manage-device" data-device="' + item.id + '"' +
+    (item.id === d.id ? ' aria-pressed="true"' : "") + ">" + esc(item.name) + "</button>").join("");
+  const layer = stackNodes().find((node) => node.id === state.manage.layer) || stackNodes()[0];
+  return '<div class="page-head"><div class="top"><div><h1>Data center management</h1><p class="sub">Grid to chip, including the BMC. Now is the live system. Future is the planned state of the whole site.</p></div></div>' +
+    pills() + "</div>" + horizonHtml() + chainHtml() + '<div class="manage-grid"><section class="panel"><div class="panel-head"><h2>' +
+    esc(layer.name) + "</h2><p class=\"fine\">" + esc(layer.detail) + "</p></div>" +
+    (state.manage.layer === "bmc" || state.manage.layer === "chip" || state.manage.layer === "tray" ? '<div class="device-pick">' + picker + "</div>" : "") +
+    layerCopy(state.manage.layer, d) + "</section>" + futureBrief() + "</div>";
+}
+
 function viewHtml() {
+  if (state.view === "manage") return renderManage();
   if (state.view === "floor") return renderFloor();
   if (state.view === "map") return renderMap();
   if (state.view === "control") return renderControl();
@@ -2417,6 +3562,11 @@ function onClick(event) {
   }
   if (act === "signout") signOut();
   else if (act === "nav") go(el.dataset.view);
+  else if (act === "horizon") { state.horizon = el.dataset.horizon === "future" ? "future" : "now"; render(); }
+  else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
+  else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); }
+  else if (act === "manage-layer") { state.manage.layer = el.dataset.layer || "bmc"; render(); }
+  else if (act === "manage-device") { state.manage.device = el.dataset.device; state.selected = el.dataset.device; render(); }
   else if (act === "select") selectDevice(el.dataset.device);
   else if (act === "launch") {
     const medium = el.dataset.medium || (el.dataset.type === "serial" && el.dataset.path === "acs" ? "rs232" : "");
@@ -2432,6 +3582,9 @@ function onClick(event) {
   else if (act === "lab-close") { state.labOpen = false; render(); }
   else if (act === "bmc-toggle") toggleBmc(el.dataset.device);
   else if (act === "floor-pod") openPod(el.dataset.pod);
+  else if (act === "floor-row") openRow(el.dataset.pod, el.dataset.row);
+  else if (act === "floor-feed") openFeed(el.dataset.pod, el.dataset.feed);
+  else if (act === "floor-part") openPart(el.dataset.server, el.dataset.part);
   else if (act === "floor-rack") openRack(el.dataset.pod, el.dataset.rack);
   else if (act === "floor-server") openFloorServer(el.dataset.server);
   else if (act === "floor-go") goFloor(el.dataset.level);
@@ -2451,6 +3604,20 @@ function onClick(event) {
   else if (act === "floor-zoom") zoomFloor(el.dataset.dir);
   else if (act === "alarm-ack") ackAlarm(el.dataset.alarm);
   else if (act === "alarm-go") goAlarm(el.dataset.alarm);
+  else if (act === "plan-maker") { state.plan.maker = el.dataset.maker; render(); }
+  else if (act === "plan-preview") {
+    state.plan.preview = el.dataset.catalog;
+    state.plan.selected = "";
+    render();
+  }
+  else if (act === "plan-select") {
+    state.plan.selected = el.dataset.plan;
+    state.plan.preview = "";
+    render();
+  }
+  else if (act === "plan-open") openPlan(el.dataset.plan);
+  else if (act === "plan-remove") removePlan(el.dataset.plan);
+  else if (act === "plan-nudge") nudgePlan(el.dataset.plan, el.dataset.dir);
   else if (act === "rm-toggle") toggleRm();
   else if (act === "leak-toggle") toggleLeak();
   else if (act === "maint-toggle") toggleMaint();
@@ -2556,6 +3723,187 @@ window.AccessDemo = {
   },
 };
 
+function scenePoint(event) {
+  const scene = event.target.closest(".scene");
+  const rect = scene.getBoundingClientRect();
+  const nx = (event.clientX - rect.left) / rect.width - 0.5;
+  const ny = (event.clientY - rect.top) / rect.height - 0.5;
+  return {
+    x: clamp(Math.round((nx * 860) / 24) * 24, -480, 460),
+    y: clamp(Math.round((ny * 520) / 24) * 24, -300, 280),
+  };
+}
+
+function dropTarget(node) {
+  const token = dragToken;
+  const specItem = token.indexOf("new:") === 0 ? catalogById(token.slice(4)) : null;
+  const moving = token.indexOf("move:") === 0 ? placementById(token.slice(5)) : null;
+  const place = specItem ? specItem.place : (moving ? moving.place : "");
+  const scene = node.closest(".scene");
+  const planHost = node.closest("[data-plan-host]");
+  const rackHost = node.closest("[data-rack-host]");
+  const rackBox = node.closest(".rackbox");
+  if (place === "yard") {
+    if (!scene || !scene.classList.contains("site-scene")) return { ok: false, el: scene };
+    return { ok: true, el: scene, kind: "floor" };
+  }
+  if (place === "floor") {
+    if (!scene || scene.classList.contains("chassis-scene") || scene.classList.contains("site-scene")) return { ok: false, el: scene };
+    return { ok: true, el: scene, kind: "floor" };
+  }
+  if (place !== "rack") return { ok: false, el: scene };
+  if (planHost) return { ok: true, el: planHost, kind: "rack", host: planHost.getAttribute("data-plan-host") };
+  if (rackHost) return { ok: true, el: rackHost, kind: "rack", host: rackHost.getAttribute("data-rack-host") };
+  if (rackBox && rackBox.dataset.plan) {
+    const placed = placementById(rackBox.dataset.plan);
+    if (placed && catalogById(placed.catalogId).uCapacity) return { ok: true, el: rackBox, kind: "rack", host: placed.id };
+  }
+  if (rackBox && rackBox.dataset.rack) return { ok: true, el: rackBox, kind: "rack", host: rackBox.dataset.rack };
+  return { ok: false, el: scene };
+}
+
+function placeCatalog(specItem, host, point) {
+  if (specItem.place === "rack") {
+    const need = specItem.u || 0;
+    if (freeU(host) < need) {
+      state.toast = specItem.name + " needs " + need + "U. " + Math.max(0, freeU(host)) + "U is free there.";
+      render();
+      return;
+    }
+  }
+  const count = state.plan.placements.filter((item) => item.catalogId === specItem.id).length + 1;
+  const item = {
+    id: "plan-" + state.plan.seq,
+    catalogId: specItem.id,
+    name: specItem.name + " " + count,
+    place: specItem.place,
+    x: point ? point.x : 0,
+    y: point ? point.y : 0,
+    host: host || "",
+  };
+  state.plan.seq += 1;
+  state.plan.placements.push(item);
+  state.plan.selected = item.id;
+  state.plan.preview = "";
+  state.toast = item.name + " placed. " + specItem.powerLabel + " · " + specItem.ampLabel + ".";
+  if (specItem.place === "rack") {
+    const podId = podForRack(host);
+    state.view = "floor";
+    state.floor.level = "rack";
+    state.floor.rackId = host;
+    state.floor.serverId = "";
+    if (podId) state.floor.podId = podId;
+  }
+  render();
+}
+
+function podForRack(rackId) {
+  let found = "";
+  PODS.forEach((pod) => {
+    if (pod.racks.some((rack) => rack.id === rackId)) found = pod.id;
+  });
+  return found;
+}
+
+function openPlan(id) {
+  const item = placementById(id);
+  if (!item) return;
+  state.view = "floor";
+  state.floor.level = "rack";
+  state.floor.rackId = id;
+  state.floor.serverId = "";
+  state.plan.selected = id;
+  render();
+}
+
+function removePlan(id) {
+  state.plan.placements = state.plan.placements.filter((item) => item.id !== id && item.host !== id);
+  if (state.floor.rackId === id) {
+    state.floor.level = "hall";
+    state.floor.rackId = "A14";
+  }
+  if (state.plan.selected === id) state.plan.selected = "";
+  state.toast = "Removed from the plan.";
+  render();
+}
+
+function nudgePlan(id, dir) {
+  const item = placementById(id);
+  if (!item || (item.place !== "floor" && item.place !== "yard")) return;
+  if (dir === "left") item.x -= 24;
+  if (dir === "right") item.x += 24;
+  if (dir === "up") item.y -= 24;
+  if (dir === "down") item.y += 24;
+  item.x = clamp(item.x, -480, 460);
+  item.y = clamp(item.y, -300, 280);
+  render();
+}
+
+function onDragStart(event) {
+  const card = event.target.closest("[data-catalog], .planned");
+  if (!card) return;
+  dragToken = card.dataset.catalog ? "new:" + card.dataset.catalog : "move:" + card.dataset.plan;
+  event.dataTransfer.setData("text/plain", dragToken);
+  event.dataTransfer.effectAllowed = "copy";
+}
+
+function onDragOver(event) {
+  if (!dragToken) return;
+  const scene = event.target.closest(".scene");
+  if (!scene) return;
+  event.preventDefault();
+  const host = dropTarget(event.target);
+  document.querySelectorAll(".drop-ready, .drop-no").forEach((el) => el.classList.remove("drop-ready", "drop-no"));
+  const specItem = dragToken.indexOf("new:") === 0 ? catalogById(dragToken.slice(4)) : null;
+  const moving = dragToken.indexOf("move:") === 0 ? placementById(dragToken.slice(5)) : null;
+  const place = specItem ? specItem.place : (moving ? moving.place : "");
+  const mark = host.ok ? (host.el || scene) : scene;
+  mark.classList.add(host.ok ? "drop-ready" : "drop-no");
+  scene.dataset.drop = host.ok
+    ? (place === "yard" ? "Release to place outside the building" : (place === "floor" ? "Release to place on the floor" : "Release to mount in the rack"))
+    : (place === "yard" ? "This piece sits outside the building" : (place === "rack" ? "Rack gear mounts inside a rack" : "This piece sits on the hall floor"));
+}
+
+function onDragEnd() {
+  dragToken = "";
+  document.querySelectorAll(".drop-ready, .drop-no, [data-drop]").forEach((el) => {
+    el.classList.remove("drop-ready", "drop-no");
+    delete el.dataset.drop;
+  });
+}
+
+function onDrop(event) {
+  const token = dragToken;
+  if (!token) return;
+  event.preventDefault();
+  const host = dropTarget(event.target);
+  onDragEnd();
+  if (!host.ok) {
+    const specItem = token.indexOf("new:") === 0 ? catalogById(token.slice(4)) : null;
+    state.toast = specItem && specItem.place === "rack"
+      ? "Drop that onto a rack, or open an enclosure first."
+      : (specItem && specItem.place === "yard" ? "Drop that outside the building." : "Drop floor gear on the hall.");
+    render();
+    return;
+  }
+  if (token.indexOf("move:") === 0) {
+    const item = placementById(token.slice(5));
+    if (item && (item.place === "floor" || item.place === "yard")) {
+      const point = scenePoint(event);
+      item.x = point.x;
+      item.y = point.y;
+      state.plan.selected = item.id;
+      state.toast = item.name + " moved.";
+      render();
+    }
+    return;
+  }
+  const specItem = catalogById(token.slice(4));
+  if (!specItem) return;
+  if (specItem.place === "floor") placeCatalog(specItem, "", scenePoint(event));
+  else placeCatalog(specItem, host.host, null);
+}
+
 function boot() {
   applyCapacitySeed();
   assertWorld();
@@ -2569,9 +3917,17 @@ function boot() {
   document.body.addEventListener("pointerup", onPointerUp);
   document.body.addEventListener("pointercancel", onPointerUp);
   document.body.addEventListener("wheel", onWheel, { passive: false });
+  document.body.addEventListener("dragstart", onDragStart);
+  document.body.addEventListener("dragover", onDragOver);
+  document.body.addEventListener("drop", onDrop);
+  document.body.addEventListener("dragend", onDragEnd);
   setInterval(tick, 250);
   setInterval(stepCapacity, 1000);
   render();
 }
 
-boot();
+try {
+  boot();
+} catch (error) {
+  document.getElementById("app").textContent = "Access could not start. " + (error && error.message ? error.message : "Reload the page.");
+}
