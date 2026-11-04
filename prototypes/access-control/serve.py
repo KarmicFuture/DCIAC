@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local preview for Access. Speaks HTTP and HTTPS on port 8766.
 
+Serves the Vite build in dist/. Open / for local use, or /DCIAC/ the way GitHub Pages does.
 Safari opens the HTTPS address. Chrome can keep using HTTP.
 The certificate is created next to this file the first time the server starts.
 """
@@ -10,8 +11,10 @@ import socket
 import ssl
 import subprocess
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import unquote, urlparse
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+DIST = os.path.join(ROOT, "dist")
 CERT_DIR = os.path.join(ROOT, "certs")
 CA = os.path.join(CERT_DIR, "ca.pem")
 CA_KEY = os.path.join(CERT_DIR, "ca-key.pem")
@@ -50,7 +53,20 @@ class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=ROOT, **kwargs)
+        super().__init__(*args, directory=DIST, **kwargs)
+
+    def translate_path(self, path):
+        raw = unquote(urlparse(path).path)
+        if raw == "/DCIAC" or raw.startswith("/DCIAC/"):
+            raw = raw[len("/DCIAC"):] or "/"
+        rel = raw.lstrip("/") or "index.html"
+        root = os.path.normpath(DIST)
+        full = os.path.normpath(os.path.join(root, rel))
+        if full != root and not full.startswith(root + os.sep):
+            return os.path.join(root, "index.html")
+        if os.path.isdir(full):
+            return os.path.join(full, "index.html")
+        return full
 
     def guess_type(self, path):
         ctype = super().guess_type(path)
@@ -101,6 +117,8 @@ class Dual(ThreadingHTTPServer):
 
 def main():
     os.chdir(ROOT)
+    if not os.path.isfile(os.path.join(DIST, "index.html")):
+        raise SystemExit("Build the prototype first: npm run build")
     ensure_cert()
     fullchain = os.path.join(CERT_DIR, "fullchain.pem")
     with open(fullchain, "w") as chain:
