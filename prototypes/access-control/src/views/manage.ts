@@ -67,7 +67,7 @@ export function stackNodes() {
     { id: "xfmr", name: "Transformer", detail: "MV transformer" },
     { id: "module", name: "Power module", detail: futureOn() ? "Live module + planned skid" : "Power module" },
     { id: "battery", name: "Battery", detail: "Ride-through skid" },
-    { id: "bus", name: "Bus bar", detail: "Overhead PowerBar" },
+    { id: "bus", name: "Bus bar", detail: "Overhead track busway" },
     { id: "shelf", name: "DC shelf", detail: "50 VDC" },
     { id: "rack", name: "Rack", detail: "A14" },
     { id: "tray", name: "Tray", detail: d.name },

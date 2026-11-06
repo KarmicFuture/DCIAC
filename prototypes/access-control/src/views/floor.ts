@@ -513,7 +513,7 @@ export function libCard(specItem) {
 }
 
 export function renderLibrary() {
-  const makers = ["All", "Vertiv", "HP", "Dell", "IBM"];
+  const makers = ["All", "Hall", "HP", "Dell", "IBM"];
   const filters = makers.map((maker) => {
     const dot = maker === "All" ? "" : '<i class="maker-dot" style="background:' + makerColor(maker) + '"></i>';
     return '<button type="button" data-act="plan-maker" data-maker="' + maker + '"' +

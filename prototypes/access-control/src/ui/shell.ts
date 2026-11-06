@@ -25,7 +25,7 @@ export function themeButton() {
 }
 
 export function wordmark() {
-  return '<div class="wordmark"><div class="v-name">VERTIV</div><div class="v-rule"></div><div class="v-sub">Avocent</div></div>';
+  return '<div class="wordmark"><div class="v-name">DCIAC</div><div class="v-rule"></div><div class="v-sub">Access</div></div>';
 }
 
 export function pills() {
@@ -52,8 +52,8 @@ export function fruSummary(editable) {
   const tag = editable && state.user.role === "Administrator"
     ? '<dd class="tag"><input id="asset-tag" data-focus-key="asset-tag" maxlength="32"><button type="button" class="act" data-act="asset">Save</button></dd>'
     : "<dd>" + esc(state.assetTag) + "</dd>";
-  return '<dl class="fru"><dt>Manufacturer</dt><dd>Vertiv</dd><dt>Model</dt><dd>Avocent ACS 8000</dd>' +
-    '<dt>Serial</dt><dd class="mono">ACS8K-A14-00481</dd><dt>Asset tag</dt>' + tag +
+  return '<dl class="fru"><dt>Manufacturer</dt><dd>Hall</dd><dt>Model</dt><dd>Serial console ACS</dd>' +
+    '<dt>Serial</dt><dd class="mono">ACS-A14-00481</dd><dt>Asset tag</dt>' + tag +
     "<dt>Domain</dt><dd>Rack A14 · one ACS</dd>" +
     "<dt>Serial ports</dt><dd>" + ACS_PORTS + " · each opens a logged-in server console</dd></dl>";
 }

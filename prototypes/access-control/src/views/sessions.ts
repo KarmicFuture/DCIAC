@@ -147,7 +147,7 @@ export function sessionCard(s) {
     body = kvmBody(d, s);
   }
   const kind = s.type === "desktop" ? "rdp" : (s.type === "kvm" ? "kvm" : "serial");
-  const badge = s.type === "desktop" ? "warn" : (s.path === "rm1048" ? "nvidia" : "vertiv");
+  const badge = s.type === "desktop" ? "warn" : (s.path === "rm1048" ? "nvidia" : "acs");
   return '<article class="session ' + (s.path === "rm1048" ? "rm" : "acs") + " " + kind +
     (blocked ? " blocked" : "") + (state.focusSession === s.id ? " selected" : "") + '" data-session-pane="' + s.id + '"><header class="session-head"><div><span class="badge ' +
     badge + '">' + esc(sessionTitle(s)) + "</span><h3>" + esc(sessionTitle(s)) + "</h3><p>" + esc(d.name) +
