@@ -195,7 +195,7 @@ export function portGrid() {
 export function renderMap() {
   const ready = ACS_PORTS - REFUSED.length;
   return '<div class="page-head"><div class="top"><div><h1>Port map</h1>' +
-    "<p class=\"sub\">ACS 8000 has " + ACS_PORTS + " serial ports. " + ready +
+    "<p class=\"sub\">Unubtanium 2.0 has " + ACS_PORTS + " serial ports. " + ready +
     " of them reach a server in rack A14. Open a port and the console is already logged in.</p></div></div>" +
     pills() + '</div><section class="panel"><h2>48 serial ports</h2><p class="fine port-lead">One server per port. A cell marked “In the rack” is one of the named trays, the switch, or the power shelf. The rest are serial servers on the same ACS. Port 15 is unbound. Port 16 is in rack B07, so ACS-A14 will not open it.</p>' +
     portGrid() + '</section><section class="panel"><h2>FRU</h2>' + fruSummary(true) +

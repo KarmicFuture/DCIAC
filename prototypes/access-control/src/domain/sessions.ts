@@ -108,9 +108,9 @@ export function bootLines(d, s) {
     lines.push("RM1048 Redfish serial");
     lines.push(rmSerialUri(d));
   } else if (s.medium === "usb") {
-    lines.push("ACS 8000 USB console");
+    lines.push("Unubtanium 2.0 USB console");
   } else {
-    lines.push("ACS 8000 " + d.tty + "  port " + d.port);
+    lines.push("Unubtanium 2.0 " + d.tty + "  port " + d.port);
   }
   if (note) lines.push(note);
   const kind = consoleKind(d);

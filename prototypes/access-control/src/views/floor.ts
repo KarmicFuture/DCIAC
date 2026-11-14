@@ -6,7 +6,6 @@ import { waiting } from "../domain/failover";
 import { openSession } from "../domain/sessions";
 import { runtime, state } from "../state";
 import { activeAlarms, watchTable } from "../ui/alarms";
-import { alarmInput, explainHtml } from "../ui/explain";
 import { clamp, esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { pills } from "../ui/shell";
@@ -90,15 +89,43 @@ export function cameraTransform() {
 export function applyCamera() {
   const world = document.querySelector(".world");
   if (world) {
-    world.style.transform = cameraTransform();
+    const stage = world.closest(".stage");
+    const width = 1280;
+    const height = 960;
+    let fit = 1;
+    if (stage && stage.clientWidth > 0 && stage.clientHeight > 0) {
+      fit = Math.min((stage.clientWidth - 8) / width, (stage.clientHeight - 8) / height);
+      fit = Math.max(0.12, fit);
+    }
+    world.style.transform = "scale(" + fit.toFixed(4) + ") " + cameraTransform();
     world.style.setProperty("--pitch", state.floor.pitch + "deg");
     world.style.setProperty("--yaw", state.floor.yaw + "deg");
   }
+  watchStage();
   const chassis = document.querySelector(".chassis");
   if (chassis) {
     chassis.style.transform = "rotateX(" + state.floor.chassisPitch + "deg) rotateY(" +
       state.floor.chassisYaw + "deg) scale(" + state.floor.chassisZoom + ")";
   }
+}
+
+let stageObserver = null;
+let observedStage = null;
+
+function watchStage() {
+  const stage = document.querySelector(".stage");
+  if (!stage) {
+    observedStage = null;
+    return;
+  }
+  if (stage === observedStage) return;
+  if (!stageObserver && typeof ResizeObserver !== "undefined") {
+    stageObserver = new ResizeObserver(() => applyCamera());
+  }
+  if (!stageObserver) return;
+  if (observedStage) stageObserver.unobserve(observedStage);
+  observedStage = stage;
+  stageObserver.observe(stage);
 }
 
 export function paintHeat() {
@@ -418,9 +445,10 @@ export function hudHtml() {
     feed: "Power feed",
   };
   const level = levelName[state.floor.level] || "Hall";
+  const outside = state.floor.level === "site";
   return '<div class="hud"><div class="hud-score"><b data-abnormal>' + alarms.length +
     '</b><span>Abnormal</span></div><p class="hud-mission">' + esc(level) +
-    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-zoom"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button><button type="button" data-act="floor-go" data-level="site">Outside</button><button type="button" data-act="floor-go" data-level="hall">Hall</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="reset">Reset view</button></div></div>';
+    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-controls"><div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>';
 }
 
 export function makerColor(maker) {
@@ -513,7 +541,7 @@ export function libCard(specItem) {
 }
 
 export function renderLibrary() {
-  const makers = ["All", "Hall", "HP", "Dell", "IBM"];
+  const makers = ["All", "Unubtanium 2.0", "HP", "Dell", "IBM"];
   const filters = makers.map((maker) => {
     const dot = maker === "All" ? "" : '<i class="maker-dot" style="background:' + makerColor(maker) + '"></i>';
     return '<button type="button" data-act="plan-maker" data-maker="' + maker + '"' +
@@ -536,9 +564,13 @@ export function renderLibrary() {
     amps += specItem.amps;
   });
   const power = watts >= 1000 ? (watts / 1000).toFixed(1) + " kW" : watts + " W";
-  return '<aside class="lib"><h2>Device library</h2><p class="fine">Drag a tile. Outside gear lands in the yard. Floor gear lands in the hall. Rack gear mounts in an enclosure.</p><div class="lib-filters">' +
+  const phone = typeof matchMedia !== "undefined" && matchMedia("(max-width: 767px)").matches;
+  const existing = typeof document !== "undefined" ? document.querySelector("details.lib") : null;
+  const open = existing ? existing.open : !phone;
+  return '<details class="lib"' + (open ? " open" : "") +
+    '><summary><h2>Device library</h2></summary><div class="lib-body"><p class="fine">Drag a tile. Outside gear lands in the yard. Floor gear lands in the hall. Rack gear mounts in an enclosure.</p><div class="lib-filters">' +
     filters + "</div>" + groups + '<p class="lib-total"><b>' + state.plan.placements.length + '</b><span>placed</span><b>' +
-    power + "</b><b>" + amps.toFixed(1) + " A</b></p></aside>";
+    power + "</b><b>" + amps.toFixed(1) + " A</b></p></div></details>";
 }
 
 export function renderPlanChassis(item) {
@@ -1058,15 +1090,6 @@ export function planSheet() {
   return "";
 }
 
-export function explainRest() {
-  const rest = activeAlarms().slice(3);
-  if (!rest.length) return "";
-  const cards = rest.map((alarm) => '<article class="explain-alarm"><h3>' + esc(alarm.asset) + "</h3><p>" +
-    esc(alarm.text) + "</p>" + explainHtml(alarmInput(alarm)) + "</article>").join("");
-  return '<section class="panel explain-rest"><div class="panel-head"><h2>Other alarms</h2><p class="fine">Each alarm has an Explain panel. The banner keeps the first three. The rest are here.</p></div>' +
-    cards + "</section>";
-}
-
 export function renderFloor() {
   const planOpen = placementById(state.floor.rackId);
   const deep = state.floor.level === "rack" || state.floor.level === "server" || state.floor.level === "part";
@@ -1082,8 +1105,8 @@ export function renderFloor() {
   const sub = future
     ? "Future state of the whole system. Live control is unchanged. Hall 2, the second feeder, and restored BMC paths are shown as planned."
     : (outside ? "Click the grid, the feeder, a pipe, or the compute hall to open that part." : "Click a pod, a row, a rack, or a server. The next click opens the inlet, exhaust, BMC, or DC feed.");
-  return '<div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div></div>" +
-    pills() + '</div><div class="plan-layout">' + renderLibrary() + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable() + explainRest();
+  return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div></div>" +
+    pills() + '</div><div class="plan-layout">' + renderLibrary() + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable() + "</div>";
 }
 
 export function zoomFloor(dir) {

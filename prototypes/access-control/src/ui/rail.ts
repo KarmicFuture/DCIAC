@@ -50,7 +50,7 @@ export function rail() {
   return '<header class="rail" tabindex="0">' +
     wordmark() +
     '<div class="product-name">Access</div>' +
-    '<p class="rack-id">DSVS · ACS 8000 · MPU<br>Rack A14 only</p>' +
+    '<p class="rack-id">MPU<br>Rack A14 only</p>' +
     "<nav>" +
     navButton("floor", "Overview", "Outside and hall") +
     navButton("manage", "Manage", "Grid to chip") +
