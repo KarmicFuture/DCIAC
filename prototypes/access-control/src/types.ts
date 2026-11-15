@@ -2,6 +2,9 @@ export interface User {
   id: string;
   role: string;
   note: string;
+  token?: string;
+  tenantId?: string;
+  expiresAt?: string;
 }
 
 export interface DeviceLoad {
@@ -119,6 +122,7 @@ export interface FloorState {
   chassisYaw: number;
   chassisZoom: number;
   suppressClick: boolean;
+  elevationFace: string;
 }
 
 export interface AppState {
@@ -168,9 +172,15 @@ export interface AppState {
   manage: { layer: string; device: string };
   containment: string;
   theme: string;
+  collapsed: Record<string, boolean>;
+  scenePop: boolean;
+  sceneFull: boolean;
   demoId: string;
   demoStep: number;
+  offerBriefing: boolean;
+  briefingStep: number;
   demoDone: boolean;
+  modelEdit: string;
   outletGate: {
     phase: string;
     n: number;

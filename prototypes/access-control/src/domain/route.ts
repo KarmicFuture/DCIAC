@@ -1,6 +1,7 @@
 import { PODS } from "../data/pods";
 import { state } from "../state";
 import { render } from "../ui/schedule";
+import { loadElevation } from "../views/elevation";
 
 function rowFor(podId, rackId) {
   const pod = PODS.find((item) => item.id === podId);
@@ -62,7 +63,8 @@ function applyFloor(rest) {
   state.floor.rackId = decodeURIComponent(rest[1]);
   state.floor.rowId = rowFor(state.floor.podId, state.floor.rackId);
   if (!rest[2]) {
-    state.floor.level = "rack";
+    state.floor.level = "elevation";
+    loadElevation(state.floor.rackId);
     return;
   }
   state.floor.serverId = decodeURIComponent(rest[2]);
@@ -136,7 +138,7 @@ export function routeFromState() {
         : "#/floor/feed/" + encodeURIComponent(floor.feedId || "");
     } else if (floor.level === "pod") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a");
     else if (floor.level === "row") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/row/" + encodeURIComponent(floor.rowId || "");
-    else if (floor.level === "rack") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14");
+    else if (floor.level === "rack" || floor.level === "elevation") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14");
     else if (floor.level === "server" || floor.level === "part") {
       path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14") + "/" + encodeURIComponent(floor.serverId || "");
       if (floor.level === "part" && floor.partId) path += "/" + encodeURIComponent(floor.partId);

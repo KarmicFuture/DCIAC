@@ -1,5 +1,7 @@
 import { USERS } from "../data/users";
+import { loadWorld } from "../data/repository";
 import { userAudit } from "../domain/audit";
+import { noteFirstLogin, retireBriefing } from "../domain/briefing";
 import { clearDemo } from "../domain/demo";
 import { applyRoute, hasRoute } from "../domain/route";
 import { state } from "../state";
@@ -7,10 +9,25 @@ import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { themeButton, wordmark } from "../ui/shell";
 
-export function signIn(id) {
+export async function signIn(id) {
   const user = USERS.find((u) => u.id === id);
   if (!user) return;
-  state.user = user;
+  let session: any = null;
+  try {
+    const response = await fetch("/api/v1/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: id, password: "hall-a14" }),
+    });
+    if (response.ok) session = await response.json();
+  } catch (err) {
+    session = null;
+  }
+  state.user = Object.assign({}, user, {
+    token: session && session.token,
+    tenantId: session && session.tenantId,
+    expiresAt: session && session.expiresAt,
+  });
   state.labOpen = false;
   state.toast = "";
   if (hasRoute()) applyRoute(location.hash);
@@ -29,11 +46,16 @@ export function signIn(id) {
     state.selected = state.selected || "tray-01";
   }
   userAudit("sign in", { detail: "DSVS identity", wo: "" });
+  noteFirstLogin();
   render();
+  if (session && session.tenantId === "colo") {
+    loadWorld().then(() => render()).catch(() => undefined);
+  }
 }
 
 export function signOut() {
   if (state.user) userAudit("sign out", { wo: "" });
+  retireBriefing();
   state.user = null;
   state.labOpen = false;
   state.toast = "";
@@ -58,7 +80,7 @@ export function login() {
     esc(choice.hint) + '</span></span><span class="role-go">Sign in</span></button>').join("");
   return '<a class="skip" href="#content">Skip to content</a><div class="login-wrap" id="content" data-screen="login" tabindex="-1"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +
-    '<div class="login-body"><h1>Sign in</h1><p class="sub">No password on this demo. Choose a role.</p>' +
+    '<div class="login-body"><h1>Sign in</h1><p class="sub">Password for every role is hall-a14. A colo customer only sees Hall 10. OIDC and SAML stay off until DCIAC_OIDC_ISSUER is set.</p>' +
     themeButton() +
     '<div class="role-list">' + roles + "</div></div></div></div>";
 }

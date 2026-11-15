@@ -4,6 +4,8 @@ import { state } from "../state";
 import { esc } from "./format";
 import { render } from "./schedule";
 import { renderAudit } from "../views/audit";
+import { renderDcim } from "../views/dcim";
+import { renderModels } from "../views/models";
 import { renderControl } from "../views/control";
 import { renderFloor } from "../views/floor";
 import { renderManage } from "../views/manage";
@@ -65,5 +67,7 @@ export function viewHtml() {
   if (state.view === "control") return renderControl();
   if (state.view === "sessions") return renderSessions();
   if (state.view === "audit") return renderAudit();
+  if (state.view === "models") return renderModels();
+  if (state.view === "dcim") return renderDcim();
   return renderRack();
 }

@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """Local preview for Access. Speaks HTTP and HTTPS on port 8766.
 
-Serves the Vite build in dist/. Open / for local use, or /DCIAC/ the way GitHub Pages does.
+Serves the Vite build in dist/ and the asset API under /api/v1/.
+Open / for local use, or /DCIAC/ the way GitHub Pages does.
 Safari opens the HTTPS address. Chrome can keep using HTTP.
 The certificate is created next to this file the first time the server starts.
 """
 
+import json
 import os
 import socket
 import ssl
 import subprocess
+import sys
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import unquote, urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from server.api import dispatch
+from server.db import connect as connect_db
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DIST = os.path.join(ROOT, "dist")
@@ -85,6 +92,44 @@ class Handler(SimpleHTTPRequestHandler):
         self.close_connection = True
         super().handle()
 
+    def _api_path(self):
+        path = unquote(urlparse(self.path).path)
+        if path == "/DCIAC" or path.startswith("/DCIAC/"):
+            path = path[len("/DCIAC"):] or "/"
+        return path
+
+    def _serve_api(self):
+        path = self._api_path()
+        if not path.startswith("/api/"):
+            return False
+        length = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(length) if length else b""
+        from server.db import set_peer
+        peer = self.client_address[0] if getattr(self, "client_address", None) else ""
+        set_peer(peer)
+        status, payload = dispatch(self.command, path, dict(self.headers.items()), raw)
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
+    def do_GET(self):
+        if self._serve_api():
+            return
+        super().do_GET()
+
+    def do_POST(self):
+        if not self._serve_api():
+            self.send_error(404)
+
+    def do_PATCH(self):
+        if not self._serve_api():
+            self.send_error(404)
+
 
 class Dual(ThreadingHTTPServer):
     address_family = socket.AF_INET6
@@ -117,6 +162,7 @@ class Dual(ThreadingHTTPServer):
 
 def main():
     os.chdir(ROOT)
+    connect_db()
     if not os.path.isfile(os.path.join(DIST, "index.html")):
         raise SystemExit("Build the prototype first: npm run build")
     ensure_cert()

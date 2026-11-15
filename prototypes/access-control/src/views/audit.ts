@@ -1,7 +1,7 @@
 import { fmt } from "../domain/audit";
 import { state } from "../state";
 import { esc } from "../ui/format";
-import { pills } from "../ui/shell";
+import { pills, themeButton } from "../ui/shell";
 
 export function renderAudit() {
   const rows = state.audit.map((a) => "<tr><td>" + esc(fmt(a.t)) + "</td><td>" + esc(a.user) + "</td><td>" +
@@ -12,6 +12,6 @@ export function renderAudit() {
       rows + "</tbody></table></div>"
     : '<p class="empty">No acts yet.</p>';
   return '<div class="page-head"><div class="top"><div><h1>Audit</h1>' +
-    '<p class="sub">Every console session and every outlet or DI act is logged with the identity on the act.</p></div></div>' +
+    '<p class="sub">Every console session and every outlet or DI act is logged with the identity on the act.</p></div>' + themeButton() + "</div>" +
     pills() + '</div><section class="panel"><h2>Log</h2>' + table + "</section>";
 }

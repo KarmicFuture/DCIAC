@@ -5,7 +5,7 @@ import { onLeak } from "../domain/leak";
 import { state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
-import { fruSummary, pills } from "../ui/shell";
+import { fruSummary, pills, themeButton } from "../ui/shell";
 import { conditionTone } from "./floor";
 import { rdpLauncher } from "./sessions";
 
@@ -148,7 +148,7 @@ export function elevation() {
 export function renderRack() {
   const d = deviceById(state.selected);
   return '<div class="page-head"><div class="top"><div><h1>Rack A14</h1>' +
-    "<p class=\"sub\">Front faces the cold aisle. Rear exhausts into the hot aisle. Inlet temperature is the reading that has to stay in band.</p></div></div>" +
+    "<p class=\"sub\">Front faces the cold aisle. Rear exhausts into the hot aisle. Inlet temperature is the reading that has to stay in band.</p></div>" + themeButton() + "</div>" +
     pills() + "</div>" + containSwitch() +
     '<div class="rack-wrap"><section class="panel"><h2>Cold aisle front</h2><div class="elevation">' + elevation() +
     '</div></section><section class="panel"><h2>Device</h2><div class="detail">' +

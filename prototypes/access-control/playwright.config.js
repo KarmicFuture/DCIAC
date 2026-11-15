@@ -1,4 +1,6 @@
+const fs = require("fs");
 const { defineConfig, devices } = require("@playwright/test");
+const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 module.exports = defineConfig({
   testDir: "./e2e",
@@ -19,7 +21,10 @@ module.exports = defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: fs.existsSync(chrome) ? { executablePath: chrome } : {},
+      },
     },
   ],
 });

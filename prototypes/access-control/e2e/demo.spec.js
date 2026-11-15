@@ -77,7 +77,7 @@ test("NOC theme, live regions, keyboard focus, and reduced motion", async ({ pag
     return getComputedStyle(el, "::after").animationName;
   });
   expect(motion).toBe("none");
-  await page.locator(".rail [data-act=theme]").click();
+  await page.locator(".page-head [data-act=theme]").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
-  await expect(page.locator(".rail [data-act=theme]")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".page-head [data-act=theme]")).toHaveAttribute("aria-pressed", "false");
 });

@@ -1,5 +1,6 @@
 import { deviceById } from "../data/devices";
 import { outletByN, outlets } from "../data/outlets";
+import { authHeaders } from "../data/repository";
 import { currentWo, maintenanceOpen, userAudit } from "./audit";
 import { bmcText } from "./failover";
 import { sessionLocator, sessionTitle } from "./sessions";
@@ -143,7 +144,7 @@ export function cancelOutlet() {
   render();
 }
 
-export function submitOutletConfirm() {
+export async function submitOutletConfirm() {
   const gate = state.outletGate;
   if (!gate || gate.phase !== "confirm") return;
   const woEl = document.getElementById("outlet-wo");
@@ -161,6 +162,35 @@ export function submitOutletConfirm() {
   }
   if (mapped && mapped.kind === "GPU tray" && typed !== mapped.short) {
     gate.error = "Type the device short name " + mapped.short + " to confirm.";
+    gate.wo = wo;
+    gate.typed = typed;
+    render();
+    return;
+  }
+  const maintenance = maintenanceOpen();
+  try {
+    const response = await fetch("/api/v1/actions/outlet", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        outlet: gate.n,
+        op: gate.op,
+        reason: wo || "maintenance window",
+        workOrderId: wo,
+        deviceId: mapped ? mapped.id : "",
+        maintenance,
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      gate.error = body.error || "The outlet change was refused.";
+      gate.wo = wo;
+      gate.typed = typed;
+      render();
+      return;
+    }
+  } catch (err) {
+    gate.error = "The outlet change was refused.";
     gate.wo = wo;
     gate.typed = typed;
     render();

@@ -18,10 +18,16 @@ import { bindRender, render } from "./schedule";
 import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
-import { applyCamera, floorSerial, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, zoomFloor } from "../views/floor";
+import { applyCamera, floorSerial, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
 import { advanceDemo, loadTheme, startDemo, stopDemo, toggleTheme } from "../domain/demo";
-import { lab, resetWorld, saveAsset, toggleMaint } from "../views/lab";
+import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
+import { loadWorld } from "../data/repository";
+import { ackAlarm, addScenarioChange, advanceWork, applyInventoryFilter, cancelCable, chooseCablePort, collectSample, compareScenario, createWorkOrder, decideDiscovery, dropCable, exportCables, findHome, importCables, loadAlarms, loadFuturePlan, loadTrend, openHall, openRackCapacity, openReport, planHome, promoteScenario, reportMissing, reservePort, sampleSweep, saveCable, scanAsset, scheduleReport, sendServiceNow, showCableRack, traceCable } from "../views/dcim";
+import { dropNetworkCable, exportElevation, saveNetworkCable } from "../views/elevation";
+import { failPower, setPowerMode } from "../views/power";
+import { cloneModel, importModels, saveModel } from "../views/models";
 import { selectDevice } from "../views/rack";
 
 function hydrateFields() {
@@ -57,6 +63,93 @@ export function settle() {
   focusTerm(id);
 }
 
+function panelTitle(panel) {
+  if (panel.classList.contains("dcim")) return "DCIM";
+  if (panel.classList.contains("inspector")) return "Details";
+  if (panel.classList.contains("watch-panel")) return "Serial watch";
+  const heading = panel.querySelector("h2");
+  return heading && heading.textContent ? heading.textContent.trim() : "Panel";
+}
+
+function toggleButton(key, collapsed) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "act panel-toggle";
+  button.dataset.act = "panel-toggle";
+  button.dataset.panel = key;
+  button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  button.textContent = collapsed ? "Show" : "Hide";
+  return button;
+}
+
+function dressChrome() {
+  document.querySelectorAll(".scene-popbar").forEach((node) => node.remove());
+  document.querySelectorAll("#content section.panel, #content aside.inspector").forEach((node) => {
+    const panel = node as HTMLElement;
+    const title = panelTitle(panel);
+    const key = state.view + ":" + title;
+    const collapsed = !!state.collapsed[key];
+    panel.classList.toggle("is-collapsed", collapsed);
+    panel.querySelectorAll(":scope > .panel-bar > .panel-toggle, :scope > .panel-head > .panel-toggle").forEach((button) => button.remove());
+    const head = panel.querySelector(":scope > .panel-head") as HTMLElement | null;
+    if (head) {
+      head.classList.add("panel-bar");
+      head.appendChild(toggleButton(key, collapsed));
+      return;
+    }
+    let bar = panel.querySelector(":scope > .panel-bar") as HTMLElement | null;
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "panel-bar";
+      const heading = panel.querySelector(":scope > h2");
+      if (heading) bar.appendChild(heading);
+      else {
+        const made = document.createElement("h2");
+        made.textContent = title;
+        bar.appendChild(made);
+      }
+      panel.insertBefore(bar, panel.firstChild);
+    }
+    bar.appendChild(toggleButton(key, collapsed));
+  });
+  document.querySelectorAll("details.lib").forEach((node) => {
+    const details = node as HTMLDetailsElement;
+    const summary = details.querySelector("summary");
+    if (!summary || summary.querySelector(".panel-toggle")) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "act panel-toggle";
+    button.dataset.act = "lib-toggle";
+    button.textContent = details.open ? "Hide" : "Show";
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    summary.appendChild(button);
+  });
+  document.querySelectorAll("#content .scene").forEach((node) => {
+    const scene = node as HTMLElement;
+    scene.classList.toggle("is-popped", state.scenePop);
+    scene.classList.toggle("is-full", state.scenePop && state.sceneFull);
+    const bar = document.createElement("div");
+    bar.className = "scene-popbar";
+    const pop = document.createElement("button");
+    pop.type = "button";
+    pop.className = "act";
+    pop.dataset.act = "scene-pop";
+    pop.textContent = state.scenePop ? "Dock" : "Pop out";
+    bar.appendChild(pop);
+    if (state.scenePop) {
+      const fill = document.createElement("button");
+      fill.type = "button";
+      fill.className = "act";
+      fill.dataset.act = "scene-full";
+      fill.textContent = state.sceneFull ? "Window" : "Fill screen";
+      bar.appendChild(fill);
+    }
+    const hud = scene.querySelector(".hud");
+    if (hud) hud.appendChild(bar);
+    else scene.appendChild(bar);
+  });
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
@@ -71,10 +164,11 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}</div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(briefingHtml())}</div>`, root);
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
+  dressChrome();
   mountTerminals();
   markScrollers();
   settle();
@@ -97,7 +191,7 @@ export function syncFields() {
 
 export function onClick(event) {
   let el = event.target.closest("[data-act]");
-  if (state.user && state.view === "floor" && !event.target.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back")) {
+  if (state.user && state.view === "floor" && !event.target.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing")) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }
@@ -124,9 +218,9 @@ export function onClick(event) {
   else if (act === "nav") go(el.dataset.view);
   else if (act === "port-filter") { state.portFilter = el.dataset.filter || "all"; render(); }
   else if (act === "port-density") { state.portCompact = !state.portCompact; render(); }
-  else if (act === "horizon") { state.horizon = el.dataset.horizon === "future" ? "future" : "now"; render(); }
+  else if (act === "horizon") { state.horizon = el.dataset.horizon === "future" ? "future" : "now"; render(); if (state.horizon === "future") loadFuturePlan(); }
   else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
-  else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); }
+  else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); loadFuturePlan(); }
   else if (act === "manage-layer") { state.manage.layer = el.dataset.layer || "bmc"; render(); }
   else if (act === "manage-device") { state.manage.device = el.dataset.device; state.selected = el.dataset.device; render(); }
   else if (act === "select") selectDevice(el.dataset.device);
@@ -146,17 +240,93 @@ export function onClick(event) {
   else if (act === "demo-start") startDemo(el.dataset.demo);
   else if (act === "demo-next") advanceDemo();
   else if (act === "demo-stop") stopDemo();
+  else if (act === "briefing-start") startBriefing();
+  else if (act === "briefing-next") advanceBriefing();
+  else if (act === "briefing-skip") skipBriefing();
   else if (act === "lab-open") { state.labOpen = true; state.menuOpen = false; render(); }
   else if (act === "lab-close") { state.labOpen = false; render(); }
   else if (act === "bmc-toggle") toggleBmc(el.dataset.device);
-  else if (act === "floor-pod") openPod(el.dataset.pod);
+  else if (act === "floor-pod") {
+    const inside = state.floor.level === "hall" || state.floor.level === "pod" || state.floor.level === "row";
+    if (inside && el.dataset.pod === state.floor.podId) startWalk(el.dataset.pod);
+    else openPod(el.dataset.pod);
+  }
+  else if (act === "floor-walk") startWalk(state.floor.podId);
+  else if (act === "floor-walk-stop") stopWalk(true);
+  else if (act === "floor-walk-pause") toggleWalk();
+  else if (act === "floor-walk-step") stepWalk(el.dataset.dir === "prev" ? -1 : 1);
+  else if (act === "model-new") { state.modelEdit = "new"; render(); }
+  else if (act === "model-cancel") { state.modelEdit = ""; render(); }
+  else if (act === "model-edit") { state.modelEdit = el.dataset.id || ""; render(); }
+  else if (act === "model-clone") cloneModel(el.dataset.id || "");
   else if (act === "floor-row") openRow(el.dataset.pod, el.dataset.row);
   else if (act === "floor-feed") openFeed(el.dataset.pod, el.dataset.feed);
   else if (act === "floor-part") openPart(el.dataset.server, el.dataset.part);
   else if (act === "floor-rack") openRack(el.dataset.pod, el.dataset.rack);
+  else if (act === "elev-face") { state.floor.elevationFace = el.dataset.face === "rear" ? "rear" : "front"; render(); }
+  else if (act === "elev-net-save") saveNetworkCable();
+  else if (act === "elev-net-drop") dropNetworkCable(el.dataset.id || "");
+  else if (act === "elev-png") exportElevation("png");
+  else if (act === "elev-pdf") exportElevation("pdf");
+  else if (act === "elev-chassis") { state.floor.level = "rack"; render(); }
+  else if (act === "rack-positions") { state.floor.level = "elevation"; render(); }
+  else if (act === "power-fail") failPower(el.dataset.power || "", el.dataset.node || "");
+  else if (act === "power-mode") setPowerMode(el.dataset.power || "", el.dataset.mode || "nameplate");
+  else if (act === "dcim-tab") {
+    runtime.dcim.tab = el.dataset.tab || "capacity";
+    if (runtime.dcim.tab === "monitor") loadAlarms();
+    else render();
+  }
+  else if (act === "dcim-home") findHome();
+  else if (act === "dcim-plan") planHome(el.dataset.rack || "");
+  else if (act === "dcim-promote") promoteScenario();
+  else if (act === "dcim-advance") advanceWork(el.dataset.id || "", el.dataset.to || "");
+  else if (act === "dcim-cable-show") showCableRack();
+  else if (act === "dcim-cable-near") chooseCablePort(el.dataset.port || "");
+  else if (act === "dcim-cable-save") saveCable();
+  else if (act === "dcim-cable-cancel") cancelCable();
+  else if (act === "dcim-cable-drop") dropCable(el.dataset.id || "");
+  else if (act === "dcim-cable-reserve") reservePort(el.dataset.port || "", "reserved");
+  else if (act === "dcim-cable-free") reservePort(el.dataset.port || "", "free");
+  else if (act === "dcim-trace") traceCable(el.dataset.port || "");
+  else if (act === "dcim-cables") exportCables();
+  else if (act === "dcim-report") openReport(el.dataset.kind || "capacity", "");
+  else if (act === "dcim-csv") openReport(runtime.dcim.reportKind || "capacity", "csv");
+  else if (act === "dcim-pdf") openReport(runtime.dcim.reportKind || "capacity", "pdf");
+  else if (act === "dcim-ack") ackAlarm(el.dataset.id || "");
+  else if (act === "dcim-decide") decideDiscovery(el.dataset.id || "", el.dataset.accept !== "0");
+  else if (act === "dcim-scan") scanAsset();
+  else if (act === "dcim-hall") openHall(el.dataset.id || "");
+  else if (act === "dcim-rack") openRackCapacity(el.dataset.id || "");
+  else if (act === "dcim-diff") compareScenario();
+  else if (act === "dcim-change") addScenarioChange();
+  else if (act === "dcim-wo-new") createWorkOrder();
+  else if (act === "dcim-collect") collectSample(el.dataset.source || "lab");
+  else if (act === "dcim-trend") loadTrend();
+  else if (act === "dcim-schedule") scheduleReport();
+  else if (act === "dcim-snow") sendServiceNow(el.dataset.id || "");
+  else if (act === "dcim-filter") applyInventoryFilter();
+  else if (act === "dcim-sweep") sampleSweep();
+  else if (act === "dcim-missing") reportMissing();
+  else if (act === "dcim-console") openSession(el.dataset.device || "", "acs", "serial", "rs232");
+  else if (act === "elev-device") {
+    const device = deviceById(el.dataset.tag || "");
+    if (device && !device.serialOnly) openFloorServer(device.id);
+  }
   else if (act === "floor-server") {
     if (el.dataset.part && state.floor.level === "server" && state.floor.serverId === el.dataset.server) openPart(el.dataset.server, el.dataset.part);
     else openFloorServer(el.dataset.server);
+  }
+  else if (act === "floor-hall") {
+    state.view = "floor";
+    state.floor.podId = el.dataset.pod || "pod-a";
+    state.floor.level = "hall";
+    state.floor.serverId = "";
+    state.floor.rowId = "";
+    state.floor.feedId = "";
+    state.floor.partId = "";
+    state.floor.zoom = Math.max(state.floor.zoom, 0.9);
+    render();
   }
   else if (act === "floor-go") goFloor(el.dataset.level);
   else if (act === "floor-serial") floorSerial(el.dataset.device);
@@ -194,6 +364,32 @@ export function onClick(event) {
   else if (act === "leak-toggle") toggleLeak();
   else if (act === "maint-toggle") toggleMaint();
   else if (act === "reset-world") resetWorld();
+  else if (act === "lab-post") postLabReadings();
+  else if (act === "panel-toggle") {
+    const key = el.dataset.panel || "";
+    state.collapsed[key] = !state.collapsed[key];
+    render();
+  }
+  else if (act === "lib-toggle") {
+    const details = el.closest("details");
+    if (details) details.open = !details.open;
+    render();
+  }
+  else if (act === "scene-pop") {
+    state.scenePop = !state.scenePop;
+    if (!state.scenePop) {
+      state.sceneFull = false;
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => undefined);
+    }
+    render();
+  }
+  else if (act === "scene-full") {
+    state.sceneFull = !state.sceneFull;
+    render();
+    const scene = document.querySelector(".scene.is-popped");
+    if (state.sceneFull && scene && scene.requestFullscreen) scene.requestFullscreen().catch(() => undefined);
+    else if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => undefined);
+  }
   else if (act === "asset") saveAsset();
   else if (act === "term-copy") copyTerm(el.dataset.session);
   else if (act === "term-search") {
@@ -244,7 +440,13 @@ function runExplain(kind, id) {
 
 export function onSubmit(event) {
   const form = event.target;
-  if (!(form instanceof HTMLFormElement) || form.dataset.act !== "serial-line") return;
+  if (!(form instanceof HTMLFormElement)) return;
+  if (form.dataset.act === "model-save") {
+    event.preventDefault();
+    saveModel(form);
+    return;
+  }
+  if (form.dataset.act !== "serial-line") return;
   event.preventDefault();
   sendSerial(form.dataset.session, new FormData(form).get("line"));
 }
@@ -266,6 +468,28 @@ export function onInput(event) {
 
 export function onChange(event) {
   const target = event.target;
+  if (target.dataset && target.dataset.csvModels && target.files && target.files[0]) {
+    importModels(target.files[0]);
+    target.value = "";
+    return;
+  }
+  if (target.dataset && target.dataset.csvCables && target.files && target.files[0]) {
+    importCables(target.files[0]);
+    target.value = "";
+    return;
+  }
+  if (target.id === "dcim-cable-hall") {
+    runtime.dcim.cableHall = target.value;
+    runtime.dcim.cableRack = target.value === "1" ? "A14" : "H" + target.value + "-01";
+    render();
+    return;
+  }
+  if (target.id === "dcim-cable-device") {
+    runtime.dcim.cableDevice = target.value;
+    runtime.dcim.nearPort = "";
+    render();
+    return;
+  }
   if (!target.dataset || !target.dataset.mediaFor) return;
   const session = sessionById(target.dataset.mediaFor);
   if (session) session.mediaChoice = target.value;
@@ -299,10 +523,16 @@ function markScrollers() {
   });
 }
 
-export function boot() {
+export async function boot() {
   loadTheme();
   const root = document.getElementById("app");
-  if (root) root.replaceChildren();
+  if (root) root.textContent = "Loading the asset repository…";
+  try {
+    await loadWorld();
+  } catch (err) {
+    if (root) root.textContent = "The asset repository is not reachable. Start serve.py and open this page again.";
+    return;
+  }
   applyCapacitySeed();
   assertWorld();
   restoreWorld();

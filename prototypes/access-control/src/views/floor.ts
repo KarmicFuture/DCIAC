@@ -1,15 +1,18 @@
 import { deviceById, devices } from "../data/devices";
-import { LIBRARY, catalogById, findRack, freeU, placementById, spec } from "../data/library";
+import { LIBRARY, MODELS, applyModels, catalogById, findRack, freeU, placementById } from "../data/library";
+import { elevationParts, elevationPointerDown, elevationPointerMove, elevationPointerUp, loadElevation } from "./elevation";
+import { powerHtml } from "./power";
+import { authHeaders } from "../data/repository";
 import { outlets } from "../data/outlets";
-import { PODS, SHELL, YARD, deviceRackId, entityById, entityScore, heatBand, infra, isFacility, podById, rackById, rackEntities, worstBand } from "../data/pods";
+import { PLANT, PODS, YARD, deviceRackId, entityById, entityScore, heatBand, infra, isFacility, podById, rackById, rackEntities, worstBand } from "../data/pods";
 import { waiting } from "../domain/failover";
 import { openSession } from "../domain/sessions";
 import { runtime, state } from "../state";
 import { activeAlarms, watchTable } from "../ui/alarms";
 import { clamp, esc } from "../ui/format";
 import { render } from "../ui/schedule";
-import { pills } from "../ui/shell";
-import { futureHallHtml, futureOn, futureYardHtml } from "./manage";
+import { pills, themeButton } from "../ui/shell";
+import { futureYardHtml } from "./manage";
 import { deviceFaces, faceplate, thermalCard, thermalReading } from "./rack";
 
 export function updateFloorMeters() {
@@ -77,7 +80,7 @@ export function missionText() {
   if (hot.length) {
     return hot.length + " server" + (hot.length === 1 ? "" : "s") + " climbing the thermal scale. Zoom the rack and catch them on ACS.";
   }
-  return "Hall is cool. Drag to orbit. Scroll to zoom in.";
+  return "Hall is cool. Drag a piece to move it. Drag empty floor to orbit.";
 }
 
 export function cameraTransform() {
@@ -169,7 +172,7 @@ export function drillEl(node) {
   const el = node.closest("[data-act]");
   if (!el) return null;
   const act = el.dataset.act;
-  if (act !== "floor-pod" && act !== "floor-row" && act !== "floor-rack" && act !== "floor-server" && act !== "floor-feed" && act !== "floor-part" && act !== "floor-go" && act !== "plan-select" && act !== "horizon-focus") return null;
+  if (act !== "floor-pod" && act !== "floor-row" && act !== "floor-rack" && act !== "floor-server" && act !== "floor-feed" && act !== "floor-part" && act !== "floor-go" && act !== "floor-hall" && act !== "plan-select" && act !== "horizon-focus") return null;
   if (!el.closest(".world, .chassis, .cabinet")) return null;
   return el;
 }
@@ -177,7 +180,7 @@ export function drillEl(node) {
 export function pickDrill(x, y) {
   const stack = document.elementsFromPoint(x, y);
   const top = stack[0];
-  if (!top || (top.closest && top.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back"))) return null;
+  if (!top || (top.closest && top.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .elev-scene, .scene-popbar, .panel-bar, .briefing"))) return null;
   let direct = null;
   for (let i = 0; i < stack.length; i += 1) {
     const el = drillEl(stack[i]);
@@ -194,11 +197,151 @@ export function pickDrill(x, y) {
   return direct;
 }
 
+function floorRecord(el) {
+  if (!el || el.closest(".chassis-scene")) return null;
+  if (el.dataset.plan) {
+    const item = placementById(el.dataset.plan);
+    if (!item || (item.place !== "floor" && item.place !== "yard")) return null;
+    return { item, space: "world", key: "plan", id: item.id, site: item.place === "yard" };
+  }
+  const pod = el.dataset.pod ? podById(el.dataset.pod) : null;
+  if (pod && el.dataset.rack) {
+    const rack = rackById(pod, el.dataset.rack);
+    if (!rack) return null;
+    return { item: rack, space: "pod", pod, key: "rack", id: rack.id, site: false };
+  }
+  if (pod && el.dataset.server) {
+    const id = el.dataset.server;
+    const box = (pod.boxes || []).find((entry) => entry.id === id)
+      || (pod.fit && pod.fit.containment && pod.fit.containment.id === id && pod.fit.containment)
+      || (pod.fit && pod.fit.busbar && pod.fit.busbar.id === id && pod.fit.busbar);
+    if (!box) return null;
+    return { item: box, space: "pod", pod, key: "server", id, site: false };
+  }
+  if (el.dataset.server) {
+    const yard = YARD.find((entry) => entry.id === el.dataset.server);
+    if (!yard) return null;
+    return { item: yard, space: "world", key: "server", id: yard.id, site: true };
+  }
+  if (el.classList.contains("building")) {
+    const hall = el.dataset.pod ? podById(el.dataset.pod) : null;
+    if (!hall || !hall.site) return null;
+    return { item: hall.site, space: "world", key: "hall", id: hall.id, site: true };
+  }
+  return null;
+}
+
+function carryElement(record) {
+  if (record.key === "hall") return document.querySelector('.rackbox.building[data-pod="' + record.id + '"]');
+  if (record.key === "plan") return document.querySelector('.rackbox[data-plan="' + record.id + '"]');
+  if (record.key === "rack") return document.querySelector('.rackbox[data-rack="' + record.id + '"]');
+  return document.querySelector('.rackbox[data-server="' + record.id + '"]');
+}
+
+function clampFloorItem(item, record) {
+  const width = item.w || 40;
+  const depth = item.d || 40;
+  if (record.space === "pod" && record.pod) {
+    item.x = clamp(item.x, 0, Math.max(0, record.pod.w - width));
+    item.y = clamp(item.y, 0, Math.max(0, record.pod.h - depth));
+    return;
+  }
+  if (record.site) {
+    item.x = clamp(item.x, -640, 640 - width);
+    item.y = clamp(item.y, -440, 440 - depth);
+    return;
+  }
+  item.x = clamp(item.x, -520, 520 - width);
+  item.y = clamp(item.y, -360, 360 - depth);
+}
+
+function stageMetrics() {
+  const stage = document.querySelector(".stage");
+  if (!stage) return null;
+  const rect = stage.getBoundingClientRect();
+  if (rect.width < 8 || rect.height < 8) return null;
+  const fit = Math.max(0.12, Math.min((rect.width - 8) / 1280, (rect.height - 8) / 960));
+  const perspective = parseFloat(getComputedStyle(stage).perspective) || 1400;
+  return {
+    fit,
+    perspective,
+    originX: rect.left + rect.width / 2,
+    originY: rect.top + rect.height * 0.54,
+  };
+}
+
+export function clientToFloor(clientX, clientY) {
+  const metrics = stageMetrics();
+  if (!metrics) return null;
+  const yaw = state.floor.yaw * Math.PI / 180;
+  const pitch = state.floor.pitch * Math.PI / 180;
+  const cosYaw = Math.cos(yaw);
+  const sinYaw = Math.sin(yaw);
+  const cosPitch = Math.cos(pitch);
+  const sinPitch = Math.sin(pitch);
+  const span = metrics.fit * (state.floor.zoom || 1);
+  const depth = metrics.perspective;
+  const screenX = clientX - metrics.originX;
+  const screenY = clientY - metrics.originY;
+  const denom = span * (cosPitch + (screenY * sinPitch) / depth);
+  if (Math.abs(denom) < 0.0001) return null;
+  const ry = (screenY - metrics.fit * state.floor.panY) / denom;
+  const rx = (screenX - metrics.fit * state.floor.panX - screenX * (span / depth) * sinPitch * ry) / span;
+  return {
+    x: rx * cosYaw + ry * sinYaw,
+    y: -rx * sinYaw + ry * cosYaw,
+  };
+}
+
+function placeCarry(event) {
+  const carry = runtime.carry;
+  if (!carry || Math.abs(event.clientX - carry.originX) + Math.abs(event.clientY - carry.originY) < 6) return;
+  carry.moved = true;
+  const point = clientToFloor(event.clientX, event.clientY);
+  if (!point) return;
+  const record = carry.record;
+  const local = record.space === "pod"
+    ? { x: point.x - record.pod.x, y: point.y - record.pod.y }
+    : point;
+  const item = record.item;
+  item.x = Math.round((local.x + carry.grabX) / 4) * 4;
+  item.y = Math.round((local.y + carry.grabY) / 4) * 4;
+  clampFloorItem(item, record);
+  const el = carryElement(record);
+  if (!el) return;
+  el.classList.add("carry");
+  el.style.setProperty("--x", item.x + "px");
+  el.style.setProperty("--y", item.y + "px");
+}
+
 export function onPointerDown(event) {
+  if (elevationPointerDown(event)) return;
   if (!state.user || state.view !== "floor" || event.button !== 0) return;
-  if (event.target.closest(".lib, [data-plan]")) return;
+  if (event.target.closest(".lib, .hud, .legend, .inspector, button, a, input, select")) return;
+  const box = event.target.closest(".rackbox");
+  const record = box && box.closest(".world") ? floorRecord(box) : null;
+  if (record) {
+    if (runtime.walk) stopWalk(false, false);
+    const point = clientToFloor(event.clientX, event.clientY);
+    if (point) {
+      const local = record.space === "pod"
+        ? { x: point.x - record.pod.x, y: point.y - record.pod.y }
+        : point;
+      runtime.carry = {
+        id: event.pointerId,
+        originX: event.clientX,
+        originY: event.clientY,
+        moved: false,
+        record,
+        grabX: record.item.x - local.x,
+        grabY: record.item.y - local.y,
+      };
+      return;
+    }
+  }
+  if (event.target.closest("[data-plan]")) return;
   const scene = event.target.closest(".scene");
-  if (!scene || event.target.closest(".hud, .legend, button, a, input, select") || drillEl(event.target)) return;
+  if (!scene || runtime.walk || drillEl(event.target) || (event.target.closest && event.target.closest(".scene-popbar"))) return;
   runtime.orbit = {
     id: event.pointerId,
     x: event.clientX,
@@ -210,6 +353,11 @@ export function onPointerDown(event) {
 }
 
 export function onPointerMove(event) {
+  if (elevationPointerMove(event)) return;
+  if (runtime.carry && event.pointerId === runtime.carry.id) {
+    placeCarry(event);
+    return;
+  }
   if (!runtime.orbit || event.pointerId !== runtime.orbit.id) return;
   const dx = event.clientX - runtime.orbit.x;
   const dy = event.clientY - runtime.orbit.y;
@@ -227,6 +375,17 @@ export function onPointerMove(event) {
 }
 
 export function onPointerUp(event) {
+  if (elevationPointerUp(event)) return;
+  if (runtime.carry && event.pointerId === runtime.carry.id) {
+    const moved = runtime.carry.moved;
+    runtime.carry = null;
+    if (moved) {
+      state.floor.suppressClick = true;
+      setTimeout(() => { state.floor.suppressClick = false; }, 0);
+      render();
+    }
+    return;
+  }
   if (!runtime.orbit || event.pointerId !== runtime.orbit.id) return;
   if (runtime.orbit.moved) {
     state.floor.suppressClick = true;
@@ -239,6 +398,7 @@ export function onWheel(event) {
   const scene = event.target.closest && event.target.closest(".scene");
   if (!scene || !state.user || state.view !== "floor") return;
   event.preventDefault();
+  if (runtime.walk) stopWalk(false, false);
   const factor = event.deltaY > 0 ? 0.92 : 1.08;
   if (scene.classList.contains("chassis-scene")) {
     state.floor.chassisZoom = clamp(state.floor.chassisZoom * factor, 0.65, 1.85);
@@ -248,7 +408,223 @@ export function onWheel(event) {
   applyCamera();
 }
 
+const WALK_MOVE = 1500;
+const WALK_HOLD = 1100;
+
+function southRack(rack) {
+  return (rack.row || "").slice(-1) === "s" || rack.y > 150;
+}
+
+function standOf(rack) {
+  const south = southRack(rack);
+  return {
+    rack,
+    x: rack.x + Math.max(0, (rack.w - 22) / 2),
+    y: south ? rack.y - 28 : rack.y + rack.d + 6,
+    face: south ? "n" : "s",
+  };
+}
+
+function walkStops(pod) {
+  const north = pod.racks.filter((rack) => !southRack(rack)).sort((a, b) => a.x - b.x);
+  const south = pod.racks.filter((rack) => southRack(rack)).sort((a, b) => b.x - a.x);
+  return north.concat(south).map(standOf);
+}
+
+function aimWalk(pod, point) {
+  const px = pod.x + point.x + 11;
+  const py = pod.y + point.y + (point.face === "s" ? -18 : 18);
+  const zoom = 2.35;
+  const yaw = -36 * Math.PI / 180;
+  const pitch = 42 * Math.PI / 180;
+  const sx = px * zoom;
+  const sy = py * zoom;
+  const cosYaw = Math.cos(yaw);
+  const sinYaw = Math.sin(yaw);
+  const x1 = sx * cosYaw - sy * sinYaw;
+  const y1 = sx * sinYaw + sy * cosYaw;
+  state.floor.zoom = zoom;
+  state.floor.yaw = -36;
+  state.floor.pitch = 42;
+  state.floor.panX = -x1;
+  state.floor.panY = -y1 * Math.cos(pitch);
+}
+
+function walkElapsed(now) {
+  const walk = runtime.walk;
+  if (!walk.playing) return walk.held;
+  return now - walk.stepStart;
+}
+
+function walkerSpot(now) {
+  const walk = runtime.walk;
+  const elapsed = walkElapsed(now);
+  const t = Math.min(1, elapsed / WALK_MOVE);
+  const eased = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+  const from = walk.stops[walk.from];
+  const to = walk.stops[walk.index];
+  return {
+    x: from.x + (to.x - from.x) * eased,
+    y: from.y + (to.y - from.y) * eased,
+    face: eased > 0.5 ? to.face : from.face,
+    moving: walk.playing && elapsed < WALK_MOVE,
+    to,
+  };
+}
+
+function walkCaption() {
+  const walk = runtime.walk;
+  const pod = podById(walk.podId);
+  const stop = walk.stops[walk.index];
+  return (pod ? pod.name : "Hall") + " · " + stop.rack.name + " · " + (walk.index + 1) + " of " + walk.stops.length;
+}
+
+function markWalkRack() {
+  const walk = runtime.walk;
+  if (!walk) return;
+  const id = walk.stops[walk.index].rack.id;
+  document.querySelectorAll(".walk-here").forEach((el) => el.classList.remove("walk-here"));
+  document.querySelectorAll('[data-rack="' + id + '"]').forEach((rack) => {
+    if (rack.classList.contains("pov-rack") || rack.classList.contains("rackbox")) rack.classList.add("walk-here");
+  });
+  const read = document.querySelector("[data-walk-read]");
+  const caption = walkCaption();
+  if (read) read.textContent = caption;
+  const mission = document.querySelector(".hud-mission");
+  if (mission) mission.textContent = caption;
+}
+
+function frameWalk(now) {
+  const walk = runtime.walk;
+  if (!walk) return;
+  if (!state.user || state.view !== "floor" || state.floor.level !== "hall" || state.floor.podId !== walk.podId) {
+    stopWalk(false, false);
+    return;
+  }
+  const pod = podById(walk.podId);
+  if (!pod) {
+    stopWalk(false, false);
+    return;
+  }
+  if (walk.playing && walkElapsed(now) >= WALK_MOVE + WALK_HOLD) {
+    walk.from = walk.index;
+    walk.index = (walk.index + 1) % walk.stops.length;
+    walk.stepStart = now;
+    markWalkRack();
+  }
+  const from = walk.stops[walk.from];
+  const to = walk.stops[walk.index];
+  const elapsed = walkElapsed(now);
+  const t = Math.min(1, elapsed / WALK_MOVE);
+  const eased = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+  const turning = southRack(from.rack) !== southRack(to.rack);
+  const eye = (from.rack.x + from.rack.w / 2) + ((to.rack.x + to.rack.w / 2) - (from.rack.x + from.rack.w / 2)) * eased;
+  const line = !turning || eased < 0.5 ? (southRack(from.rack) ? "s" : "n") : (southRack(to.rack) ? "s" : "n");
+  const yaw = turning ? Math.sin(t * Math.PI) * -62 : 0;
+  const rig = document.querySelector(".pov-rig");
+  if (rig) {
+    rig.style.setProperty("--eye", eye.toFixed(1));
+    rig.style.setProperty("--yaw", yaw.toFixed(1) + "deg");
+    rig.dataset.line = line;
+  }
+  markWalkRack();
+  walk.frame = requestAnimationFrame(frameWalk);
+}
+
+export function startWalk(podId) {
+  const pod = podById(podId) || PODS[0];
+  if (!pod || !pod.racks.length) return;
+  if (runtime.walk && runtime.walk.podId === pod.id && state.floor.level === "hall") return;
+  const saved = runtime.walk ? runtime.walk.saved : {
+    pitch: state.floor.pitch,
+    yaw: state.floor.yaw,
+    zoom: state.floor.zoom,
+    panX: state.floor.panX,
+    panY: state.floor.panY,
+  };
+  if (runtime.walk && runtime.walk.frame) cancelAnimationFrame(runtime.walk.frame);
+  const stops = walkStops(pod);
+  runtime.walk = {
+    podId: pod.id,
+    stops,
+    index: 0,
+    from: 0,
+    playing: true,
+    stepStart: performance.now() - WALK_MOVE,
+    held: WALK_MOVE,
+    saved,
+    frame: 0,
+  };
+  state.view = "floor";
+  state.floor.podId = pod.id;
+  state.floor.level = "hall";
+  state.floor.serverId = "";
+  state.floor.rowId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
+  render();
+  runtime.walk.frame = requestAnimationFrame(frameWalk);
+}
+
+export function stopWalk(restore, paint) {
+  const walk = runtime.walk;
+  if (!walk) return;
+  if (walk.frame) cancelAnimationFrame(walk.frame);
+  runtime.walk = null;
+  if (restore && walk.saved) {
+    state.floor.pitch = walk.saved.pitch;
+    state.floor.yaw = walk.saved.yaw;
+    state.floor.zoom = walk.saved.zoom;
+    state.floor.panX = walk.saved.panX;
+    state.floor.panY = walk.saved.panY;
+  }
+  if (paint !== false) render();
+}
+
+export function toggleWalk() {
+  const walk = runtime.walk;
+  if (!walk) return;
+  if (walk.playing) {
+    walk.held = performance.now() - walk.stepStart;
+    walk.playing = false;
+  } else {
+    walk.stepStart = performance.now() - walk.held;
+    walk.playing = true;
+  }
+  const button = document.querySelector("[data-act='floor-walk-pause']");
+  if (button) button.textContent = walk.playing ? "Pause" : "Play";
+}
+
+export function stepWalk(dir) {
+  const walk = runtime.walk;
+  if (!walk) return;
+  walk.from = walk.index;
+  walk.index = (walk.index + (dir < 0 ? -1 : 1) + walk.stops.length) % walk.stops.length;
+  walk.stepStart = performance.now();
+  walk.held = 0;
+  walk.playing = true;
+  markWalkRack();
+  const button = document.querySelector("[data-act='floor-walk-pause']");
+  if (button) button.textContent = "Pause";
+}
+
+function walkerHtml(pod) {
+  if (!runtime.walk || runtime.walk.podId !== pod.id) return "";
+  const spot = walkerSpot(performance.now());
+  return '<div class="walker' + (spot.moving ? " moving" : "") + (spot.face === "s" ? " face-s" : "") +
+    '" style="--x:' + spot.x.toFixed(1) + "px;--y:" + spot.y.toFixed(1) +
+    'px;--w:22px;--d:16px;--h:118px" aria-hidden="true"><i class="ftop"></i><i class="ffront"><b></b></i><i class="fside"></i></div>';
+}
+
+function walkBar() {
+  if (!runtime.walk || state.floor.level !== "hall") return "";
+  return '<div class="walk-bar"><button type="button" class="act" data-act="floor-walk-step" data-dir="prev">Previous</button><p data-walk-read>' +
+    esc(walkCaption()) + '</p><button type="button" class="act" data-act="floor-walk-pause">' +
+    (runtime.walk.playing ? "Pause" : "Play") + '</button><button type="button" class="act" data-act="floor-walk-step" data-dir="next">Next</button><button type="button" class="act" data-act="floor-walk-stop">Stop</button></div>';
+}
+
 export function goFloor(level) {
+  if (runtime.walk && (level === "site" || level === "hall")) stopWalk(true, false);
   if (level === "site") {
     state.floor.level = "site";
     state.floor.serverId = "";
@@ -275,6 +651,11 @@ export function goFloor(level) {
     state.floor.feedId = "";
     state.floor.partId = "";
   } else if (level === "rack") {
+    const rack = rackById(podById(state.floor.podId), state.floor.rackId);
+    if (rack) {
+      openRack(state.floor.podId, state.floor.rackId);
+      return;
+    }
     state.floor.level = state.floor.rackId ? "rack" : "pod";
     state.floor.serverId = "";
     state.floor.partId = "";
@@ -283,6 +664,7 @@ export function goFloor(level) {
 }
 
 export function openRow(podId, rowId) {
+  stopWalk(true, false);
   if (state.floor.level === "hall" || state.floor.level === "site") state.floor.zoom = Math.max(state.floor.zoom, 1.15);
   state.floor.podId = podId;
   state.floor.rowId = rowId;
@@ -320,6 +702,7 @@ export function placeServer(id) {
 }
 
 export function openPod(id) {
+  stopWalk(true, false);
   if (state.floor.level === "hall") state.floor.zoom = Math.max(state.floor.zoom, 1.12);
   state.floor.podId = id;
   state.floor.level = "pod";
@@ -331,6 +714,8 @@ export function openPod(id) {
 }
 
 export function openRack(podId, rackId) {
+  stopWalk(true, false);
+  state.view = "floor";
   state.floor.podId = podId;
   state.floor.rackId = rackId;
   state.floor.level = "rack";
@@ -338,7 +723,9 @@ export function openRack(podId, rackId) {
   state.floor.partId = "";
   const rack = rackById(podById(podId), rackId);
   if (rack && rack.row) state.floor.rowId = rack.row;
+  runtime.elevation = null;
   render();
+  loadElevation(rackId);
 }
 
 export function openFloorServer(id) {
@@ -408,7 +795,7 @@ function boxLabel(extra, band) {
 
 export function boxHtml(item, band, act, extra) {
   const tone = extra.server ? conditionTone(entityById(extra.server)) : listTone(extra.leds || []);
-  const leds = (extra.leds || []).map((entity) => {
+  const leds = extra.face ? "" : (extra.leds || []).map((entity) => {
     const ledTone = conditionTone(entity);
     return '<em class="led" data-heat-for="' + entity.id + '" title="' + esc(ledTone.word) + '" style="background:' +
       ledTone.color + '"></em>';
@@ -419,7 +806,7 @@ export function boxHtml(item, band, act, extra) {
     : '" data-heat-rack="' + (extra.rack || "");
   const face = extra.face || "";
   const cap = extra.cap ? '<span class="cap-label">' + esc(extra.cap) + "</span>" : "";
-  const planAttr = extra.plan ? ' data-plan="' + extra.plan + '" draggable="true"' : "";
+  const planAttr = extra.plan ? ' data-plan="' + extra.plan + '"' : "";
   const attrs = extra.attrs || "";
   const label = boxLabel(extra, band);
   const faceText = String(face || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -434,9 +821,10 @@ export function boxHtml(item, band, act, extra) {
 
 export function hudHtml() {
   const alarms = activeAlarms();
+  const hall = podById(state.floor.podId) || PODS[0];
   const levelName = {
-    site: "Outside the building",
-    hall: "Level 1 · Hall",
+    site: "Outside · " + PLANT.halls + " halls",
+    hall: hall.name + " · " + PLANT.racksPerHall + " AI racks",
     pod: "Level 2 · Pod",
     row: "Level 2 · Row",
     rack: "Level 3 · Rack",
@@ -444,11 +832,16 @@ export function hudHtml() {
     part: "Level 4 · Inside the device",
     feed: "Power feed",
   };
-  const level = levelName[state.floor.level] || "Hall";
+  const level = levelName[state.floor.level] || hall.name;
   const outside = state.floor.level === "site";
+  const walking = runtime.walk && state.floor.level === "hall";
+  const walkBtn = outside || walking
+    ? ""
+    : '<button type="button" class="act walk-start" data-act="floor-walk">Walk through</button>';
   return '<div class="hud"><div class="hud-score"><b data-abnormal>' + alarms.length +
-    '</b><span>Abnormal</span></div><p class="hud-mission">' + esc(level) +
-    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-controls"><div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>';
+    '</b><span>Abnormal</span></div><p class="hud-mission">' + esc(walking ? walkCaption() : level) +
+    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-controls"><div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
+    walkBtn + '<div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>';
 }
 
 export function makerColor(maker) {
@@ -535,7 +928,7 @@ export function libCard(specItem) {
     '" data-act="plan-preview" tabindex="0" style="--mc:' + makerColor(specItem.maker) + '"><span class="grip" aria-hidden="true"></span>' +
     mini3d(specItem) + '<span class="lib-copy"><span class="place-badge ' + specItem.place + '">' +
     placeWord(specItem.place) + "</span><strong>" + esc(specItem.name) +
-    "</strong><span class=\"lib-maker\">" + esc(specItem.maker) + "</span></span><span class=\"lib-stats\"><b>" +
+    "</strong><span class=\"lib-maker\">" + esc(specItem.maker) + " · used by " + (specItem.usedBy || 0) + "</span></span><span class=\"lib-stats\"><b>" +
     esc(specItem.powerLabel) + "</b><b>" + esc(specItem.ampLabel) + "</b><b>" + specItem.powerPorts + " P · " +
     specItem.netPorts + " N</b></span></div>";
 }
@@ -568,7 +961,7 @@ export function renderLibrary() {
   const existing = typeof document !== "undefined" ? document.querySelector("details.lib") : null;
   const open = existing ? existing.open : !phone;
   return '<details class="lib"' + (open ? " open" : "") +
-    '><summary><h2>Device library</h2></summary><div class="lib-body"><p class="fine">Drag a tile. Outside gear lands in the yard. Floor gear lands in the hall. Rack gear mounts in an enclosure.</p><div class="lib-filters">' +
+    '><summary><h2>Device library</h2></summary><div class="lib-body"><p class="fine">Drag a tile onto the view. Outside gear lands in the yard, floor gear on the hall, and rack gear in an enclosure. Pieces already in the view can be dragged to a new spot. A click still opens them.</p><div class="lib-filters">' +
     filters + "</div>" + groups + '<p class="lib-total"><b>' + state.plan.placements.length + '</b><span>placed</span><b>' +
     power + "</b><b>" + amps.toFixed(1) + " A</b></p></div></details>";
 }
@@ -685,30 +1078,51 @@ export function yardById(id) {
 }
 
 export function siteFeedHtml() {
-  const grid = itemPoint(yardById("grid-1"));
-  const xfmr = itemPoint(yardById("xfmr-1"));
-  const modulePt = itemPoint(yardById("pwr-mod"));
-  const battery = itemPoint(yardById("batt-1"));
-  const wall = { x: SHELL.x - 2, y: SHELL.y + 96 };
-  let html = feedHtml(grid, xfmr, "live", "grid-xfmr", "", "cable") +
-    feedHtml(xfmr, modulePt, "live", "xfmr-mod", "", "cable") +
-    feedHtml(battery, modulePt, "live", "batt-mod", "", "cable") +
-    feedHtml(modulePt, wall, "live", "mod-hall", "", "cable");
-  if (futureOn()) html += feedHtml(grid, { x: -420, y: 200 }, "live", "grid-future", "", "cable");
+  const pairs = [
+    ["grid-1", "xfmr-1", "grid-xfmr-a"],
+    ["xfmr-1", "pwr-mod", "xfmr-mod-a"],
+    ["grid-2", "xfmr-2", "grid-xfmr-b"],
+    ["xfmr-2", "pwr-2", "xfmr-mod-b"],
+    ["pwr-mod", "pwr-3", "mod-c"],
+    ["pwr-2", "pwr-4", "mod-d"],
+    ["batt-1", "pwr-mod", "batt-a"],
+    ["batt-2", "pwr-2", "batt-b"],
+  ];
+  let html = pairs.map((pair) => feedHtml(itemPoint(yardById(pair[0])), itemPoint(yardById(pair[1])), "live", pair[2], "", "cable")).join("");
+  const bus = { x: -370, y: itemPoint(yardById("pwr-mod")).y };
+  html += feedHtml(itemPoint(yardById("pwr-mod")), bus, "live", "mod-bus", "", "cable");
+  html += feedHtml(itemPoint(yardById("pwr-2")), bus, "live", "mod-bus-b", "", "cable");
+  const rows = [0, 1].map((row) => PODS.filter((hall, index) => Math.floor(index / 5) === row));
+  const yTop = rows[0][0].site.y + rows[0][0].site.d / 2;
+  const yBot = rows[1][0].site.y + rows[1][0].site.d / 2;
+  html += feedHtml({ x: bus.x, y: yTop }, { x: bus.x, y: yBot }, "live", "mod-riser", "", "cable");
+  rows.forEach((row, index) => {
+    const hall = row[0];
+    const y = hall.site.y + hall.site.d / 2;
+    html += feedHtml({ x: bus.x, y }, { x: hall.site.x - 8, y }, "live", "feed-row-" + index, "", "cable");
+  });
   return html;
 }
 
 export function sitePipesHtml() {
-  const trunkS = SHELL.x + SHELL.w + 26;
-  const trunkR = trunkS + 18;
-  const y0 = SHELL.y + 16;
-  const y1 = SHELL.y + SHELL.d - 10;
+  const rows = [0, 1].map((row) => PODS.filter((hall, index) => Math.floor(index / 5) === row));
+  const trunkS = 470;
+  const trunkR = 486;
+  const y0 = rows[0][0].site.y + rows[0][0].site.d / 2;
+  const y1 = rows[1][0].site.y + rows[1][0].site.d / 2;
   let html = pipeHtml({ x: trunkS, y: y0 }, { x: trunkS, y: y1 }, "supply") +
     pipeHtml({ x: trunkR, y: y0 }, { x: trunkR, y: y1 }, "return");
-  ["heat-1", "heat-2", "hydro-1"].forEach((id) => {
+  rows.forEach((row) => {
+    const hall = row[row.length - 1];
+    const y = hall.site.y + hall.site.d / 2;
+    const east = hall.site.x + hall.site.w + 8;
+    html += pipeHtml({ x: east, y }, { x: trunkS, y }, "supply");
+    html += pipeHtml({ x: east, y: y + 10 }, { x: trunkR, y: y + 10 }, "return");
+  });
+  ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5", "heat-6", "hydro-1", "hydro-2"].forEach((id) => {
     const gear = itemPoint(yardById(id));
     html += pipeHtml({ x: trunkS, y: gear.y }, { x: gear.x - 4, y: gear.y }, "supply");
-    html += pipeHtml({ x: trunkR, y: gear.y + 12 }, { x: gear.x - 4, y: gear.y + 12 }, "return");
+    html += pipeHtml({ x: trunkR, y: gear.y + 8 }, { x: gear.x - 4, y: gear.y + 8 }, "return");
   });
   return html;
 }
@@ -735,15 +1149,90 @@ export function fitHtml(pod) {
   return aisles + containment + bus + rows;
 }
 
+function gearLed(entity) {
+  const tone = conditionTone(entity);
+  return '<em class="led" data-heat-for="' + entity.id + '" title="' + esc(tone.word) + '" style="background:' +
+    tone.color + '"></em>';
+}
+
+function gearFace(rack) {
+  if (rack.kind === "Power") return "";
+  const entities = rackEntities(rack);
+  const gpus = entities.filter((entity) => entity.kind === "GPU tray");
+  const bars = [];
+  for (let slot = 0; slot < 8; slot += 1) {
+    const entity = gpus.length ? gpus[slot % gpus.length] : null;
+    const color = entity ? conditionTone(entity).color : "#1f6f68";
+    const led = entity && slot < gpus.length ? gearLed(entity) : '<em class="led" style="background:' + color + '"></em>';
+    bars.push('<b class="gear gpu" style="--gear:' + color + '">' + led + "</b>");
+  }
+  const network = entities.find((entity) => entity.kind === "Switch");
+  const shelf = entities.find((entity) => entity.kind === "Power shelf");
+  bars.push('<b class="gear net">' + (network ? gearLed(network) : "") + "</b>");
+  bars.push('<b class="gear shelf">' + (shelf ? gearLed(shelf) : "") + "</b>");
+  return '<span class="gear-stack" aria-hidden="true">' + bars.join("") + "</span>";
+}
+
+function rowBuses(pod) {
+  const groups = {};
+  pod.racks.forEach((rack) => {
+    if (rack.kind === "Power") return;
+    const key = rack.row || "row";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(rack);
+  });
+  return Object.keys(groups).map((key) => {
+    const racks = groups[key];
+    const x0 = Math.min.apply(null, racks.map((rack) => rack.x));
+    const x1 = Math.max.apply(null, racks.map((rack) => rack.x + rack.w));
+    const sample = racks[0];
+    const south = String(sample.row || "").slice(-1) === "s";
+    const y = south ? sample.y - 8 : sample.y + sample.d - 4;
+    return '<div class="row-bus" aria-hidden="true" style="--x:' + x0 + "px;--y:" + y + "px;--w:" + (x1 - x0) + 'px"></div>';
+  }).join("");
+}
+
+function povLine(racks, line, podId) {
+  const centers = racks.map((rack) => rack.x + rack.w / 2);
+  const x0 = Math.min.apply(null, centers);
+  const x1 = Math.max.apply(null, centers);
+  const current = runtime.walk && runtime.walk.stops[runtime.walk.index].rack.id;
+  const faces = racks.map((rack) => '<button type="button" class="pov-rack' + (rack.id === current ? " walk-here" : "") + '" data-act="floor-rack" data-pod="' + podId +
+    '" data-rack="' + esc(rack.id) + '" style="--x:' + (rack.x + rack.w / 2) + '"><span class="pov-name">' +
+    esc(rack.name) + '</span><span class="pov-face">' + gearFace(rack) + "</span></button>").join("");
+  return '<div class="pov-line" data-line="' + line + '"><div class="pov-bus" style="--x0:' + x0 + ";--x1:" + x1 +
+    '"></div>' + faces + "</div>";
+}
+
+function renderPov(pod) {
+  const walk = runtime.walk;
+  const stop = walk.stops[walk.index];
+  const eye = stop.rack.x + stop.rack.w / 2;
+  const line = southRack(stop.rack) ? "s" : "n";
+  const north = pod.racks.filter((rack) => !southRack(rack));
+  const south = pod.racks.filter(southRack);
+  return '<div class="scene thermal walking pov-scene">' + hudHtml() +
+    '<div class="pov" aria-label="Eye-level aisle"><div class="pov-ceiling"></div><div class="pov-floor"></div>' +
+    '<div class="pov-rig" data-line="' + line + '" style="--eye:' + eye.toFixed(1) + ';--yaw:0deg">' +
+    povLine(north, "n", pod.id) + povLine(south, "s", pod.id) +
+    "</div></div>" + walkBar() + "</div>";
+}
+
 export function renderHall() {
-  const pods = PODS.map((pod) => {
+  const open = podById(state.floor.podId) || PODS[0];
+  if (runtime.walk && runtime.walk.podId === open.id) return renderPov(open);
+  const pods = [open].map((pod) => {
     const racks = pod.racks.map((rack) => {
       const facing = (rack.row || "").slice(-1) === "s" ? "face-south" : "face-north";
       const power = rack.kind === "Power";
+      const here = runtime.walk && runtime.walk.podId === pod.id && runtime.walk.stops[runtime.walk.index].rack.id === rack.id;
+      const planned = state.horizon === "future" && (runtime.futureChanges || []).some((change) => change.rackId === rack.id);
       return boxHtml(rack, worstBand(rackEntities(rack)), "floor-rack", {
         pod: pod.id, rack: rack.id, leds: rackEntities(rack),
-        klass: (power ? "powershelf " : "") + facing,
-        cap: power ? "50 VDC" : "Front",
+        klass: (power ? "powershelf " : "loaded ") + facing + (here ? " walk-here" : ""),
+        cap: power ? "50 VDC" : (planned ? "Planned" : "Front"),
+        plan: planned ? "future" : "",
+        face: power ? "" : gearFace(rack),
       });
     }).join("");
     const boxes = (pod.boxes || []).map((box) => {
@@ -752,45 +1241,100 @@ export function renderHall() {
       return boxHtml(box, heatBand(entity), "floor-server", {
         pod: pod.id, server: box.id, leds: [],
         klass: shelf ? "powershelf" : "",
-        cap: shelf ? "50 VDC" : "",
+        cap: shelf ? "DC shelf" : PLANT.cduMw + " MW CDU",
       });
     }).join("");
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
     return '<div class="pod' + current + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + fitHtml(pod) + racks + boxes + podFeeds(pod) + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod) + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod) + "</div>";
   }).join("");
-  return '<div class="scene thermal">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
-    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + futureHallHtml() + planBoxes("floor") +
-    '</div></div><div class="legend"><span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span><span class="legend-hint">' +
-    (state.horizon === "future" ? "Future state. Click Hall 2, a row, a rack, or a server to open it." : "Click a pod, aisle, row, rack, or feed to open it.") +
-    "</span></div></div>";
+  const hint = runtime.walk
+    ? "Walking the cold aisle, one rack at a time."
+    : (open.name + " · " + PLANT.racksPerHall + " AI racks · " + PLANT.hallItMw + " MW IT · " + PLANT.cduMw + " MW CDU. Click the floor to walk the racks.");
+  return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + planBoxes("floor") +
+    '</div></div>' + walkBar() + '<div class="legend"><span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span><span class="legend-hint">' +
+    hint + "</span></div></div>";
 }
 
 export function renderSite() {
-  const shell = boxHtml(SHELL, "ok", "floor-go", {
-    klass: "building", color: "#d9d2c8", cap: "Compute hall", attrs: ' data-level="hall"', leds: [],
-  });
+  const shell = PODS.map((hall) => boxHtml(hall.site, "ok", "floor-hall", {
+    klass: "building", color: hall.managed ? "#d9d2c8" : "#e4ddd4", cap: hall.name,
+    pod: hall.id, attrs: ' data-level="hall"', leds: [],
+  })).join("");
   const gear = YARD.map((item) => boxHtml(item, heatBand(entityById(item.id)), "floor-server", {
     server: item.id, klass: item.klass, cap: item.name, color: item.klass === "heat-yard" ? "#2f4a3c" : (item.klass === "core-block" ? "#1c1c1c" : "#3a342e"), leds: [],
   })).join("");
   return '<div class="scene thermal site-scene">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab yard-slab"></div>' + shell + gear + futureYardHtml() + planBoxes("yard") +
-    siteFeedHtml() + sitePipesHtml() + '</div></div><div class="legend"><span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span><span class="legend-hint">Click the grid, a feeder, a pipe, or the hall</span></div></div>';
+    siteFeedHtml() + sitePipesHtml() + '</div></div><div class="legend"><span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span><span class="legend-hint">Drag a piece to move it. Click it to open it.</span></div></div>';
+}
+
+function unitKind(item) {
+  const cat = String(item.category || item.kind || "").toLowerCase();
+  const name = String((item.model || "") + " " + (item.assetTag || "") + " " + (item.name || "")).toLowerCase();
+  if (cat.indexOf("switch") >= 0 || name.indexOf("sn2201") >= 0) return "net";
+  if (cat === "pdu" || cat.indexOf("shelf") >= 0 || name.indexOf("shelf") >= 0) return "shelf";
+  if (cat.indexOf("gpu") >= 0 || name.indexOf("gpu") >= 0 || name.indexOf("tray") >= 0) return "gpu";
+  return "server";
+}
+
+function frontMounts(mounts) {
+  return mounts.filter((item) => item.uHeight && item.uPosition && (item.face || "front") !== "rear");
+}
+
+function mountButton(item) {
+  const label = item.model || item.assetTag || "Device";
+  const where = item.uPosition ? '<span class="rack-u">U' + item.uPosition + "</span>" : "";
+  return '<button type="button" class="rack-unit ' + unitKind(item) + '" data-act="elev-device" data-tag="' +
+    esc(item.assetTag) + '" style="--u:' + item.uPosition + ";--h:" + item.uHeight + '"><span class="rack-vents"></span><b>' +
+    esc(label) + "</b>" + where + "</button>";
+}
+
+function stackUnits(rack) {
+  const entities = rackEntities(rack);
+  const gpus = entities.filter((entity) => entity.kind === "GPU tray");
+  const network = entities.find((entity) => entity.kind === "Switch");
+  const shelf = entities.find((entity) => entity.kind === "Power shelf" || entity.kind === "Powershelf");
+  const bars = [];
+  for (let slot = 0; slot < 8; slot += 1) {
+    const entity = gpus[slot] || null;
+    const act = entity ? ' data-act="floor-server" data-server="' + esc(entity.id) + '"' : "";
+    bars.push('<button type="button" class="rack-unit gpu"' + act + '><span class="rack-vents"></span><b>' +
+      esc(entity ? entity.name : "GPU") + "</b></button>");
+  }
+  bars.push('<button type="button" class="rack-unit net"' + (network ? ' data-act="floor-server" data-server="' + esc(network.id) + '"' : "") +
+    '><span class="rack-vents"></span><b>' + esc(network ? network.name : "Switch") + "</b></button>");
+  bars.push('<button type="button" class="rack-unit shelf"' + (shelf ? ' data-act="floor-server" data-server="' + esc(shelf.id) + '"' : "") +
+    '><span class="rack-vents"></span><b>' + esc(shelf ? shelf.name : "DC shelf") + "</b></button>");
+  return bars.join("");
+}
+
+function zeroUnits(mounts) {
+  return mounts.filter((item) => !item.uHeight).map((item) => '<button type="button" class="rack-zero" data-act="elev-device" data-tag="' +
+    esc(item.assetTag) + '">' + esc(item.model || item.assetTag) + "</button>").join("");
+}
+
+function cabinetBay(rack) {
+  const data = runtime.elevation;
+  const mounts = data && data.rackId === rack.id && Array.isArray(data.mounts) ? data.mounts : null;
+  const front = mounts ? frontMounts(mounts) : [];
+  if (front.length) {
+    const used = front.reduce((sum, item) => sum + item.uHeight, 0);
+    const buttons = front.slice().sort((a, b) => b.uPosition - a.uPosition).map(mountButton).join("");
+    const bay = used >= 16 ? "placed" : "sparse";
+    const voidSpace = bay === "sparse" ? '<div class="rack-void"></div>' : "";
+    return '<div class="rack-post">' + zeroUnits(mounts) + '</div><div class="rack-bay ' + bay + '">' + voidSpace + buttons + "</div>";
+  }
+  return '<div class="rack-post"></div><div class="rack-bay stack">' + stackUnits(rack) + "</div>";
 }
 
 export function renderChassis(rack, pod) {
-  const blades = rackEntities(rack).map((entity) => faceplate(entity, state.floor.serverId === entity.id, "floor-server")).join("") + planBlades(rack.id);
-  const sample = rackEntities(rack)[0];
-  const note = sample ? thermalCard(sample) : "";
-  return '<div class="scene chassis-scene thermal">' + hudHtml() + '<div class="chassis-wrap"><div class="chassis cabinet-chassis" data-rack-host="' +
-    rack.id + '" style="transform:rotateX(' +
-    state.floor.chassisPitch + "deg) rotateY(" + state.floor.chassisYaw + "deg) scale(" + state.floor.chassisZoom +
-    ')"><div class="chassis-top">' +
-    esc(pod.name) + " · " + esc(rack.name) + " · cold aisle front · " + freeU(rack.id) + 'U free</div><div class="cabinet in-scene"><div class="cab-rail"></div><div class="cab-bay">' +
-    blades + '</div><div class="cab-rail"></div></div></div></div><div class="legend chassis-hint">Intake on this face. Exhaust is the hot aisle behind the row.' +
-    (state.containment === "cac" ? " Cold aisle is enclosed." : " Hot aisle is enclosed.") + "</div>" +
-    (note ? '<div class="chassis-thermal">' + note + "</div>" : "") + "</div>";
+  return '<div class="scene chassis-scene thermal elevation" data-rack-host="' + esc(rack.id) + '">' + hudHtml() +
+    '<div class="rack-view" aria-label="' + esc(pod.name) + " " + esc(rack.name) + '"><div class="rack-cab">' +
+    cabinetBay(rack) + '<div class="rack-post bus" aria-hidden="true"></div></div></div>' +
+    '<p class="legend chassis-hint">Front of the rack. The bus bar is the rail on the right.</p></div>';
 }
 
 export function gaugeRow(entity, key, label) {
@@ -884,7 +1428,7 @@ export function serverInspector(entity) {
   const faces = !isFacility(entity) && entity.load ? deviceFaces(entity) : "";
   const inside = faces ? "" : (!isFacility(entity) && entity.load ? deviceParts(entity) : "");
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + powerHtml(entity.id) + "</div>";
 }
 
 export function deviceParts(entity) {
@@ -952,8 +1496,8 @@ export function feedPanel() {
     copy = "Medium-voltage transformer to the power module. Energized.";
   } else if (id === "batt-mod") {
     copy = "Battery skid onto the power module. Energized for ride-through.";
-  } else if (id === "mod-hall") {
-    copy = "Power module to the outside of the compute hall. Energized. The feeder ends at the shell.";
+  } else if (id.indexOf("feed-") === 0) {
+    copy = "Power module bus to a hall wall. Energized. Each hall draws " + PLANT.hallItMw + " MW.";
   }
   return "<h2>" + energWord(mode) + "</h2><p>" + esc(copy) + "</p>" + next;
 }
@@ -1012,9 +1556,10 @@ export function renderInspector() {
   if (level === "site" && state.floor.serverId && entityById(state.floor.serverId)) {
     body = serverInspector(entityById(state.floor.serverId));
   } else if (level === "site") {
-    body = "<h2>Outside the building</h2><p class=\"fine\">The grid feeder, transformer, and power module stay west of the shell. Supply and return pipes stay east of it. Neither run enters the compute hall.</p>" +
-      '<button type="button" class="act primary" data-act="floor-go" data-level="hall">Enter the compute hall</button><h3>Yard</h3>' +
-      infra.filter((item) => item.yard).map(rowButton).join("");
+    body = "<h2>Ten halls</h2><p class=\"fine\">" + PLANT.halls + " halls × " + PLANT.racksPerHall + " AI racks × " + PLANT.kwPerRack + " kW = " + PLANT.itMw + " MW of IT. Two " + PLANT.feederMw + " MW feeders (either one can carry the site) and " + PLANT.coolMw + " MW of heat rejection sit outside. Each hall has a " + PLANT.cduMw + " MW CDU for " + PLANT.hallItMw + " MW of racks.</p><h3>Halls</h3>" +
+      PODS.map((hall) => '<button type="button" class="floor-row" data-act="floor-hall" data-pod="' + hall.id + '"><span>' + esc(hall.name) + "</span><b>" + PLANT.racksPerHall + " racks</b></button>").join("") +
+      '<h3>Yard</h3>' +
+      infra.filter((item) => item.yard && item.kind !== "Pipe").map(rowButton).join("");
   } else if (level === "part") {
     const entity = entityById(state.floor.serverId);
     body = entity ? partPanel(entity) : '<p class="fine">Select a device.</p>';
@@ -1026,8 +1571,10 @@ export function renderInspector() {
     const entity = entityById(state.floor.serverId);
     body = entity ? serverInspector(entity) : '<p class="fine">Select a server.</p>';
   } else if (level === "rack" && rack) {
-    body = "<h2>" + esc(rack.name) + "</h2><p class=\"fine\">" + esc(pod.name) + " · " + esc(rack.kind) +
-      "</p>" + rackEntities(rack).map(rowButton).join("");
+    body = "<h2>" + esc(rack.name) + "</h2><p class=\"fine\">" + esc(pod.name) +
+      ". The cabinet is the equipment. The bus bar is the rail on the right.</p>" +
+      powerHtml(rack.id) +
+      '<p class="elev-actions"><button type="button" class="act" data-act="rack-positions">U positions</button></p>';
   } else if (level === "rack" && planOpen && !rack) {
     const gear = state.plan.placements.filter((item) => item.host === planOpen.id);
     body = "<h2>" + esc(planOpen.name) + "</h2><p class=\"fine\">" + freeU(planOpen.id) + "U free. Drop servers, switches, and PDUs into the enclosure.</p>" +
@@ -1038,8 +1585,8 @@ export function renderInspector() {
       }).join("") || '<p class="fine">Nothing in this enclosure yet.</p>');
   } else if (level === "pod" && pod) {
     const servers = pod.racks.reduce((all, item) => all.concat(rackEntities(item)), []);
-    body = "<h2>" + esc(pod.name) + "</h2><p class=\"fine\">" + (pod.managed ? "ACS-A14 serves rack A14 in the north row." : "Neighbor pod. Capacity is simulated.") +
-      " A rack row stands between every cold aisle and hot aisle.</p><h3>Rows</h3>" +
+    body = "<h2>" + esc(pod.name) + "</h2><p class=\"fine\">" + (pod.managed ? "ACS-A14 serves rack A14. The other racks in this hall are simulated." : "Simulated hall, same power and cooling as Hall 1.") +
+      " " + PLANT.racksPerHall + " AI racks, " + PLANT.hallItMw + " MW IT, " + PLANT.cduMw + " MW CDU.</p><h3>Rows</h3>" +
       (pod.fit.rows || []).map((item) => '<button type="button" class="floor-row" data-act="floor-row" data-pod="' + pod.id + '" data-row="' + item.id + '"><span>' +
         esc(item.name) + "</span><b>Between aisles</b></button>").join("") +
       "<h3>Racks</h3>" + pod.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' +
@@ -1048,14 +1595,13 @@ export function renderInspector() {
       "<h3>Infrastructure</h3>" + infra.filter((item) => item.pod === pod.id).map(rowButton).join("") +
       "<h3>Nearing capacity</h3>" + (servers.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical").map(rowButton).join("") || '<p class="fine">None right now.</p>');
   } else {
+    const hall = podById(state.floor.podId) || PODS[0];
     const managed = devices.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical" || heatBand(entity) === "failover");
-    body = "<h2>AI Hall 1</h2><p class=\"fine\">Each pod is cold aisle, rack row, hot aisle, rack row, cold aisle. Green traces are energized feeds. Rack A14 fails over to ACS serial.</p>" +
-      PODS.map((item) => {
-        const servers = item.racks.reduce((all, rack) => all.concat(rackEntities(rack)), []);
-        return '<button type="button" class="floor-row" data-act="floor-pod" data-pod="' + item.id + '">' +
-          ledDot(servers) + '<span>' + esc(item.name) + "</span><b>" + servers.length + " servers</b></button>";
-      }).join("") +
-      "<h3>Infrastructure</h3>" + infra.filter((item) => !item.yard && item.kind !== "Aisle").map(rowButton).join("") +
+    body = "<h2>" + esc(hall.name) + "</h2><p class=\"fine\">" + PLANT.racksPerHall + " AI racks in two rows of ten. " + PLANT.hallItMw + " MW of IT against a " + PLANT.cduMw + " MW CDU. " +
+      (hall.managed ? "Rack A14 fails over to ACS serial." : "This hall is simulated. ACS-A14 stays in Hall 1.") + "</p><h3>Racks</h3>" +
+      hall.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' + hall.id + '" data-rack="' + item.id + '">' +
+        ledDot(rackEntities(item)) + '<span>' + esc(item.name) + "</span><b>" + rackEntities(item).length + "</b></button>").join("") +
+      "<h3>Power and cooling</h3>" + infra.filter((item) => item.pod === hall.id && item.kind !== "Aisle").map(rowButton).join("") +
       "<h3>Watch list</h3>" + (managed.map(rowButton).join("") || '<p class="fine">All rack A14 servers are nominal.</p>');
   }
   return '<aside class="inspector"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
@@ -1091,6 +1637,15 @@ export function planSheet() {
 }
 
 export function renderFloor() {
+  if (state.floor.level === "elevation") {
+    const elev = elevationParts();
+    const pod = podById(state.floor.podId);
+    const title = (pod ? pod.name : "Hall") + " · " + state.floor.rackId;
+    return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + esc(title) +
+      '</h1><p class="sub">Front and rear elevation. Devices are drawn to their U height. Zero-U rPDUs sit on the rails.</p></div>' +
+      themeButton() + '</div>' + pills() + '</div><div class="plan-layout"><div class="floor-layout">' + elev.scene + elev.detail +
+      "</div></div>" + watchTable() + "</div>";
+  }
   const planOpen = placementById(state.floor.rackId);
   const deep = state.floor.level === "rack" || state.floor.level === "server" || state.floor.level === "part";
   const openedPlan = deep && planOpen && catalogById(planOpen.catalogId).uCapacity;
@@ -1101,15 +1656,23 @@ export function renderFloor() {
   const scene = onSite ? renderSite() : (openedPlan ? renderPlanChassis(planOpen) : (chassis && rack ? renderChassis(rack, pod) : renderHall()));
   const outside = state.floor.level === "site";
   const future = state.horizon === "future";
-  const title = future ? (outside ? "Future · outside the building" : "Future · compute halls") : (outside ? "Outside the building" : "Level 1 · AI Hall");
-  const sub = future
-    ? "Future state of the whole system. Live control is unchanged. Hall 2, the second feeder, and restored BMC paths are shown as planned."
-    : (outside ? "Click the grid, the feeder, a pipe, or the compute hall to open that part." : "Click a pod, a row, a rack, or a server. The next click opens the inlet, exhaust, BMC, or DC feed.");
-  return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div></div>" +
-    pills() + '</div><div class="plan-layout">' + renderLibrary() + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable() + "</div>";
+  const inside = chassis && rack && state.floor.level === "rack";
+  const hallName = (podById(state.floor.podId) || PODS[0]).name;
+  const title = inside
+    ? (pod ? pod.name : hallName) + " · " + rack.id
+    : (future ? (outside ? "Future · ten halls" : "Future · " + hallName) : (outside ? "Outside the building" : hallName + " · " + PLANT.racksPerHall + " AI racks"));
+  const planned = (runtime.futureChanges || []).map((change) => change.rackId).filter(Boolean);
+  const sub = inside
+    ? "The front of the rack. The equipment is drawn in place, and the bus bar is the rail on the right."
+    : (future
+      ? (planned.length ? "Planned changes are outlined on " + planned.join(", ") + ". Promoting them creates work orders." : "The ten halls are already built. Future restores dark BMC paths until a scenario is compared.")
+      : (outside ? "Ten halls, each with " + PLANT.racksPerHall + " AI racks. Drag a hall to move it. Click it to go inside." : "Drag a rack to move it inside the hall. Click it to see the equipment inside."));
+  return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div>" + themeButton() + "</div>" +
+    pills() + '</div><div class="plan-layout">' + (inside ? "" : renderLibrary()) + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable() + "</div>";
 }
 
 export function zoomFloor(dir) {
+  if (runtime.walk) stopWalk(false, false);
   if (dir === "reset") {
     state.floor.pitch = 56;
     state.floor.yaw = -40;
@@ -1168,31 +1731,58 @@ export function dropTarget(node) {
   return { ok: false, el: scene };
 }
 
-export function placeCatalog(specItem, host, point) {
-  if (specItem.place === "rack") {
-    const need = specItem.u || 0;
-    if (freeU(host) < need) {
-      state.toast = specItem.name + " needs " + need + "U. " + Math.max(0, freeU(host)) + "U is free there.";
-      render();
-      return;
-    }
+export async function placeCatalog(specItem, host, point) {
+  if (!state.user || state.user.role !== "Administrator") {
+    state.toast = "Only an Administrator can place a model. That creates an asset.";
+    render();
+    return;
+  }
+  const locationId = specItem.place === "yard" ? "yard" : (specItem.place === "floor" ? state.floor.podId : host);
+  let body: any = {};
+  let response: Response;
+  try {
+    response = await fetch("/api/v1/placements", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        modelId: specItem.id,
+        locationId: locationId,
+        hallId: state.floor.podId,
+        x: point ? point.x : 0,
+        y: point ? point.y : 0,
+      }),
+    });
+    body = await response.json();
+  } catch (err) {
+    state.toast = "The asset repository did not accept the placement.";
+    render();
+    return;
+  }
+  if (!response.ok) {
+    state.toast = body.error || "That model does not fit.";
+    render();
+    return;
   }
   const count = state.plan.placements.filter((item) => item.catalogId === specItem.id).length + 1;
   const item = {
-    id: "plan-" + state.plan.seq,
+    id: body.asset.id,
     catalogId: specItem.id,
     name: specItem.name + " " + count,
     place: specItem.place,
     x: point ? point.x : 0,
     y: point ? point.y : 0,
     host: host || "",
+    uPosition: body.uPosition,
   };
   state.plan.seq += 1;
   state.plan.placements.push(item);
   state.plan.selected = item.id;
   state.plan.preview = "";
-  state.toast = item.name + " placed. " + specItem.powerLabel + " · " + specItem.ampLabel + ".";
-  if (specItem.place === "rack") {
+  state.toast = item.name + " placed" + (body.uPosition ? " at U" + body.uPosition : "") + ". " + specItem.powerLabel + " · " + specItem.ampLabel + ".";
+  if (body.model) {
+    applyModels(MODELS.map((model) => model.id === body.model.id ? body.model : model));
+  }
+  if (specItem.place === "rack" && host && host.indexOf("plan-") !== 0) {
     const podId = podForRack(host);
     state.view = "floor";
     state.floor.level = "rack";

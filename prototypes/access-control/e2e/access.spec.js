@@ -59,6 +59,11 @@ test("ReadOnly cannot cycle outlets or mount virtual media", async ({ page }) =>
 });
 
 test("Operator can cycle a bound outlet and the act is audited", async ({ page }) => {
+  const opened = await page.request.post("/api/v1/work-orders", {
+    headers: { "X-Dciac-User": "dsvs.admin", "X-Dciac-Role": "Administrator" },
+    data: { id: "WO-14", kind: "Power cycle", state: "In progress", title: "Cycle tray-06", deviceId: "tray-06", reason: "WO-14" },
+  });
+  expect(opened.ok() || opened.status() === 400).toBeTruthy();
   await signIn(page, "dsvs.operator");
   await page.locator('nav [data-view="control"]').click();
   const row = outletRow(page, 9);

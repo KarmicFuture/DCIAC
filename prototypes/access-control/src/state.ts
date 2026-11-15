@@ -6,6 +6,14 @@ export const runtime = {
   lastRenderedView: "",
   dragToken: "",
   orbit: null as any,
+  carry: null as any,
+  walk: null as any,
+  elevDrag: null as any,
+  powerPanels: {} as any,
+  networkRack: null as any,
+  futureChanges: [] as any[],
+  consolePass: false,
+  dcim: { tab: "capacity", home: null as any, scenarioId: "", workId: "", note: "", rows: [] as any[] },
 };
 
 export const state: AppState = {
@@ -29,6 +37,7 @@ export const state: AppState = {
     chassisYaw: -18,
     chassisZoom: 1,
     suppressClick: false,
+    elevationFace: "front",
   },
   game: { score: 0, streak: 0, best: 0, catches: 0, awarded: {} },
   acked: {},
@@ -60,8 +69,14 @@ export const state: AppState = {
   manage: { layer: "bmc", device: "tray-01" },
   containment: "hac",
   theme: "paper",
+  collapsed: {} as Record<string, boolean>,
+  scenePop: false,
+  sceneFull: false,
   demoId: "",
   demoStep: 0,
+  offerBriefing: false,
+  briefingStep: -1,
   demoDone: false,
   outletGate: null,
+  modelEdit: "",
 };

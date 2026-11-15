@@ -1,4 +1,5 @@
 import { devices } from "../data/devices";
+import { authHeaders } from "../data/repository";
 import { outlets } from "../data/outlets";
 import { audit, userAudit } from "../domain/audit";
 import { clearDemo, demoPanel } from "../domain/demo";
@@ -104,6 +105,31 @@ export function resetWorld() {
   render();
 }
 
+export async function postLabReadings() {
+  const samples = [];
+  devices.forEach((d) => {
+    if (d.bmc === "up") samples.push({ deviceId: d.id, name: "inlet", value: 24, unit: "C" });
+    samples.push({ deviceId: d.id, name: "serial", value: d.watchDeny ? 0 : 1, unit: "up" });
+    samples.push({ deviceId: d.id, name: "power", value: d.bmc === "up" ? 40 : 0, unit: "%" });
+  });
+  if (state.leak) samples.push({ deviceId: "di-1", name: "leak", value: 1, unit: "state" });
+  if (state.rm1048 !== "healthy") samples.push({ deviceId: "rm1048", name: "power", value: 0, unit: "%" });
+  try {
+    const response = await fetch("/api/v1/collect", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ source: "lab", samples }),
+    });
+    const body = await response.json().catch(() => ({}));
+    state.toast = response.ok
+      ? "Lab posted " + samples.length + " readings. Assets stay unchanged."
+      : (body.error || "The lab collector was refused.");
+  } catch (err) {
+    state.toast = "The lab collector did not run.";
+  }
+  render();
+}
+
 export function lab() {
   const gear = devices.map((d) => '<div class="lab-row"><div><strong>' + esc(d.name) + '</strong><div class="fine">' +
     (d.bmc === "up" ? "BMC up" : "BMC dark · on ACS") + '</div></div><button type="button" class="act" data-act="bmc-toggle" data-device="' +
@@ -113,6 +139,7 @@ export function lab() {
     '<div class="lab-head"><div><p class="kicker">Simulated world</p><h2>Lab</h2></div>' +
     '<button type="button" class="act" data-act="lab-close">Close</button></div>' +
     '<p class="fine">External gear only. This drawer is not an Access screen. Drop a BMC to fail that device over to ACS. Drop RDP to move the desktop onto ACS KVM. RM1048 does not take either failover.</p>' +
+    '<button type="button" class="act" data-act="lab-post">Post readings</button>' +
     '<div class="lab-row"><div><strong>RM1048 plane</strong><div class="fine">' +
     (state.rm1048 === "healthy" ? "Healthy" : "Dark") + '</div></div><button type="button" class="act" data-act="rm-toggle">' +
     (state.rm1048 === "healthy" ? "Mark dark" : "Mark healthy") + "</button></div>" +

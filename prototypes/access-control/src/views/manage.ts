@@ -2,7 +2,7 @@ import { deviceById, devices } from "../data/devices";
 import { outletByN } from "../data/outlets";
 import { state } from "../state";
 import { esc } from "../ui/format";
-import { pills } from "../ui/shell";
+import { pills, themeButton } from "../ui/shell";
 import { boxHtml } from "./floor";
 
 export function futureOn() {
@@ -62,11 +62,11 @@ export function stackNodes() {
   const bmc = shownBmc(d);
   const hot = load.temp >= 75 || load.gpu >= 90;
   return [
-    { id: "grid", name: "Grid", detail: futureOn() ? "2 feeders · 4.8 MW" : "1 feeder · 2.4 MW" },
+    { id: "grid", name: "Grid", detail: "2 feeders · 64 MW" },
     { id: "mv", name: "Substation", detail: "Medium voltage" },
-    { id: "xfmr", name: "Transformer", detail: "MV transformer" },
-    { id: "module", name: "Power module", detail: futureOn() ? "Live module + planned skid" : "Power module" },
-    { id: "battery", name: "Battery", detail: "Ride-through skid" },
+    { id: "xfmr", name: "Transformer", detail: "2 × 32 MW" },
+    { id: "module", name: "Power module", detail: "4 × 8 MW" },
+    { id: "battery", name: "Battery", detail: "Two ride-through skids" },
     { id: "bus", name: "Bus bar", detail: "Overhead PowerBar" },
     { id: "shelf", name: "DC shelf", detail: "50 VDC" },
     { id: "rack", name: "Rack", detail: "A14" },
@@ -145,10 +145,10 @@ export function chipPanel(d) {
 
 export function layerCopy(id, d) {
   const future = futureOn();
-  if (id === "grid") return "<p>Utility feed into the OneCore yard.</p><p class=\"fine\">" + (future ? "A second feeder is reserved. Nameplate rises from 2.4 MW to 4.8 MW." : "One feeder is in service at 2.4 MW.") + "</p>";
+  if (id === "grid") return "<p>Two utility feeders into the OneCore yard, 32 MW each.</p><p class=\"fine\">The site needs about 29 MW for 24 MW of IT plus cooling auxiliaries. Either feeder can carry that load. " + (future ? "Dark BMC paths are the only thing the future horizon changes." : "Both feeders are in service.") + "</p>";
   if (id === "mv") return "<p>Medium-voltage substation between the grid and the transformer.</p><p class=\"fine\">Protection and metering sit here, before the power module.</p>";
   if (id === "xfmr") return "<p>MV transformer in the yard, ahead of the power module.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="xfmr-1">Show it outside</button>';
-  if (id === "module") return "<p>Power module rectifies and holds the hall.</p><p class=\"fine\">" + (future ? "A second module is planned beside the live skid." : "One module is installed.") + "</p>" + '<button type="button" class="act" data-act="floor-server" data-server="pwr-mod">Show it outside</button>';
+  if (id === "module") return "<p>Four 8 MW power modules, 32 MW together, feed the ten halls.</p><p class=\"fine\">One module can drop and the other three still cover the IT load.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="pwr-mod">Show module A outside</button>';
   if (id === "battery") return "<p>Battery skid rides through a utility dip. It does not replace the BMC path.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="batt-1">Show it outside</button>';
   if (id === "bus") return "<p>Overhead bus bar along the hot aisle. It feeds the 50 V DC shelves.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="bus-a">Show bus bar A</button>';
   if (id === "shelf") return "<p>DC power shelf in rack A14. 50 V to the trays.</p>" + '<button type="button" class="act" data-act="select" data-device="pshelf">Open the shelf</button>';
@@ -164,14 +164,14 @@ export function futureBrief() {
   const dark = list.filter((d) => d.bmc === "down").length;
   const placed = state.plan.placements.length;
   const rows = [
-    ["Grid", "2.4 MW · 1 feeder", "4.8 MW · 2 feeders"],
-    ["Halls", "1 compute hall", "2 halls"],
+    ["Grid", "64 MW · 2 feeders", "64 MW · 2 feeders"],
+    ["Halls", "10 halls · 200 racks", "10 halls · 200 racks"],
+    ["Cooling", "30 MW heat rejection", "30 MW heat rejection"],
     ["BMC paths", dark ? dark + " dark" : "All up", "All up"],
     ["Library plan", placed + " placed", placed ? placed + " built" : "None waiting"],
   ];
-  const changes = ["Hall 2 is added, with a cold aisle, a contained hot aisle, and a bus bar."];
+  const changes = ["The ten halls, both feeders, and the 30 MW cooler yard are already built."];
   if (dark) changes.push("Dark BMC paths are restored. ACS serial remains the out-of-band wire.");
-  changes.push("A second feeder, power module, and heat-rejection skid land in the yard.");
   if (placed) changes.push(placed + " library " + (placed === 1 ? "piece is" : "pieces are") + " treated as built.");
   return '<aside class="future-card"><h2>' + (futureOn() ? "Future state" : "Now") + '</h2><p class="fine">The whole system, grid to chip. Switching horizon does not change live power or sessions.</p><table><tbody>' +
     rows.map((row) => "<tr><th>" + esc(row[0]) + "</th><td>" + esc(row[1]) + "</td><td>" + esc(row[2]) + "</td></tr>").join("") +
@@ -184,7 +184,7 @@ export function renderManage() {
   const picker = managedDevices().map((item) => '<button type="button" data-act="manage-device" data-device="' + item.id + '"' +
     (item.id === d.id ? ' aria-pressed="true"' : "") + ">" + esc(item.name) + "</button>").join("");
   const layer = stackNodes().find((node) => node.id === state.manage.layer) || stackNodes()[0];
-  return '<div class="page-head"><div class="top"><div><h1>Data center management</h1><p class="sub">Grid to chip, including the BMC. Now is the live system. Future is the planned state of the whole site.</p></div></div>' +
+  return '<div class="page-head"><div class="top"><div><h1>Data center management</h1><p class="sub">Grid to chip, including the BMC. Now is the live system. Future is the planned state of the whole site.</p></div>' + themeButton() + "</div>" +
     pills() + "</div>" + horizonHtml() + chainHtml() + '<div class="manage-grid"><section class="panel"><div class="panel-head"><h2>' +
     esc(layer.name) + "</h2><p class=\"fine\">" + esc(layer.detail) + "</p></div>" +
     (state.manage.layer === "bmc" || state.manage.layer === "chip" || state.manage.layer === "tray" ? '<div class="device-pick">' + picker + "</div>" : "") +

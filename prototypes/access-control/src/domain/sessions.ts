@@ -1,7 +1,8 @@
 import { ACS_PORTS, MEDIA, deviceById } from "../data/devices";
 import { heatBand } from "../data/pods";
 import { REFUSED } from "../data/users";
-import { audit, userAudit } from "./audit";
+import { audit, maintenanceOpen, userAudit } from "./audit";
+import { authHeaders } from "../data/repository";
 import { acsWaiting } from "./failover";
 import { mediaReason, rmBlockCopy, sessionBlocked } from "./single-master";
 import { runtime, state } from "../state";
@@ -218,6 +219,34 @@ state.view = "sessions";
   render();
   return;
 }
+  const failover = path === "acs" && type === "serial" && mapped.bmc === "down";
+  if (!failover && state.user && state.user.role !== "ReadOnly" && !runtime.consolePass) {
+    fetch("/api/v1/actions/console", {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({
+        deviceId,
+        reason: state.wo || "console open",
+        workOrderId: state.wo || "",
+        maintenance: maintenanceOpen(),
+        failover: false,
+      }),
+    }).then(async (response) => {
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        state.toast = body.error || "An in-progress work order is required to open this console.";
+        render();
+        return;
+      }
+      runtime.consolePass = true;
+      openSession(deviceId, path, type, medium);
+      runtime.consolePass = false;
+    }).catch(() => {
+      state.toast = "The console check did not run.";
+      render();
+    });
+    return;
+  }
   const id = "s" + (++runtime.seq);
   const session = {
     id,
