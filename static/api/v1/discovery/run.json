@@ -1,0 +1,1 @@
+{"created":[],"items":[{"id":"disc-bmc-extra","at":"2026-11-15T00:06:47+00:00","source":"redfish","kind":"new","device_id":"bmc-extra","detail":"Redfish found a BMC that is not in the repository.","state":"pending"}]}

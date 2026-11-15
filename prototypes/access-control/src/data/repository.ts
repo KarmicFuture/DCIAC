@@ -2,6 +2,71 @@ import { applyModels } from "./library";
 import { PLANT, PODS, YARD, seedHallTelemetry } from "./pods";
 import { state } from "../state";
 
+const nativeFetch = typeof window !== "undefined" ? window.fetch.bind(window) : null;
+
+function apiPath(input) {
+  if (typeof input === "string") return input.startsWith("/api/") ? input.split("?")[0] : "";
+  if (input instanceof URL) return input.pathname.startsWith("/api/") ? input.pathname : "";
+  try {
+    const path = new URL(input.url, location.origin).pathname;
+    return path.startsWith("/api/") ? path : "";
+  } catch (err) {
+    return "";
+  }
+}
+
+function pageMiss(response) {
+  if (!response || response.ok) return false;
+  const type = (response.headers.get("content-type") || "").toLowerCase();
+  return type.indexOf("json") < 0;
+}
+
+function staticFile(path) {
+  return import.meta.env.BASE_URL + "static" + path + ".json";
+}
+
+function readBody(init) {
+  if (!init || typeof init.body !== "string") return {};
+  try {
+    return JSON.parse(init.body);
+  } catch (err) {
+    return {};
+  }
+}
+
+if (nativeFetch) {
+  window.fetch = async function (input, init) {
+    const path = apiPath(input);
+    const method = String((init && init.method) || (typeof Request !== "undefined" && input instanceof Request ? input.method : "GET")).toUpperCase();
+    if (!path) return nativeFetch(input, init);
+    let live = null;
+    try {
+      live = await nativeFetch(input, init);
+      if (!pageMiss(live)) return live;
+    } catch (err) {
+      live = null;
+    }
+    let file = staticFile(path);
+    if (method === "POST" && path === "/api/v1/power/fail") {
+      const body = readBody(init);
+      file = staticFile(path + "/" + (body.nodeId || "grid-1") + "-" + (body.mode || "nameplate"));
+    } else if (method === "POST" && path === "/api/v1/discovery/run") {
+      const body = readBody(init);
+      if (body.found && body.found.length) return live || nativeFetch(input, init);
+      file = staticFile(path);
+    } else if (method === "POST" && path === "/api/v1/capacity/home") {
+      const body = readBody(init);
+      file = staticFile(path + "/" + (body.hallId || "all"));
+    } else if (method !== "GET") {
+      return live || nativeFetch(input, init);
+    }
+    const saved = await nativeFetch(file, { cache: "no-store" });
+    if (saved.ok) return saved;
+    if (live) return live;
+    return saved;
+  } as typeof window.fetch;
+}
+
 function children(world, parentId, kind) {
   return world.locations.filter((item) => item.parentId === parentId && item.kind === kind);
 }
