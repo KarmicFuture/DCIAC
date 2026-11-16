@@ -1,1 +1,1 @@
-{"rackId":"H4-01","rowId":"row-4-n","freeU":42,"largestFreeU":42,"blocks":[{"start":1,"length":42}],"provisionedW":120000,"installedW":120000,"strandedW":0,"networkFree":{"25G":8}}
+{"rackId": "H4-01", "rowId": "row-4-n", "freeU": 42, "largestFreeU": 42, "blocks": [{"start": 1, "length": 42}], "provisionedW": 500000, "installedW": 500000, "strandedW": 0, "networkFree": {"25G": 8}}
