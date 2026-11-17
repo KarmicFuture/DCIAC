@@ -3,7 +3,6 @@ import { authHeaders } from "../data/repository";
 import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
-import { pills, themeButton } from "../ui/shell";
 
 const TABS = [
   ["capacity", "Capacity"],
@@ -58,8 +57,7 @@ export function renderDcim() {
   }
   const tabs = TABS.map((pair) => '<button type="button" class="act' + (slot.tab === pair[0] ? " primary" : "") +
     '" data-act="dcim-tab" data-tab="' + pair[0] + '">' + pair[1] + "</button>").join("");
-  return '<div class="page-head"><div class="top"><div><h1>DCIM</h1><p class="sub">Capacity, cables, work orders, monitoring, reports, and discovery.</p></div>' +
-    themeButton() + "</div>" + pills() + '</div><section class="panel dcim"><div class="dcim-tabs">' + tabs +
+  return '<section class="panel dcim"><div class="dcim-tabs">' + tabs +
     "</div>" + panel(slot) + (slot.note ? '<p class="fine">' + esc(slot.note) + "</p>" : "") + "</section>";
 }
 
@@ -303,7 +301,10 @@ export function applyInventoryFilter() {
 function reports(slot) {
   const table = slot.report;
   const filtered = filteredRows(slot);
-  const rows = filtered.slice(0, 8).map((row) => "<tr><td>" + esc(row.tag || row.hall || row.period || row.priority || "") + "</td><td>" + esc(JSON.stringify(row)).slice(0, 180) + "</td></tr>").join("");
+  const rows = table && table.kind === "inventory"
+    ? filtered.map((row) => "<tr><td>" + esc(row.tag) + "</td><td>" + esc(row.vendor) + "</td><td>" + esc(row.model) +
+      "</td><td>" + esc(row.hall || "") + "</td><td>" + esc(row.lifecycle) + "</td></tr>").join("")
+    : filtered.slice(0, 8).map((row) => "<tr><td>" + esc(row.tag || row.hall || row.period || row.priority || "") + "</td><td>" + esc(JSON.stringify(row)).slice(0, 180) + "</td></tr>").join("");
   const chart = chartOf(table, filtered);
   const widest = chart ? Math.max.apply(null, chart.rows.map((row) => Number(row[chart.key]) || 0).concat([1])) : 1;
   const bars = chart ? chart.rows.slice(0, 10).map((row) => {
@@ -322,7 +323,7 @@ function reports(slot) {
     ((slot.schedules || []).length ? "<p>Scheduled: " + slot.schedules.map((item) => esc(item.cadence) + " " + esc(item.kind)).join(", ") + ".</p>" : "") +
     (slot.capacity && slot.capacity.pue ? '<p class="dcim-pue">PUE ' + esc(slot.capacity.pue) + ". Facility kW is IT kW plus 5% auxiliaries.</p>" : "") +
     (bars ? '<div class="dcim-chart">' + bars + "</div>" : "") +
-    (rows ? "<table><tbody>" + rows + "</tbody></table>" : "");
+    (rows ? "<div class=\"table-wrap\"><table>" + (table && table.kind === "inventory" ? "<thead><tr><th>Tag</th><th>Vendor</th><th>Model</th><th>Where</th><th>Lifecycle</th></tr></thead>" : "") + "<tbody>" + rows + "</tbody></table></div>" : "");
 }
 
 function discovery(slot) {

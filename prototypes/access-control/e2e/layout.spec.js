@@ -3,7 +3,7 @@ const { test, expect } = require("@playwright/test");
 async function signIn(page) {
   await page.goto("/");
   await page.locator('[data-user="dsvs.operator"]').click();
-  await expect(page.locator("h1")).toBeVisible();
+  await expect(page.locator(".hud-mission")).toContainText("Outside");
 }
 
 test("phone puts content first and keeps primary tabs", async ({ page }) => {
@@ -19,7 +19,7 @@ test("phone puts content first and keeps primary tabs", async ({ page }) => {
   expect(content.y).toBeLessThan(bar.y + bar.height + 24);
   const tabs = page.locator(".tabbar");
   await expect(tabs).toBeVisible();
-  for (const label of ["Rack", "Port map", "Sessions", "Audit"]) {
+  for (const label of ["Floor", "Operate", "Plan", "Audit"]) {
     await expect(tabs.getByRole("button", { name: label })).toBeVisible();
   }
   const tabBox = await tabs.boundingBox();
@@ -30,8 +30,9 @@ test("phone puts content first and keeps primary tabs", async ({ page }) => {
   await page.locator('.rail nav [data-view="floor"]').click();
   expect((await page.locator(".rail").boundingBox()).x + (await page.locator(".rail").boundingBox()).width).toBeLessThanOrEqual(1);
 
-  await tabs.getByRole("button", { name: "Port map" }).click();
-  await expect(page.locator("h1")).toHaveText("Port map");
+  await tabs.getByRole("button", { name: "Operate" }).click();
+  await page.locator('.view-tabs [data-view="map"]').click();
+  await expect(page.locator("h1")).toHaveText("Operate");
   await expect(page.locator(".port-legend")).toContainText("In the rack");
   await expect(page.locator(".port-legend")).toContainText("Serial-only");
   await expect(page.locator(".port-legend")).toContainText("Refused");
@@ -58,8 +59,9 @@ test("desktop keeps the side rail and the port map tools", async ({ page }) => {
   expect(rail.width).toBeGreaterThan(200);
   await expect(page.locator(".topbar")).toBeHidden();
   await expect(page.locator(".tabbar")).toBeHidden();
-  await page.locator('nav [data-view="map"]').click();
-  await expect(page.locator("h1")).toHaveText("Port map");
+  await page.locator('nav [data-view="rack"]').click();
+  await page.locator('.view-tabs [data-view="map"]').click();
+  await expect(page.locator("h1")).toHaveText("Operate");
   await expect(page.locator(".port-legend")).toBeVisible();
   await page.locator("#port-search").fill("SN2201");
   await expect(page.locator(".port-cell")).toHaveCount(1);

@@ -446,9 +446,11 @@ export function failRdpToKvm(id) {
       detail: "in-band RDP failed over to MPU KVM port " + mapped.mpu,
     });
   }
-  state.view = "sessions";
-  state.focusSession = kvm.id;
-  state.labOpen = false;
+  if (!runtime.sim.stay) {
+    state.view = "sessions";
+    state.focusSession = kvm.id;
+    state.labOpen = false;
+  }
   state.toast = mapped.name + " RDP lost. Failover is ACS KVM, not RM1048.";
   render();
 }

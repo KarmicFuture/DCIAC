@@ -30,14 +30,20 @@ class RepositoryTest(unittest.TestCase):
         self.assertEqual(len(halls), 10)
         self.assertEqual(len(racks), 200)
         self.assertEqual(len(cabinets), 200)
-        self.assertEqual(world["plant"]["itMw"], 24)
+        self.assertEqual(world["plant"]["itMw"], 100)
         self.assertEqual(world["plant"]["halls"], 10)
         self.assertEqual(world["plant"]["racksPerHall"], 20)
+        self.assertEqual(world["plant"]["feederMw"], 150)
         self.assertEqual(world["plant"]["feeders"], 2)
-        self.assertEqual(world["plant"]["coolMw"], 30)
+        self.assertEqual(world["plant"]["coolMw"], 120)
         a14 = next(item for item in cabinets if item["custom"]["rackId"] == "A14")
         self.assertEqual(a14["custom"]["servers"], ["tray-01", "tray-02", "tray-03", "tray-04", "tray-05", "tray-06", "tray-07", "tray-08", "sn2201", "pshelf"])
         self.assertEqual(a14["lifecycle"], "In service")
+        placed = [item for item in world["assets"] if str(item["modelId"]).startswith("inv-")]
+        self.assertGreater(len(placed), 50)
+        self.assertTrue(all(item["locationId"] != "inventory" for item in placed))
+        self.assertTrue(any(item["assetTag"] == "DGX B200" and item["locationId"] != "yard" for item in placed))
+        self.assertTrue(any(item["assetTag"] == "Generator" and item["locationId"] == "yard" for item in placed))
 
     def test_readonly_and_operator_cannot_edit_assets(self):
         status, body = api.dispatch("PATCH", "/api/v1/assets/cab-A14", {"x-dciac-user": "colo.readonly", "x-dciac-role": "ReadOnly"}, b'{"lifecycle":"Planned"}')

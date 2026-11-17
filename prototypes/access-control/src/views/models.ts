@@ -3,7 +3,6 @@ import { authHeaders } from "../data/repository";
 import { state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
-import { pills, themeButton } from "../ui/shell";
 
 const FIELDS = [
   ["manufacturer", "Manufacturer", "text"],
@@ -115,8 +114,7 @@ export function renderModels() {
     ? '<div class="model-tools"><button type="button" class="act" data-act="model-new">Add model</button>' +
       '<label class="act file">Import CSV<input type="file" accept=".csv,text/csv" data-csv-models="1"></label></div>'
     : '<p class="fine">Read only. An administrator can add or change models.</p>';
-  return '<div class="page-head"><div class="top"><div><h1>Models</h1><p class="sub">Every device type the floor can place. Used by counts the assets that already use it.</p></div>' +
-    themeButton() + "</div>" + pills() + "</div><section class=\"panel\"><h2>Library</h2>" + tools +
+  return '<section class="panel"><h2>Library</h2>' + tools +
     (editing ? formHtml(editing) : "") +
     '<div class="table-wrap"><table><thead><tr><th>Manufacturer</th><th>Model</th><th>Category</th><th>Place</th><th>U</th><th>Nameplate</th><th>Used by</th><th></th></tr></thead><tbody>' +
     rows + "</tbody></table></div></section>";

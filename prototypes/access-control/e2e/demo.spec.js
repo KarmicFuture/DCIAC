@@ -14,7 +14,8 @@ function outletRow(page, n) {
 
 test("guided demo walks BMC failover, the leak, and a read-only refusal", async ({ page }) => {
   await signIn(page);
-  await page.locator('[data-act="lab-open"]').click();
+  await page.locator('[data-act="simulate"]').click();
+  await expect(page.locator("h1")).toHaveText("Simulate");
   await expect(page.getByRole("heading", { name: "Guided demo" })).toBeVisible();
 
   await page.getByRole("button", { name: "BMC dies on Tray 06" }).click();
@@ -24,7 +25,7 @@ test("guided demo walks BMC failover, the leak, and a read-only refusal", async 
   await expect(page.locator("#demo-caption")).toContainText("is dark");
   await expect(page.locator("#demo-caption")).toContainText("ttyS8");
   await page.locator("#demo-advance").click();
-  await expect(page.locator("h1")).toHaveText("Sessions");
+  await expect(page.locator("h1")).toHaveText("Operate");
   await expect(page.locator("#demo-caption")).toContainText("out-of-band console");
   await expect(page.locator(".term-path")).toContainText("ACS ttyS8");
   await page.locator("#demo-advance").click();
@@ -35,7 +36,7 @@ test("guided demo walks BMC failover, the leak, and a read-only refusal", async 
   await page.getByRole("button", { name: "DI-1 leak" }).click();
   await expect(page.locator("#demo-caption")).toContainText("DI-1 is quiet");
   await page.locator("#demo-advance").click();
-  await expect(page.locator("h1")).toHaveText("Outlet control");
+  await expect(page.locator("h1")).toHaveText("Operate");
   await expect(page.locator("#demo-caption")).toContainText("Outlets 1 and 2 are locked");
   await expect(outletRow(page, 1).locator('[data-op="cycle"]')).toBeDisabled();
   await expect(outletRow(page, 2).locator('[data-op="cycle"]')).toBeDisabled();
@@ -77,6 +78,7 @@ test("NOC theme, live regions, keyboard focus, and reduced motion", async ({ pag
     return getComputedStyle(el, "::after").animationName;
   });
   expect(motion).toBe("none");
+  await page.locator('nav [data-view="rack"]').click();
   await page.locator(".page-head [data-act=theme]").click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "paper");
   await expect(page.locator(".page-head [data-act=theme]")).toHaveAttribute("aria-pressed", "false");

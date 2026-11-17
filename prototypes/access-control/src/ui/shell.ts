@@ -8,10 +8,13 @@ import { renderDcim } from "../views/dcim";
 import { renderModels } from "../views/models";
 import { renderControl } from "../views/control";
 import { renderFloor } from "../views/floor";
+import { renderPlan } from "../views/plan";
 import { renderManage } from "../views/manage";
 import { renderMap } from "../views/portmap";
 import { renderRack } from "../views/rack";
 import { renderSessions } from "../views/sessions";
+import { renderSimulate } from "../views/lab";
+import { OPERATE_VIEWS, PLAN_VIEWS, operateHead, planHead } from "./rail";
 
 export function go(view) {
   state.view = view;
@@ -31,23 +34,14 @@ export function wordmark() {
 }
 
 export function pills() {
-  const rmClass = state.rm1048 === "healthy" ? "ok" : "warn";
-  const rmLabel = state.rm1048 === "healthy" ? "healthy" : "dark";
-  const oob = devices.some((d) => d.bmc === "down")
-    ? '<span class="pill warn">Failover <b>ACS</b></span>'
-    : "";
-  const rdpLost = devices.some((d) => d.rdp === "down")
-    ? '<span class="pill warn">RDP <b>KVM</b></span>'
-    : "";
-  const leakClass = state.leak ? "bad" : "ok";
-  const leakLabel = state.leak ? "alarm" : "quiet";
-  const maintClass = maintenanceOpen() ? "warn" : "";
-  const maintLabel = maintenanceOpen() ? "open" : "closed";
-  return '<div class="pills">' +
-    '<span class="pill ' + rmClass + '">RM1048 <b>' + rmLabel + "</b></span>" +
-    '<span class="pill ' + leakClass + '">DI-1 <b>' + leakLabel + "</b></span>" +
-    '<span class="pill ' + maintClass + '">Maintenance <b>' + maintLabel + "</b></span>" +
-    '<span class="pill">Domain <b>rack A14</b></span>' + oob + rdpLost + "</div>";
+  const bits = [];
+  if (state.rm1048 !== "healthy") bits.push('<span class="pill warn">RM1048 <b>dark</b></span>');
+  if (state.leak) bits.push('<span class="pill bad">DI-1 <b>alarm</b></span>');
+  if (maintenanceOpen()) bits.push('<span class="pill warn">Maintenance <b>open</b></span>');
+  if (devices.some((d) => d.bmc === "down")) bits.push('<span class="pill warn">Failover <b>ACS</b></span>');
+  if (devices.some((d) => d.rdp === "down")) bits.push('<span class="pill warn">RDP <b>KVM</b></span>');
+  if (!bits.length) return "";
+  return '<div class="pills">' + bits.join("") + "</div>";
 }
 
 export function fruSummary(editable) {
@@ -63,11 +57,20 @@ export function fruSummary(editable) {
 export function viewHtml() {
   if (state.view === "manage") return renderManage();
   if (state.view === "floor") return renderFloor();
-  if (state.view === "map") return renderMap();
-  if (state.view === "control") return renderControl();
-  if (state.view === "sessions") return renderSessions();
+  if (state.view === "simulate") return renderSimulate();
   if (state.view === "audit") return renderAudit();
-  if (state.view === "models") return renderModels();
-  if (state.view === "dcim") return renderDcim();
+  if (OPERATE_VIEWS.indexOf(state.view) >= 0) {
+    const body = state.view === "map" ? renderMap()
+      : state.view === "control" ? renderControl()
+        : state.view === "sessions" ? renderSessions()
+          : renderRack();
+    return operateHead() + body;
+  }
+  if (PLAN_VIEWS.indexOf(state.view) >= 0) {
+    const body = state.view === "models" ? renderModels()
+      : state.view === "dcim" ? renderDcim()
+        : renderPlan();
+    return planHead() + body;
+  }
   return renderRack();
 }

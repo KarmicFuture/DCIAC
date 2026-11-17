@@ -5,7 +5,7 @@ async function signIn(page) {
   await page.evaluate(() => localStorage.removeItem("dciac.world"));
   await page.goto("/");
   await page.locator('[data-user="dsvs.operator"]').click();
-  await expect(page.locator("h1")).toContainText("Outside the building");
+  await expect(page.locator(".hud-mission")).toContainText("Outside");
 }
 
 async function drag(page, locator, dx, dy) {
@@ -35,7 +35,7 @@ test("floor pieces drag inside the view and a click still opens them", async ({ 
   expect(yard.ny).toBeGreaterThanOrEqual(-440);
 
   await page.locator('[data-act="floor-go"][data-level="hall"]').first().click();
-  await expect(page.locator("h1")).toContainText("Hall 1");
+  await expect(page.locator(".hud-mission")).toContainText("Hall 1");
   const rack = page.locator('.rackbox[data-rack="A14"]');
   const rackBefore = await rack.evaluate((el) => el.style.getPropertyValue("--x"));
   await drag(page, rack, 80, 16);
@@ -55,6 +55,6 @@ test("floor pieces drag inside the view and a click still opens them", async ({ 
   expect(moved.ny + moved.d).toBeLessThanOrEqual(moved.podH + 1);
   await expect(page.locator(".chassis-top")).toHaveCount(0);
 
-  await page.locator('button[data-act="floor-rack"][data-rack="A13"]').click();
-  await expect(page.locator("h1")).toContainText("A13");
+  await page.locator('.rackbox[data-act="floor-rack"][data-rack="A13"]').dispatchEvent("click");
+  await expect(page.locator(".inspector .crumbs")).toContainText("A13");
 });

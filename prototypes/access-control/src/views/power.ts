@@ -1,5 +1,6 @@
 import { devices } from "../data/devices";
 import { entityById } from "../data/pods";
+import { localPowerFail } from "../domain/events";
 import { runtime } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
@@ -49,22 +50,27 @@ export async function failPower(id, nodeId) {
   const panel = slot(id) || {};
   const mode = panel.mode || "nameplate";
   let body: any = {};
-  let response: Response;
+  let response: Response | null = null;
   try {
     response = await fetch("/api/v1/power/fail", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nodeId, mode, factors: mode === "measured" ? factors() : {} }),
     });
-    body = await response.json();
+    body = await response.json().catch(() => ({}));
   } catch (err) {
-    panel.failError = "The failure check did not run.";
+    response = null;
+  }
+  if (!response || !response.ok) {
+    panel.failError = "";
+    panel.fail = localPowerFail(nodeId, mode);
+    panel.failed = nodeId;
     runtime.powerPanels[id] = panel;
     render();
     return;
   }
-  panel.failError = response.ok ? "" : (body.error || "That node is not in the chain.");
-  panel.fail = response.ok ? body : null;
+  panel.failError = "";
+  panel.fail = body;
   panel.failed = nodeId;
   runtime.powerPanels[id] = panel;
   render();

@@ -109,6 +109,8 @@ function hallFrom(world, hall) {
   const aisle = (item) => item.custom || {};
   const boxes = here.filter((item) => item.custom && item.custom.floor === "box").map((item) => ({
     id: item.id,
+    name: item.custom.name || "",
+    kind: item.custom.kind || "",
     x: item.custom.x,
     y: item.custom.y,
     w: item.custom.w,

@@ -2,6 +2,7 @@ import { PODS } from "../data/pods";
 import { state } from "../state";
 import { render } from "../ui/schedule";
 import { loadElevation } from "../views/elevation";
+import { decodeSimPayload, loadScenario } from "./events";
 
 function rowFor(podId, rackId) {
   const pod = PODS.find((item) => item.id === podId);
@@ -86,6 +87,11 @@ export function applyRoute(raw) {
   const head = parts[0] || "floor";
   if (head === "floor") {
     applyFloor(parts.slice(1));
+    const simParam = params.get("sim");
+    if (simParam) {
+      const data = decodeSimPayload(simParam);
+      if (data) loadScenario(data);
+    }
     return;
   }
   if (head === "rack") {
@@ -123,6 +129,23 @@ export function applyRoute(raw) {
   }
   if (head === "audit") {
     state.view = "audit";
+    return;
+  }
+  if (head === "simulate") {
+    state.view = "simulate";
+    return;
+  }
+  if (head === "models") {
+    state.view = "models";
+    return;
+  }
+  if (head === "dcim") {
+    state.view = "dcim";
+    return;
+  }
+  if (head === "plan") {
+    state.view = "plan";
+    return;
   }
 }
 
@@ -157,6 +180,10 @@ export function routeFromState() {
   }
   if (state.view === "control") return state.highlightOutlet ? "#/control?outlet=" + state.highlightOutlet : "#/control";
   if (state.view === "audit") return "#/audit";
+  if (state.view === "simulate") return "#/simulate";
+  if (state.view === "models") return "#/models";
+  if (state.view === "dcim") return "#/dcim";
+  if (state.view === "plan") return "#/plan";
   return "#/floor";
 }
 

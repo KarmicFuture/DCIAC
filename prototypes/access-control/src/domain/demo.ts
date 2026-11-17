@@ -1,13 +1,14 @@
 import { deviceById } from "../data/devices";
 import { USERS } from "../data/users";
-import { audit, userAudit } from "./audit";
-import { loseBmc, toggleBmc } from "./failover";
-import { setLeak } from "./leak";
-import { actOutlet } from "./outlet-policy";
-import { openSession } from "./sessions";
 import { state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
+import { audit, userAudit } from "./audit";
+import { fireEvent, revertEvent } from "./events";
+import { toggleBmc } from "./failover";
+import { setLeak } from "./leak";
+import { actOutlet } from "./outlet-policy";
+import { openSession } from "./sessions";
 
 const THEME_KEY = "dciac.theme";
 
@@ -91,10 +92,9 @@ const SCENARIOS = [
       {
         caption: () => "GPU Tray 06 is on its BMC. Next drops that path. Failover is ACS serial, not RM1048.",
         run() {
-          const mapped = deviceById("tray-06");
           state.view = "rack";
           state.selected = "tray-06";
-          loseBmc(mapped, false);
+          fireEvent("bmc-loss", "tray-06", { quiet: true });
           state.view = "rack";
           state.selected = "tray-06";
         },
@@ -114,7 +114,10 @@ const SCENARIOS = [
         caption: () => "ACS serial is the out-of-band console. RM1048 did not take the path. Next restores the BMC.",
         run() {
           const mapped = deviceById("tray-06");
-          if (mapped && mapped.bmc === "down") toggleBmc("tray-06");
+          if (mapped && mapped.bmc === "down") {
+            revertEvent("bmc-loss", "tray-06");
+            if (mapped.bmc === "down") toggleBmc("tray-06");
+          }
         },
       },
     ],
@@ -132,7 +135,7 @@ const SCENARIOS = [
       {
         caption: () => "DI-1 is quiet. Next trips the leak rope. Suggested control is Outlet 1 and Outlet 2.",
         run() {
-          setLeak(true, true);
+          fireEvent("leak-trip", "", { quiet: true });
           state.view = "control";
         },
       },

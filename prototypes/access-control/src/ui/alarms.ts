@@ -11,7 +11,6 @@ import { esc } from "./format";
 import { render } from "./schedule";
 import { go } from "./shell";
 import { floorSerial, openFloorServer, openPart } from "../views/floor";
-import { login } from "../views/login";
 import { thermalReading } from "../views/rack";
 
 export function serialFinding(d) {
@@ -152,19 +151,23 @@ export function activeAlarms(): Alarm[] {
 
 export function alarmBanner() {
   const alarms = activeAlarms();
-  if (!alarms.length) {
-    return '<div class="alarm-banner quiet"><span class="pri-mark pri-0" aria-hidden="true">—</span><p>No abnormal conditions. The last automatic serial login on every ACS port read nominal.</p></div>';
-  }
-  const shown = alarms.map((alarm) => {
+  if (!alarms.length) return "";
+  const top = alarms[0];
+  const rows = alarms.map((alarm) => {
     const unacked = !state.acked[alarm.id];
-    return '<div class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><span class="pri-mark pri-' + alarm.pri +
-      '" aria-hidden="true">' + alarm.pri + '</span><p><b>' + esc(alarm.asset) + "</b> " + esc(alarm.text) +
-      (unacked ? " Unacknowledged." : " Acknowledged.") + '</p><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
-      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><button type="button" class="act primary" data-act="alarm-go" data-alarm="' +
-      alarm.id + '">' + esc(alarm.response) + '</button><details class="explain-fold"><summary>Explain</summary>' +
-      explainHtml(alarmInput(alarm)) + "</details></div>";
+    const action = alarm.response
+      ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id + '">' + esc(alarm.response) + "</button>"
+      : "";
+    return '<details class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><summary data-act="alarm-focus" data-alarm="' +
+      alarm.id + '"><span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + "</span><b>" +
+      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + "</span>" + action +
+      '</summary><div class="alarm-extra"><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
+      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
+      explainHtml(alarmInput(alarm)) + "</details></div></details>";
   }).join("");
-  return '<div class="alarm-banner" aria-label="Abnormal conditions">' + shown + "</div>";
+  return '<details class="alarm-banner"><summary class="alarm-chip" aria-label="Abnormal conditions"><span class="pri-mark pri-' +
+    top.pri + '" aria-hidden="true">' + top.pri + "</span><span>P" + top.pri + " · " + alarms.length +
+    "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
 }
 
 export function ackAlarm(id) {

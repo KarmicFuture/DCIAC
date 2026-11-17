@@ -9,6 +9,16 @@ import { deviceById, devices } from "./data/devices";
 import { outlets } from "./data/outlets";
 import { entityById } from "./data/pods";
 import { setAnalyzer } from "./domain/analyzer";
+import {
+  encodeSimPayload,
+  fireEvent,
+  impact,
+  loadScenario,
+  resetSimulation,
+  scenarioPayload,
+  scrubTo,
+  secondsUntilCritical,
+} from "./domain/events";
 import { finishOutletHold } from "./domain/outlet-policy";
 import { stepCapacity } from "./domain/failover";
 import { runtime, state } from "./state";
@@ -18,6 +28,7 @@ window.AccessDemo = {
   state,
   devices,
   outlets,
+  runtime,
   setFailoverMs(ms) { runtime.serialFailoverMs = ms; },
   finishFailover(id) {
     const d = deviceById(id);
@@ -29,6 +40,14 @@ window.AccessDemo = {
     Object.assign(entity.load, patch);
     stepCapacity();
   },
+  fireEvent,
+  impact: () => impact(runtime.sim),
+  secondsUntilCritical,
+  resetSimulation,
+  scrubTo,
+  loadScenario,
+  encodeSimPayload,
+  scenarioPayload,
   setAnalyzer,
   finishOutletHold,
 };

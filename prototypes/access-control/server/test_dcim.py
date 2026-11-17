@@ -176,7 +176,7 @@ class DcimTest(unittest.TestCase):
         self.assertEqual(body["pue"], 1.05)
         status, hall = api.dispatch("GET", "/api/v1/capacity/hall/hall-3", {}, b"")
         self.assertEqual(status, 200)
-        self.assertEqual(hall["cduW"], 4000000)
+        self.assertEqual(hall["cduW"], 12000000)
         self.assertEqual(len(hall["rows"]), 2)
         status, rack = api.dispatch("GET", "/api/v1/capacity/rack/H3-07", {}, b"")
         self.assertEqual(status, 200)

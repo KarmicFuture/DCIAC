@@ -103,7 +103,7 @@ class PowerApiTest(unittest.TestCase):
         status, body = api.dispatch("POST", "/api/v1/power/fail", {}, b'{"nodeId":"grid-1","mode":"nameplate"}')
         self.assertEqual(status, 200, body)
         self.assertEqual(body["lost"], [])
-        self.assertTrue(any(item["id"] == "pwr-2" and item["level"] == "critical" for item in body["over"]))
+        self.assertEqual(body["over"], [])
         status, body = api.dispatch("POST", "/api/v1/power/fail", {}, b'{"nodeId":"bus-a","mode":"nameplate"}')
         lost = {item["id"] for item in body["lost"]}
         self.assertIn("psu-tray-01-a", lost)

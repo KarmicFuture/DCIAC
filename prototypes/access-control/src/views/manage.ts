@@ -62,10 +62,10 @@ export function stackNodes() {
   const bmc = shownBmc(d);
   const hot = load.temp >= 75 || load.gpu >= 90;
   return [
-    { id: "grid", name: "Grid", detail: "2 feeders · 64 MW" },
+    { id: "grid", name: "Grid", detail: "2 × 150 MW" },
     { id: "mv", name: "Substation", detail: "Medium voltage" },
-    { id: "xfmr", name: "Transformer", detail: "2 × 32 MW" },
-    { id: "module", name: "Power module", detail: "4 × 8 MW" },
+    { id: "xfmr", name: "Transformer", detail: "2 × 150 MW" },
+    { id: "module", name: "Power module", detail: "4 × 80 MW" },
     { id: "battery", name: "Battery", detail: "Two ride-through skids" },
     { id: "bus", name: "Bus bar", detail: "Overhead PowerBar" },
     { id: "shelf", name: "DC shelf", detail: "50 VDC" },
@@ -145,10 +145,10 @@ export function chipPanel(d) {
 
 export function layerCopy(id, d) {
   const future = futureOn();
-  if (id === "grid") return "<p>Two utility feeders into the OneCore yard, 32 MW each.</p><p class=\"fine\">The site needs about 29 MW for 24 MW of IT plus cooling auxiliaries. Either feeder can carry that load. " + (future ? "Dark BMC paths are the only thing the future horizon changes." : "Both feeders are in service.") + "</p>";
+  if (id === "grid") return "<p>Two utility feeders into the OneCore yard, 150 MW each.</p><p class=\"fine\">The site is a 100 MW data center. Either feeder can carry the IT load plus cooling auxiliaries. " + (future ? "Dark BMC paths are the only thing the future horizon changes." : "Both feeders are in service.") + "</p>";
   if (id === "mv") return "<p>Medium-voltage substation between the grid and the transformer.</p><p class=\"fine\">Protection and metering sit here, before the power module.</p>";
   if (id === "xfmr") return "<p>MV transformer in the yard, ahead of the power module.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="xfmr-1">Show it outside</button>';
-  if (id === "module") return "<p>Four 8 MW power modules, 32 MW together, feed the ten halls.</p><p class=\"fine\">One module can drop and the other three still cover the IT load.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="pwr-mod">Show module A outside</button>';
+  if (id === "module") return "<p>Four 80 MW power modules feed the ten halls.</p><p class=\"fine\">Each hall is on both feeders, so one module can drop and the other side still covers that hall.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="pwr-mod">Show module A outside</button>';
   if (id === "battery") return "<p>Battery skid rides through a utility dip. It does not replace the BMC path.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="batt-1">Show it outside</button>';
   if (id === "bus") return "<p>Overhead bus bar along the hot aisle. It feeds the 50 V DC shelves.</p>" + '<button type="button" class="act" data-act="floor-server" data-server="bus-a">Show bus bar A</button>';
   if (id === "shelf") return "<p>DC power shelf in rack A14. 50 V to the trays.</p>" + '<button type="button" class="act" data-act="select" data-device="pshelf">Open the shelf</button>';
@@ -164,13 +164,13 @@ export function futureBrief() {
   const dark = list.filter((d) => d.bmc === "down").length;
   const placed = state.plan.placements.length;
   const rows = [
-    ["Grid", "64 MW · 2 feeders", "64 MW · 2 feeders"],
-    ["Halls", "10 halls · 200 racks", "10 halls · 200 racks"],
-    ["Cooling", "30 MW heat rejection", "30 MW heat rejection"],
+    ["Grid", "300 MW · 2 feeders", "300 MW · 2 feeders"],
+    ["Halls", "10 halls · 200 racks · 100 MW", "10 halls · 200 racks · 100 MW"],
+    ["Cooling", "120 MW heat rejection", "120 MW heat rejection"],
     ["BMC paths", dark ? dark + " dark" : "All up", "All up"],
     ["Library plan", placed + " placed", placed ? placed + " built" : "None waiting"],
   ];
-  const changes = ["The ten halls, both feeders, and the 30 MW cooler yard are already built."];
+  const changes = ["The ten halls, both 150 MW feeders, and the 120 MW cooler yard are already built."];
   if (dark) changes.push("Dark BMC paths are restored. ACS serial remains the out-of-band wire.");
   if (placed) changes.push(placed + " library " + (placed === 1 ? "piece is" : "pieces are") + " treated as built.");
   return '<aside class="future-card"><h2>' + (futureOn() ? "Future state" : "Now") + '</h2><p class="fine">The whole system, grid to chip. Switching horizon does not change live power or sessions.</p><table><tbody>' +

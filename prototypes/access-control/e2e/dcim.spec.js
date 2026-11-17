@@ -6,13 +6,15 @@ test("install a PowerEdge R760 from Find a home and alarm on Feeder A", async ({
   await page.locator('[data-user="dsvs.admin"]').click();
   await expect(page.locator(".who strong")).toHaveText("dsvs.admin");
 
-  await page.locator('nav [data-view="dcim"]').click();
-  await expect(page.locator("h1")).toHaveText("DCIM");
+  await page.locator('nav [data-view="plan"]').click();
+  await page.locator('.view-tabs [data-view="dcim"]').click();
+  await expect(page.locator("h1")).toHaveText("Plan");
+  await expect(page.locator('.view-tabs [data-view="dcim"]')).toHaveAttribute("aria-selected", "true");
   await page.locator('[data-act="dcim-home"]').click();
   const home = page.locator('[data-act="dcim-plan"][data-rack="H3-07"]');
   await expect(home).toBeVisible();
   await home.click();
-  const note = page.locator(".dcim p.fine");
+  const note = page.locator(".dcim > p.fine").last();
   await expect(note).toContainText("not installed yet");
   await page.locator('[data-act="dcim-promote"]').click();
   await expect(note).toContainText("is submitted");
@@ -30,13 +32,14 @@ test("install a PowerEdge R760 from Find a home and alarm on Feeder A", async ({
 
   await page.locator('nav [data-view="floor"]').click();
   await page.locator('.rackbox.building[data-pod="hall-3"] .ftop').click();
-  await page.locator('button[data-act="floor-rack"][data-rack="H3-07"]').click();
+  await page.locator('.rackbox[data-act="floor-rack"][data-rack="H3-07"] .ftop').click();
   await expect(page.locator(".elev-scene, .elevation")).toContainText("PowerEdge R760");
   await page.locator('[data-act="power-fail"][data-node="grid-1"]').click();
   await expect(page.locator(".power-fail")).toContainText("No device loses power");
   await expect(page.locator(".power-fail")).toContainText("Alarm recorded");
 
-  await page.locator('nav [data-view="dcim"]').click();
+  await page.locator('nav [data-view="plan"]').click();
+  await page.locator('.view-tabs [data-view="dcim"]').click();
   await page.locator('[data-act="dcim-tab"][data-tab="monitor"]').click();
   await expect(page.locator(".dcim")).toContainText("grid-1");
 });

@@ -5,7 +5,6 @@ import { leakCard } from "../domain/leak";
 import { allOutletsReason, outletReason } from "../domain/outlet-policy";
 import { state } from "../state";
 import { esc } from "../ui/format";
-import { pills, themeButton } from "../ui/shell";
 
 export function controlStatus() {
   if (state.user.role === "ReadOnly") {
@@ -72,9 +71,7 @@ export function renderControl() {
     ? allReason
     : "Maintenance window is open. This cycles every outlet on the rack PDU, including unbound.";
   const placeholder = state.maintenance ? state.maintenance.wo : "";
-  return '<div class="page-head"><div class="top"><div><h1>Outlet control</h1>' +
-    '<p class="sub">ACS cycles outlets that are bound to a mapped asset. The rack PDU is simulated gear.</p></div>' + themeButton() + "</div>" +
-    pills() + "</div>" + leakCard() +
+  return leakCard() +
     '<div class="status ' + status.tone + '" role="status"><p>' + esc(status.text) + "</p></div>" +
     '<section class="panel"><h2>Rack PDU A14</h2><div class="table-wrap"><table><thead><tr><th>Outlet</th><th>Binding</th><th>Power</th><th>Actions</th></tr></thead><tbody>' +
     rows + '</tbody></table></div><div class="all-out"><div><strong>All outlets</strong><p class="fine">' +

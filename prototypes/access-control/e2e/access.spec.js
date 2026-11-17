@@ -7,12 +7,9 @@ const ROLES = [
 ];
 
 const VIEWS = [
-  ["floor", "Outside the building"],
-  ["manage", "Data center management"],
-  ["rack", "Rack A14"],
-  ["map", "Port map"],
-  ["control", "Outlet control"],
-  ["sessions", "Sessions"],
+  ["floor", "Outside"],
+  ["rack", "Operate"],
+  ["plan", "Plan"],
   ["audit", "Audit"],
 ];
 
@@ -33,15 +30,20 @@ test.describe("sign in and navigation", () => {
       await expect(page.locator(".who span")).toHaveText(person.role);
       for (const [view, heading] of VIEWS) {
         await page.locator(`nav [data-view="${view}"]`).click();
-        await expect(page.locator("h1")).toHaveText(heading);
+        if (view === "floor") await expect(page.locator(".hud-mission")).toContainText("Outside");
+        else await expect(page.locator("h1")).toHaveText(heading);
       }
+      await expect(page.locator("nav [data-view]")).toHaveCount(4);
+      await expect(page.locator(".rack-id")).toHaveCount(0);
+      await expect(page.locator('[data-act="simulate"]')).toHaveText("Simulate");
     });
   }
 });
 
 test("ReadOnly cannot cycle outlets or mount virtual media", async ({ page }) => {
   await signIn(page, "colo.readonly");
-  await page.locator('nav [data-view="control"]').click();
+  await page.locator('nav [data-view="rack"]').click();
+  await page.locator('.view-tabs [data-view="control"]').click();
   await expect(page.locator(".status")).toContainText("ReadOnly cannot cycle outlets.");
   const cycles = page.locator('[data-op="cycle"]');
   await expect(cycles).toHaveCount(11);
@@ -52,7 +54,8 @@ test("ReadOnly cannot cycle outlets or mount virtual media", async ({ page }) =>
 
   await page.locator('nav [data-view="rack"]').click();
   await page.getByRole("button", { name: /ACS KVM/ }).first().click();
-  await expect(page.locator("h1")).toHaveText("Sessions");
+  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-selected", "true");
   const mount = page.locator('[data-act="mount"]');
   await expect(mount).toBeDisabled();
   await expect(page.locator(".media .reason")).toHaveText("ReadOnly cannot open write-capable KVM virtual media.");
@@ -65,7 +68,8 @@ test("Operator can cycle a bound outlet and the act is audited", async ({ page }
   });
   expect(opened.ok() || opened.status() === 400).toBeTruthy();
   await signIn(page, "dsvs.operator");
-  await page.locator('nav [data-view="control"]').click();
+  await page.locator('nav [data-view="rack"]').click();
+  await page.locator('.view-tabs [data-view="control"]').click();
   const row = outletRow(page, 9);
   await expect(row).toContainText("GPU Tray 06");
   const cycle = row.locator('[data-op="cycle"]');
@@ -92,9 +96,11 @@ test("Operator can cycle a bound outlet and the act is audited", async ({ page }
 
 test("dropping a BMC starts the 30s ACS serial failover", async ({ page }) => {
   await signIn(page, "dsvs.operator");
-  await page.locator('[data-act="lab-open"]').click();
-  const tray = page.locator(".lab-row", { hasText: "GPU Tray 01" });
-  await tray.getByRole("button", { name: "Drop BMC" }).click();
+  await page.locator('[data-act="simulate"]').click();
+  await expect(page.locator("h1")).toHaveText("Simulate");
+  await page.locator("#sim-event").selectOption("bmc-loss");
+  await page.locator("#sim-target").selectOption("tray-01");
+  await page.locator('[data-act="sim-run"]').click();
 
   const wait = page.locator('[data-countdown-for="tray-01"]');
   await expect(wait).toBeVisible();
@@ -114,10 +120,12 @@ test("dropping a BMC starts the 30s ACS serial failover", async ({ page }) => {
 
 test("tripping DI-1 raises the alarm and blocks outlets 1 and 2", async ({ page }) => {
   await signIn(page, "dsvs.operator");
-  await page.locator('[data-act="lab-open"]').click();
-  await page.getByRole("button", { name: "Trip DI-1" }).click();
+  await page.locator('[data-act="simulate"]').click();
+  await page.locator("#sim-event").selectOption("leak-trip");
+  await page.locator('[data-act="sim-run"]').click();
 
-  await expect(page.locator("h1")).toHaveText("Outlet control");
+  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator('.view-tabs [data-view="control"]')).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: "DI-1 leak alarm" })).toBeVisible();
   await expect(page.locator(".alarm")).toContainText("Outlet 1 (GPU Tray 01) and Outlet 2 (GPU Tray 02)");
   await expect(page.locator(".toast")).toContainText("DI-1 alarm. Suggested control is Outlet 1 and Outlet 2.");
@@ -137,7 +145,8 @@ test("tripping DI-1 raises the alarm and blocks outlets 1 and 2", async ({ page 
 
 test("port 15 and port 16 are refused with their reasons", async ({ page }) => {
   await signIn(page, "dsvs.operator");
-  await page.locator('nav [data-view="map"]').click();
+  await page.locator('nav [data-view="rack"]').click();
+  await page.locator('.view-tabs [data-view="map"]').click();
 
   await page.locator('.port-cell[data-key="port-15"]').click();
   await expect(page.locator(".toast")).toContainText("Port 15 is not bound to a target. Access refused.");

@@ -2,7 +2,7 @@ import { deviceById } from "../data/devices";
 import { LEAK, outletByN } from "../data/outlets";
 import { audit } from "./audit";
 import { outletReason } from "./outlet-policy";
-import { state } from "../state";
+import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 
@@ -22,7 +22,7 @@ export function setLeak(on, keepOpen) {
       outlet: "Outlet 1, Outlet 2",
       detail: "Bound control only. Plant-wide trip is not the policy.",
     });
-    state.view = "control";
+    if (!runtime.sim.stay) state.view = "control";
     if (!keepOpen) state.labOpen = false;
     state.toast = "DI-1 alarm. Suggested control is Outlet 1 and Outlet 2.";
   } else {

@@ -17,14 +17,14 @@ A14 = (
 )
 
 YARD = (
-    ("grid-1", "Feeder A", "feeder", "A", "source", 32000000),
-    ("grid-2", "Feeder B", "feeder", "B", "source", 32000000),
-    ("xfmr-1", "Transformer A", "transformer", "A", "distribution", 32000000),
-    ("xfmr-2", "Transformer B", "transformer", "B", "distribution", 32000000),
-    ("pwr-mod", "Power module A", "module", "A", "distribution", 8000000),
-    ("pwr-2", "Power module B", "module", "B", "distribution", 8000000),
-    ("pwr-3", "Power module C", "module", "A", "distribution", 8000000),
-    ("pwr-4", "Power module D", "module", "B", "distribution", 8000000),
+    ("grid-1", "Feeder A", "feeder", "A", "source", 150000000),
+    ("grid-2", "Feeder B", "feeder", "B", "source", 150000000),
+    ("xfmr-1", "Transformer A", "transformer", "A", "distribution", 150000000),
+    ("xfmr-2", "Transformer B", "transformer", "B", "distribution", 150000000),
+    ("pwr-mod", "Power module A", "module", "A", "distribution", 80000000),
+    ("pwr-2", "Power module B", "module", "B", "distribution", 80000000),
+    ("pwr-3", "Power module C", "module", "A", "distribution", 80000000),
+    ("pwr-4", "Power module D", "module", "B", "distribution", 80000000),
 )
 
 
@@ -70,19 +70,19 @@ def ensure_power(conn):
         return
     for node_id, name, kind, side, role, capacity in YARD:
         add_node(conn, node_id, name, kind, side, role, capacity, asset_id=node_id)
-    add_edge(conn, "e-fa-xa", "grid-1", "xfmr-1", 32000000, 13800, 3)
-    add_edge(conn, "e-fb-xb", "grid-2", "xfmr-2", 32000000, 13800, 3)
-    add_edge(conn, "e-xa-ma", "xfmr-1", "pwr-mod", 8000000, 13800, 3)
-    add_edge(conn, "e-xa-mc", "xfmr-1", "pwr-3", 8000000, 13800, 3)
-    add_edge(conn, "e-xb-mb", "xfmr-2", "pwr-2", 8000000, 13800, 3)
-    add_edge(conn, "e-xb-md", "xfmr-2", "pwr-4", 8000000, 13800, 3)
+    add_edge(conn, "e-fa-xa", "grid-1", "xfmr-1", 150000000, 13800, 3)
+    add_edge(conn, "e-fb-xb", "grid-2", "xfmr-2", 150000000, 13800, 3)
+    add_edge(conn, "e-xa-ma", "xfmr-1", "pwr-mod", 80000000, 13800, 3)
+    add_edge(conn, "e-xa-mc", "xfmr-1", "pwr-3", 80000000, 13800, 3)
+    add_edge(conn, "e-xb-mb", "xfmr-2", "pwr-2", 80000000, 13800, 3)
+    add_edge(conn, "e-xb-md", "xfmr-2", "pwr-4", 80000000, 13800, 3)
     for index in range(10):
         key = "a" if index == 0 else str(index + 1)
         bus = "bus-" + key
-        add_node(conn, bus, "Hall " + str(index + 1) + " busway", "bus", "both", "distribution", 4000000, asset_id=bus, rack_id=key)
+        add_node(conn, bus, "Hall " + str(index + 1) + " busway", "bus", "both", "distribution", 16000000, asset_id=bus, rack_id=key)
         left, right = module_pair(key)
-        add_edge(conn, "e-" + left + "-" + bus, left, bus, 8000000, 415, 3)
-        add_edge(conn, "e-" + right + "-" + bus, right, bus, 8000000, 415, 3)
+        add_edge(conn, "e-" + left + "-" + bus, left, bus, 16000000, 415, 3)
+        add_edge(conn, "e-" + right + "-" + bus, right, bus, 16000000, 415, 3)
     for row in conn.execute(
         """SELECT a.id, a.custom_json FROM asset a
            JOIN model m ON m.id = a.model_id WHERE m.category = 'Cabinet'"""
@@ -92,8 +92,8 @@ def ensure_power(conn):
         if not rack or rack == "A14":
             continue
         node = "rack-" + rack
-        add_node(conn, node, "Rack " + rack, "rack", "both", "load", 120000, 120000, 96000, asset_id=row["id"], rack_id=rack)
-        add_edge(conn, "e-bus-" + node, "bus-" + hall_key(rack), node, 120000, 415, 3)
+        add_node(conn, node, "Rack " + rack, "rack", "both", "load", 500000, 500000, 400000, asset_id=row["id"], rack_id=rack)
+        add_edge(conn, "e-bus-" + node, "bus-" + hall_key(rack), node, 500000, 415, 3)
     add_node(conn, "pdu-A14-a", "rPDU A", "rpdu", "A", "distribution", 120000, asset_id="pdu-A14-a", rack_id="A14")
     add_node(conn, "pdu-A14-b", "rPDU B", "rpdu", "B", "distribution", 120000, asset_id="pdu-A14-b", rack_id="A14")
     add_edge(conn, "e-bus-rpdu-a", "bus-a", "pdu-A14-a", 120000, 50, 1)

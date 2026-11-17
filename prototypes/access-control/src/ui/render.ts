@@ -1,6 +1,20 @@
 import { html, render as litRender } from "lit-html";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import { assertWorld, deviceById } from "../data/devices";
+import {
+  bindSimAlarmReader,
+  closeSimBar,
+  copySimLink,
+  fireEvent,
+  openSimBar,
+  pauseSim,
+  resetSimulation,
+  runSimSelection,
+  saveSimScenario,
+  scrubTo,
+  setSimSpeed,
+  stepSimCapacity,
+} from "../domain/events";
 import { applyCapacitySeed, stepCapacity, tick, toggleBmc } from "../domain/failover";
 import { onHashChange, syncHash } from "../domain/route";
 import { restoreWorld, saveWorld } from "../domain/storage";
@@ -18,7 +32,7 @@ import { bindRender, render } from "./schedule";
 import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
-import { applyCamera, floorSerial, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
 import { advanceDemo, loadTheme, startDemo, stopDemo, toggleTheme } from "../domain/demo";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
@@ -84,7 +98,7 @@ function toggleButton(key, collapsed) {
 
 function dressChrome() {
   document.querySelectorAll(".scene-popbar").forEach((node) => node.remove());
-  document.querySelectorAll("#content section.panel, #content aside.inspector").forEach((node) => {
+  document.querySelectorAll("#content section.panel, #content aside.inspector:not(.drawer)").forEach((node) => {
     const panel = node as HTMLElement;
     const title = panelTitle(panel);
     const key = state.view + ":" + title;
@@ -150,9 +164,16 @@ function dressChrome() {
   });
 }
 
+function clearBootNote(root) {
+  Array.from(root.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE && node.textContent && node.textContent.indexOf("asset repository") >= 0) node.remove();
+  });
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
+  clearBootNote(root);
   if (state.user) refreshSerialWatch();
   if (!state.user) {
     runtime.lastRenderedView = "login";
@@ -191,14 +212,15 @@ export function syncFields() {
 
 export function onClick(event) {
   let el = event.target.closest("[data-act]");
-  if (state.user && state.view === "floor" && !event.target.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing")) {
+  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing")) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }
-  if (!el || el.disabled) return;
-  if (el.dataset.port) state.selectedPort = Number(el.dataset.port) || 0;
-  syncFields();
-  const act = el.dataset.act;
+  const floorBlank = !el && state.user && state.view === "floor";
+  if ((!el || el.disabled) && !floorBlank) return;
+  if (el && el.dataset.port) state.selectedPort = Number(el.dataset.port) || 0;
+  if (el) syncFields();
+  const act = el ? el.dataset.act : "";
   if (act === "login") {
     signIn(el.dataset.user);
     return;
@@ -212,6 +234,15 @@ export function onClick(event) {
     state.floor.suppressClick = false;
     return;
   }
+  if (!el) {
+    const scene = event.target.closest && event.target.closest(".scene");
+    const chrome = event.target.closest && event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .lib, .inspector, .walk-bar, .scene-popbar");
+    if (scene && !chrome && (state.inspectorOpen || state.plan.selected || state.plan.preview)) {
+      closeFloorDetail();
+      render();
+    }
+    return;
+  }
   if (act === "signout") signOut();
   else if (act === "menu") { state.menuOpen = !state.menuOpen; render(); }
   else if (act === "menu-close") { state.menuOpen = false; render(); }
@@ -219,6 +250,18 @@ export function onClick(event) {
   else if (act === "port-filter") { state.portFilter = el.dataset.filter || "all"; render(); }
   else if (act === "port-density") { state.portCompact = !state.portCompact; render(); }
   else if (act === "horizon") { state.horizon = el.dataset.horizon === "future" ? "future" : "now"; render(); if (state.horizon === "future") loadFuturePlan(); }
+  else if (act === "build-day" || act === "build-stage") { state.buildDate = el.dataset.date || state.buildDate; render(); }
+  else if (act === "build-open") {
+    if (el.dataset.live === "1" && el.dataset.pod) {
+      state.view = "floor";
+      state.floor.level = "hall";
+      state.floor.podId = el.dataset.pod;
+      render();
+    } else {
+      state.toast = "That hall is not in service on this date.";
+      render();
+    }
+  }
   else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
   else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); loadFuturePlan(); }
   else if (act === "manage-layer") { state.manage.layer = el.dataset.layer || "bmc"; render(); }
@@ -243,7 +286,28 @@ export function onClick(event) {
   else if (act === "briefing-start") startBriefing();
   else if (act === "briefing-next") advanceBriefing();
   else if (act === "briefing-skip") skipBriefing();
-  else if (act === "lab-open") { state.labOpen = true; state.menuOpen = false; render(); }
+  else if (act === "lab-open" || act === "simulate") {
+    state.labOpen = false;
+    state.menuOpen = false;
+    state.view = "simulate";
+    state.toast = "";
+    render();
+  }
+  else if (act === "sim-open") openSimBar();
+  else if (act === "sim-close") closeSimBar();
+  else if (act === "sim-run") runSimSelection();
+  else if (act === "sim-pause") pauseSim();
+  else if (act === "sim-speed") { setSimSpeed(Number(el.dataset.speed) || 1); render(); }
+  else if (act === "sim-reset") resetSimulation();
+  else if (act === "sim-scrub") scrubTo(Number(el.dataset.at) || 0);
+  else if (act === "sim-copy") copySimLink();
+  else if (act === "sim-save") saveSimScenario();
+  else if (act === "sim-break") {
+    runtime.sim.barOpen = true;
+    runtime.sim.running = true;
+    runtime.sim.paused = false;
+    fireEvent(el.dataset.event || "", el.dataset.target || "", { stay: true });
+  }
   else if (act === "lab-close") { state.labOpen = false; render(); }
   else if (act === "bmc-toggle") toggleBmc(el.dataset.device);
   else if (act === "floor-pod") {
@@ -319,6 +383,7 @@ export function onClick(event) {
   }
   else if (act === "floor-hall") {
     state.view = "floor";
+    state.inspectorOpen = false;
     state.floor.podId = el.dataset.pod || "pod-a";
     state.floor.level = "hall";
     state.floor.serverId = "";
@@ -344,17 +409,30 @@ export function onClick(event) {
   }
   else if (act === "floor-zoom") zoomFloor(el.dataset.dir);
   else if (act === "alarm-ack") ackAlarm(el.dataset.alarm);
-  else if (act === "alarm-go") goAlarm(el.dataset.alarm);
+  else if (act === "alarm-focus") {
+    if (state.view === "floor") {
+      const alarm = activeAlarms().find((item) => item.id === el.dataset.alarm);
+      if (alarm) focusFloorAlarm(alarm);
+    }
+  }
+  else if (act === "alarm-go") {
+    event.preventDefault();
+    event.stopPropagation();
+    goAlarm(el.dataset.alarm);
+  }
   else if (act === "explain-run") runExplain(el.dataset.explainKind, el.dataset.explainId);
   else if (act === "plan-maker") { state.plan.maker = el.dataset.maker; render(); }
+  else if (act === "library-open") { state.libraryOpen = !state.libraryOpen; render(); }
   else if (act === "plan-preview") {
     state.plan.preview = el.dataset.catalog;
     state.plan.selected = "";
+    state.inspectorOpen = true;
     render();
   }
   else if (act === "plan-select") {
     state.plan.selected = el.dataset.plan;
     state.plan.preview = "";
+    state.inspectorOpen = true;
     render();
   }
   else if (act === "plan-open") openPlan(el.dataset.plan);
@@ -464,6 +542,14 @@ export function onInput(event) {
     state.focusField = "port-search";
     render();
   }
+  if (target.id === "sim-event") {
+    runtime.sim.eventId = target.value;
+    runtime.sim.targetId = "";
+    render();
+  }
+  if (target.id === "sim-target") {
+    runtime.sim.targetId = target.value;
+  }
 }
 
 export function onChange(event) {
@@ -496,6 +582,16 @@ export function onChange(event) {
 }
 
 export function onKeyDown(event) {
+  if (event.key === "Escape") {
+    const typing = event.target.closest && event.target.closest("input, textarea, select");
+    if (typing) return;
+    if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.plan.selected || state.plan.preview)) {
+      state.libraryOpen = false;
+      closeFloorDetail();
+      render();
+    }
+    return;
+  }
   if ((event.key === "Enter" || event.key === " ") && event.target.matches && event.target.matches("[role='button'][data-act]")) {
     event.preventDefault();
     event.target.click();
@@ -525,6 +621,11 @@ function markScrollers() {
 
 export async function boot() {
   loadTheme();
+  bindSimAlarmReader(() => activeAlarms().map((alarm) => ({
+    id: alarm.id,
+    text: alarm.text,
+    asset: alarm.asset,
+  })));
   const root = document.getElementById("app");
   if (root) root.textContent = "Loading the asset repository…";
   try {
@@ -552,7 +653,7 @@ export async function boot() {
   document.body.addEventListener("drop", onDrop);
   document.body.addEventListener("dragend", onDragEnd);
   setInterval(() => { tick(); settleOutletHold(); }, 250);
-  setInterval(stepCapacity, 1000);
+  setInterval(() => stepSimCapacity(stepCapacity, 1000), 100);
   render();
 }
 

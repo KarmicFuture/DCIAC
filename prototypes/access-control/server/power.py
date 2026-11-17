@@ -87,6 +87,9 @@ def analyze(nodes, edges, failed_id="", mode="nameplate", measured=None, factors
         if node.get("role") == "load" or cap <= 0 or not live.get(node["id"]):
             continue
         percent = 100.0 * watts / cap
+        # A tap sized to its device sits at its rating. That is the design load, not an overload.
+        if node.get("kind") == "outlet" and percent <= 100:
+            continue
         if percent >= 80:
             over.append({
                 "id": node["id"],

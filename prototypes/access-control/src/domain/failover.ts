@@ -41,7 +41,7 @@ export function loseBmc(mapped, navigate) {
     state.selected = mapped.id;
     state.view = "rack";
     state.labOpen = false;
-  } else if (state.view === "floor") {
+  } else if (state.view === "floor" && !runtime.sim.stay && !runtime.sim.running) {
     state.floor.level = "server";
     state.floor.podId = "pod-a";
     state.floor.rackId = "A14";
@@ -157,7 +157,7 @@ export function stepCapacity() {
   devices.forEach(consider);
   neighbors.forEach(consider);
   infra.forEach(consider);
-  if (state.user && state.view === "floor") {
+  if (state.user && state.view === "floor" && !runtime.sim.stay) {
     if (dirty) render();
     else updateFloorMeters();
   }

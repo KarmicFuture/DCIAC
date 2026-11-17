@@ -5,7 +5,7 @@ import { mediaReason, rmBlockCopy, sessionBlocked } from "../domain/single-maste
 import { state } from "../state";
 import { explainHtml, serialInput } from "../ui/explain";
 import { esc } from "../ui/format";
-import { pills, themeButton } from "../ui/shell";
+import { watchTable } from "../ui/alarms";
 import { launcher } from "./rack";
 
 export function mediaControls(s) {
@@ -161,7 +161,5 @@ export function renderSessions() {
   const body = state.sessions.length
     ? '<p class="fine">A dark BMC fails over to ACS serial and ACS KVM. A lost RDP desktop fails over to ACS KVM. RM1048 stays the in-band plane.</p><div class="workspace">' + cards + "</div>"
     : '<p class="empty">No sessions open. On the port map, choose any of the 48 ACS serial ports.</p>';
-  return '<div class="page-head"><div class="top"><div><h1>Sessions</h1>' +
-    '<p class="sub">Each pane names the path, the device, and the port or URI.</p></div>' + themeButton() + "</div>" +
-    pills() + "</div>" + body;
+  return body + watchTable();
 }

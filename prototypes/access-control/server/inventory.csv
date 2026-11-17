@@ -1,0 +1,41 @@
+﻿Category,Device Type,Example Models,Role in AI Data Center,Mgmt Interface,Typical Size,Typical Power (approx.),Notes
+Compute,GPU server (8-GPU HGX),"NVIDIA DGX B200, Dell PowerEdge XE9680, Supermicro HGX systems",Runs AI training and inference workloads,"BMC (Redfish, IPMI), serial console",8–10U,~10–14 kW,"Highest-value asset; track GPU serials individually"
+Compute,Rack-scale GPU system,NVIDIA GB200 NVL72,Full-rack GPU domain linked by NVLink,"BMC per compute tray (Redfish), rack mgmt controller",Full rack,~120+ kW per rack,"Liquid cooled; pairs with CDU"
+Compute,CPU / head node,"Dell PowerEdge R760, HPE ProLiant DL380 Gen11","Scheduler, login, and cluster mgmt nodes","BMC (Redfish, IPMI)",1–2U,~0.5–1 kW,Runs Slurm / Kubernetes control plane
+Compute,DPU / SuperNIC,"NVIDIA BlueField-3, ConnectX-7/8","Offloads networking, storage, and security","Host PCIe, DPU BMC",PCIe card,~75–150 W,Inventory as a component of its host server
+Storage,High-performance storage node,"DDN AI400X2, VAST Data, WEKA",Feeds training data to GPUs at high throughput,"BMC, mgmt Ethernet, REST API",2U,~1.5–3 kW,Parallel file system tier
+Storage,Bulk / object storage,"Pure FlashBlade, NetApp AFF / StorageGRID","Datasets, checkpoints, model artifacts","Mgmt Ethernet, REST API, SNMP",Varies,Varies,Capacity tier
+Network,InfiniBand switch,NVIDIA Quantum-2 QM9700,GPU-to-GPU compute fabric (leaf/spine),"Serial console, mgmt Ethernet, UFM",1U,~1.7 kW,64 ports of 400G NDR
+Network,AI Ethernet fabric switch,"NVIDIA Spectrum-X SN5600, Arista 7060X, Cisco Nexus 9364D-GX2A",RoCE-based GPU compute fabric,"Serial console, mgmt Ethernet, SSH, gNMI",1–2U,~1–2.5 kW,800G/400G ports
+Network,Frontend / data switch,"Arista 7050X, Cisco Nexus 9300",Storage and user traffic,"Serial console, mgmt Ethernet, SNMP",1U,~0.5 kW,
+Network,OOB management switch,"Cisco Catalyst 9300, NVIDIA SN2201, Juniper EX4400","1G network for BMCs, PDUs, and console servers","Serial console, SSH, SNMP",1U,~0.2–0.5 kW,Keep separate from production fabric
+Network,Border router / firewall,"Juniper MX, Palo Alto PA-5400","Internet and WAN edge, security policy","Serial console, mgmt Ethernet",2–5U,Varies,
+Network,Fabric manager appliance,NVIDIA UFM appliance,InfiniBand subnet management and telemetry,"Mgmt Ethernet, BMC",1U,~0.5 kW,
+Network,Optical transceivers / cables,"800G / 400G OSFP and QSFP-DD optics, DAC / AEC cables",Physical fabric links,Read via host switch (DOM),Pluggable,~10–17 W each,"Thousands per cluster; track by serial"
+Mgmt / OOB,Serial console server,"Vertiv Avocent ACS 8000, Opengear CM8100",Out-of-band console access to switches and servers,"Serial (RS-232 / USB), Ethernet, cellular",1U,~30–50 W,Last-resort access when the network is down
+Mgmt / OOB,Rack manager,Vertiv Avocent ADX RM1048P,"Rack-level aggregation of BMC, PDU, and sensor mgmt","Ethernet, serial, USB",1U,Low,
+Mgmt / OOB,Management platform appliance,Vertiv Avocent ADX MP1000,Central management of rack managers and devices,"Ethernet, web UI, API",1U,Low,
+Mgmt / OOB,IP KVM switch,Vertiv Avocent KVM / IP KVM,"Remote keyboard, video, mouse for legacy hosts","Ethernet, web UI",1U,Low,
+Mgmt / OOB,Jump host / bastion,Hardened 1U server or VM,Secure entry point to mgmt network,"BMC, SSH",1U,~0.3 kW,
+Mgmt / OOB,Time server (PTP / NTP),"Meinberg LANTIME, Microchip SyncServer",Precise time sync across the cluster,"Ethernet, SNMP, web UI",1U,Low,GPS antenna input
+Power,Rack PDU (switched / metered),"Vertiv Geist rPDU, Raritan PX4",Per-outlet power distribution and metering in the rack,"Ethernet: SNMP, Redfish, web; serial",0U,Distributes up to ~50–60 kW,Often 2+ per rack for A/B feeds
+Power,Power shelf (48V),OCP ORv3 power shelf,Rack-level DC power for ORv3 racks,"PMBus, Ethernet / rack mgmt",Shelf,Up to ~33 kW per shelf,Common in hyperscale / OCP builds
+Power,Busway / tap-off box,Vertiv / Starline Track Busway,Overhead power feed to racks,Metered tap-offs via Modbus / SNMP,Overhead,N/A,
+Power,Floor PDU / remote power panel,"Vertiv Liebert RPP, Liebert FPC",Distributes UPS power to rows,"Modbus, SNMP",Floor unit,N/A,
+Power,UPS,"Vertiv Liebert EXL S1, Eaton 93PM",Ride-through and power conditioning,"SNMP / web card, Modbus",Floor unit,Hundreds of kW to MW,Track battery strings separately
+Power,Battery cabinet (Li-ion / VRLA),Vertiv Liebert EXL battery cabinets,UPS energy storage,BMS via Modbus / SNMP,Floor unit,N/A,Track install date for replacement cycle
+Power,Static transfer switch / ATS,Vertiv Liebert STS2,Switches between power sources,"Modbus, SNMP",Floor unit,N/A,
+Power,Generator,"Caterpillar, Cummins",Backup power during utility outage,Modbus / BMS controller,Outdoor,MW scale,
+Cooling,Coolant distribution unit (CDU),"Vertiv CoolChip CDU, CoolIT CHx",Direct-to-chip liquid cooling loop,"Modbus, BACnet, SNMP",In-row or in-rack,Removes 100s of kW to MW of heat,Critical for GB200-class racks
+Cooling,Rear-door heat exchanger,"Vertiv Liebert DCD, Motivair ChilledDoor",Removes heat at the back of the rack,"Modbus, SNMP",Rack door,Fans ~1 kW,
+Cooling,CRAH / CRAC / fan wall,Vertiv Liebert CW / PDX,Air cooling for the room,"Modbus, BACnet, SNMP",Floor unit,Varies,
+Cooling,Chiller,"Vertiv Liebert AFC, Trane",Produces chilled water for CDUs and CRAHs,"BACnet, Modbus",Outdoor,Varies,
+Cooling,Leak detection sensor,"Vertiv Liebert LDM, rope leak sensors",Detects coolant leaks under racks and CDUs,"Contact closure, Modbus, SNMP via monitor",Sensor,N/A,Essential with liquid cooling
+Environmental,Environmental monitoring unit,Vertiv Geist Watchdog,"Temperature, humidity, airflow, door sensors","Ethernet: SNMP, web",0–1U,Low,
+Environmental,Rack / cabinet,"Vertiv VR Rack, OCP ORv3 rack",Houses IT equipment,N/A (track via rack manager),42–52U,N/A,"Track location, row, and position"
+Environmental,Containment system,Vertiv SmartAisle,Hot / cold aisle separation,Optional sensors,Aisle,N/A,
+Security,Electronic rack lock / access control,Vertiv Geist / HID-compatible rack locks,Controls and logs physical access to racks,Ethernet via PDU or monitor,Rack door,Low,
+Security,Security camera,"Axis, Hanwha",Video surveillance of data hall,"Ethernet, ONVIF",Ceiling / wall,PoE,
+Security,Hardware security module (HSM),Thales Luna Network HSM,Protects keys for model and data encryption,"Ethernet, serial",1U,~0.1–0.2 kW,
+Facility,Fire suppression panel,Clean agent (FM-200 / Novec) or pre-action systems,Fire detection and suppression,"Contact closure, BMS",Wall panel,Low,
+Facility,Building management system (BMS) controller,"Schneider, Siemens, Johnson Controls",Ties facility systems together,"BACnet, Modbus",Panel,Low,

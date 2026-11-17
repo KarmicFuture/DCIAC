@@ -169,6 +169,9 @@ export interface AppState {
     placements: any[];
   };
   horizon: string;
+  buildDate: string;
+  libraryOpen: boolean;
+  inspectorOpen: boolean;
   manage: { layer: string; device: string };
   containment: string;
   theme: string;

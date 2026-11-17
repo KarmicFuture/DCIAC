@@ -242,6 +242,8 @@ def connect(path=None):
     ensure_power(_conn)
     from server.dcim import ensure_dcim
     ensure_dcim(_conn)
+    from server.campus_scale import scale_campus
+    scale_campus(_conn)
     _conn.commit()
     return _conn
 
@@ -343,6 +345,38 @@ def migrate(conn):
         conn.execute("ALTER TABLE audit_event ADD COLUMN source_ip TEXT")
 
 
+def ensure_inventory(conn):
+    from server.inventory_catalog import load_sheet
+    names = {row["model"].casefold() for row in conn.execute("SELECT model FROM model")}
+    ids = {row["id"] for row in conn.execute("SELECT id FROM model")}
+    conn.execute(
+        "INSERT OR IGNORE INTO location (id, kind, name, parent_id, custom_json) VALUES ('inventory', 'stock', 'Inventory', 'bldg-1', '{}')"
+    )
+    for item in load_sheet():
+        if item[2].casefold() in names:
+            continue
+        model_id = item[0]
+        if model_id in ids:
+            model_id = model_id + "-b"
+        conn.execute(
+            """INSERT OR IGNORE INTO model (
+                id, manufacturer, model, category, u_height, nameplate_w, depth_mm, weight_kg,
+                typical_w, derated_w, input_voltage, plug_type, power_ports, power_port_type,
+                power_redundancy, net_ports, net_speed, net_media, place, redfish_type, note
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (model_id, item[1], item[2], item[3], item[4], item[7], item[5], item[6], item[8], item[9], item[10], item[11], item[12], item[13], item[14], item[15], item[16], item[17], item[18], item[19], item[20]),
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO asset (
+                id, asset_tag, serial, model_id, tenant_id, lifecycle, installed_on, warranty_end,
+                location_id, u_position, face, width, custom_json
+            ) VALUES (?, ?, ?, ?, 'unubtanium', 'Received', '', '2029-01-15', 'inventory', NULL, 'front', 'full', ?)""",
+            ("stock-" + model_id, item[2], "STOCK-" + model_id, model_id, json.dumps({"floor": "stock"})),
+        )
+        names.add(item[2].casefold())
+        ids.add(model_id)
+
+
 def ensure_catalog(conn):
     from server.catalog import A14_GEAR, LIBRARY
     for item in LIBRARY:
@@ -354,6 +388,7 @@ def ensure_catalog(conn):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (item[0], item[1], item[2], item[3], item[4], item[7], item[5], item[6], item[8], item[9], item[10], item[11], item[12], item[13], item[14], item[15], item[16], item[17], item[18], item[19], item[20]),
         )
+    ensure_inventory(conn)
     for row in conn.execute("SELECT id, custom_json FROM location WHERE kind = 'rack'"):
         custom = json.loads(row["custom_json"] or "{}")
         custom.setdefault("uHeight", 42)

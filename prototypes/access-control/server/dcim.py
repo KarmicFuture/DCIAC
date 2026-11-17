@@ -9,6 +9,9 @@ from datetime import datetime, timedelta, timezone
 
 from server.fit import check_fit
 
+RACK_BUDGET_W = 500000
+HALL_CDU_W = 12000000
+
 STATES = ("Draft", "Submitted", "Approved", "Scheduled", "In progress", "Verified", "Closed", "Rejected")
 NEXT = {
     "Draft": {"Submitted"},
@@ -414,11 +417,11 @@ def find_home(conn, model_id, quantity=1, hall_id=""):
         if model["netPorts"] > free_net:
             continue
         used_w = sum(item["nameplateW"] for item in mounts)
-        if used_w + model["nameplateW"] > 120000:
+        if used_w + model["nameplateW"] > RACK_BUDGET_W:
             continue
         reasons = [
             str(model["uHeight"]) + "U fits at U" + str(u_position),
-            str(model["nameplateW"]) + " W is inside the 120 kW rack budget on both feeds",
+            str(model["nameplateW"]) + " W is inside the 500 kW rack budget on both feeds",
             "CDU has room for the extra heat",
             str(free_net) + " network ports of 25G are free",
         ]
@@ -441,7 +444,7 @@ def installed_watts(conn):
         if it:
             total += sum(row["nameplate_w"] or 0 for row in it)
         else:
-            total += 120000
+            total += RACK_BUDGET_W
     return total
 
 
@@ -449,7 +452,7 @@ def _rack_installed(assets):
     it = [row for row in assets if row["category"] in ("Server", "Switch", "Storage", "GPU tray")]
     if it:
         return sum(row["nameplate_w"] or 0 for row in it)
-    return 120000
+    return RACK_BUDGET_W
 
 
 def capacity_tree(conn):
@@ -482,9 +485,9 @@ def capacity_tree(conn):
             "freeU": 42 - used_u,
             "largestFreeU": max([block["length"] for block in blocks], default=0),
             "blocks": blocks,
-            "provisionedW": 120000,
+            "provisionedW": RACK_BUDGET_W,
             "installedW": installed,
-            "strandedW": stranded(120000, installed),
+            "strandedW": stranded(RACK_BUDGET_W, installed),
             "networkFree": {"25G": max(0, 8 - used_net)},
         }
         bucket = halls.setdefault(hall["id"], {"id": hall["id"], "name": hall["name"], "rows": {}, "racks": []})
@@ -496,12 +499,12 @@ def capacity_tree(conn):
     out = []
     for hall in halls.values():
         installed = sum(rack["installedW"] for rack in hall["racks"])
-        provisioned = 120000 * len(hall["racks"])
+        provisioned = RACK_BUDGET_W * len(hall["racks"])
         hall["provisionedW"] = provisioned
         hall["installedW"] = installed
         hall["strandedW"] = stranded(provisioned, installed)
         hall["heatW"] = installed
-        hall["cduW"] = 4000000
+        hall["cduW"] = HALL_CDU_W
         hall["freeU"] = sum(rack["freeU"] for rack in hall["racks"])
         hall["largestFreeU"] = max([rack["largestFreeU"] for rack in hall["racks"]], default=0)
         hall["networkFree"] = {"25G": sum(rack["networkFree"]["25G"] for rack in hall["racks"])}
@@ -536,7 +539,7 @@ def measured_watts(conn):
 
 def capacity_report(conn, inlet_c=24):
     it_w = installed_watts(conn)
-    provisioned = conn.execute("SELECT COUNT(*) AS n FROM location WHERE kind = 'rack'").fetchone()["n"] * 120000
+    provisioned = conn.execute("SELECT COUNT(*) AS n FROM location WHERE kind = 'rack'").fetchone()["n"] * RACK_BUDGET_W
     facility = int(it_w * 1.05)
     return {
         "provisionedW": provisioned,
@@ -546,7 +549,7 @@ def capacity_report(conn, inlet_c=24):
         "pue": pue(facility, it_w),
         "inletC": inlet_c,
         "ashrae": ashrae(inlet_c),
-        "cduW": 4000000,
+        "cduW": HALL_CDU_W,
         "heatW": it_w,
         "halls": capacity_tree(conn),
     }
@@ -565,7 +568,7 @@ def _future_deltas(conn, scenario_id):
         free_u -= sign * (row["u_height"] or 0)
         heat += sign * (row["nameplate_w"] or 0)
         ports -= sign * (row["net_ports"] or 0)
-    cooling = 10 * 4000000
+    cooling = 10 * HALL_CDU_W
     now_w = installed_watts(conn)
     later = max(0, now_w + heat)
     return {
@@ -888,7 +891,11 @@ def note_failure(conn, node_id, report):
     critical = [item for item in report.get("over") or [] if item.get("level") == "critical"]
     lost = report.get("lost") or []
     if not critical and not lost:
-        return None
+        return raise_alarm(
+            conn, 2, node_id,
+            node_id + " failed. The other side still carries the load. No node is over 80%.",
+            "Keep the surviving feed. Restore this feeder before the next maintenance window.",
+        )
     text = node_id + " failed. " + str(len(lost)) + " loads lost. " + str(len(critical)) + " nodes over 100%."
     return raise_alarm(conn, 1 if lost else 2, node_id, text, "Open the power path. Keep the surviving feed, and use ACS serial if a BMC goes dark.")
 
@@ -1080,7 +1087,12 @@ def report_table(conn, kind):
                     soon = (datetime.fromisoformat(asset["warranty_end"]).date() - today).days <= 90
                 except ValueError:
                     soon = False
-            rows.append({"tag": asset["asset_tag"], "vendor": asset["manufacturer"], "model": asset["manufacturer"] + " " + asset["model"], "lifecycle": asset["lifecycle"], "location": asset["location"], "hall": hall_of(asset["location_id"]), "warrantySoon": soon})
+            hall = hall_of(asset["location_id"])
+            if not hall and asset["location_id"] == "inventory":
+                hall = "Inventory"
+            elif not hall and asset["location_id"] == "yard":
+                hall = "Outside"
+            rows.append({"tag": asset["asset_tag"], "vendor": asset["manufacturer"], "model": asset["manufacturer"] + " " + asset["model"], "lifecycle": asset["lifecycle"], "location": asset["location"], "hall": hall, "warrantySoon": soon})
         return {"kind": kind, "rows": rows}
     if kind == "capacity":
         halls = capacity_tree(conn)

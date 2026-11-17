@@ -5,10 +5,19 @@ import { powerHtml } from "./power";
 import { authHeaders } from "../data/repository";
 import { outlets } from "../data/outlets";
 import { PLANT, PODS, YARD, deviceRackId, entityById, entityScore, heatBand, infra, isFacility, podById, rackById, rackEntities, worstBand } from "../data/pods";
+import {
+  breakEventsForEntity,
+  breakEventsForRack,
+  breakThisHtml,
+  impact,
+  simBarHtml,
+  simStripeHtml,
+} from "../domain/events";
+import type { SimImpact } from "../domain/events";
 import { waiting } from "../domain/failover";
 import { openSession } from "../domain/sessions";
 import { runtime, state } from "../state";
-import { activeAlarms, watchTable } from "../ui/alarms";
+import { activeAlarms } from "../ui/alarms";
 import { clamp, esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { pills, themeButton } from "../ui/shell";
@@ -89,6 +98,12 @@ export function cameraTransform() {
     "deg) rotateZ(" + floor.yaw + "deg) scale(" + floor.zoom + ")";
 }
 
+export const LOD_NEAR = 1.12;
+
+export function floorLod() {
+  return state.floor.zoom >= LOD_NEAR ? "near" : "far";
+}
+
 export function applyCamera() {
   const world = document.querySelector(".world");
   if (world) {
@@ -103,6 +118,9 @@ export function applyCamera() {
     world.style.transform = "scale(" + fit.toFixed(4) + ") " + cameraTransform();
     world.style.setProperty("--pitch", state.floor.pitch + "deg");
     world.style.setProperty("--yaw", state.floor.yaw + "deg");
+    if (world.hasAttribute("data-lod") || world.querySelector(".pod")) {
+      world.setAttribute("data-lod", floorLod());
+    }
   }
   watchStage();
   const chassis = document.querySelector(".chassis");
@@ -180,19 +198,18 @@ export function drillEl(node) {
 export function pickDrill(x, y) {
   const stack = document.elementsFromPoint(x, y);
   const top = stack[0];
-  if (!top || (top.closest && top.closest(".hud, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .elev-scene, .scene-popbar, .panel-bar, .briefing"))) return null;
-  let direct = null;
+  if (!top || (top.closest && top.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .elev-scene, .scene-popbar, .panel-bar, .briefing"))) return null;
+  const hits = [];
   for (let i = 0; i < stack.length; i += 1) {
     const el = drillEl(stack[i]);
-    if (!el) continue;
-    direct = el;
-    break;
+    if (el && hits.indexOf(el) < 0) hits.push(el);
   }
+  const gear = hits.find((el) => el.classList.contains("rackbox"));
+  if (gear) return gear;
+  const direct = hits[0] || null;
   if (direct && direct.classList.contains("pod")) {
-    for (let i = 0; i < stack.length; i += 1) {
-      const el = drillEl(stack[i]);
-      if (el && el !== direct && direct.contains(el)) return el;
-    }
+    const inner = hits.find((el) => el !== direct && direct.contains(el));
+    if (inner) return inner;
   }
   return direct;
 }
@@ -312,14 +329,34 @@ function placeCarry(event) {
   el.classList.add("carry");
   el.style.setProperty("--x", item.x + "px");
   el.style.setProperty("--y", item.y + "px");
+  if (record.key === "hall") syncSiteServices();
+}
+
+function floorBoxAt(event) {
+  const direct = event.target.closest && event.target.closest(".rackbox");
+  if (direct && direct.closest(".world")) return direct;
+  const stack = document.elementsFromPoint(event.clientX, event.clientY);
+  for (let i = 0; i < stack.length; i += 1) {
+    const box = stack[i].closest && stack[i].closest(".rackbox");
+    if (box && box.closest(".world")) return box;
+  }
+  return null;
 }
 
 export function onPointerDown(event) {
   if (elevationPointerDown(event)) return;
-  if (!state.user || state.view !== "floor" || event.button !== 0) return;
-  if (event.target.closest(".lib, .hud, .legend, .inspector, button, a, input, select")) return;
-  const box = event.target.closest(".rackbox");
-  const record = box && box.closest(".world") ? floorRecord(box) : null;
+  if (!state.user || event.button !== 0) return;
+  if (state.view === "plan") {
+    const scene = event.target.closest && event.target.closest(".build-scene");
+    if (!scene || event.target.closest("button, a")) return;
+    runtime.orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, chassis: false };
+    scene.setPointerCapture(event.pointerId);
+    return;
+  }
+  if (state.view !== "floor") return;
+  if (event.target.closest(".lib, .hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, button, a, input, select")) return;
+  const box = floorBoxAt(event);
+  const record = box ? floorRecord(box) : null;
   if (record) {
     if (runtime.walk) stopWalk(false, false);
     const point = clientToFloor(event.clientX, event.clientY);
@@ -431,23 +468,135 @@ function walkStops(pod) {
   return north.concat(south).map(standOf);
 }
 
+function aimPoint(px, py) {
+  const zoom = 2.35;
+  const yawDeg = -36;
+  const pitchDeg = 42;
+  const yaw = yawDeg * Math.PI / 180;
+  const pitch = pitchDeg * Math.PI / 180;
+  const sx = px * zoom;
+  const sy = py * zoom;
+  const x1 = sx * Math.cos(yaw) - sy * Math.sin(yaw);
+  const y1 = sx * Math.sin(yaw) + sy * Math.cos(yaw);
+  return { zoom, yaw: yawDeg, pitch: pitchDeg, panX: -x1, panY: -y1 * Math.cos(pitch) };
+}
+
 function aimWalk(pod, point) {
   const px = pod.x + point.x + 11;
   const py = pod.y + point.y + (point.face === "s" ? -18 : 18);
-  const zoom = 2.35;
-  const yaw = -36 * Math.PI / 180;
-  const pitch = 42 * Math.PI / 180;
-  const sx = px * zoom;
-  const sy = py * zoom;
-  const cosYaw = Math.cos(yaw);
-  const sinYaw = Math.sin(yaw);
-  const x1 = sx * cosYaw - sy * sinYaw;
-  const y1 = sx * sinYaw + sy * cosYaw;
-  state.floor.zoom = zoom;
-  state.floor.yaw = -36;
-  state.floor.pitch = 42;
-  state.floor.panX = -x1;
-  state.floor.panY = -y1 * Math.cos(pitch);
+  Object.assign(state.floor, aimPoint(px, py));
+}
+
+function cameraOf(cam) {
+  return "translate(" + cam.panX + "px," + cam.panY + "px) rotateX(" + cam.pitch +
+    "deg) rotateZ(" + cam.yaw + "deg) scale(" + cam.zoom + ")";
+}
+
+function glideCamera(from) {
+  const world = document.querySelector(".world") as HTMLElement | null;
+  if (!world) {
+    applyCamera();
+    return;
+  }
+  const stage = world.closest(".stage") as HTMLElement | null;
+  let fit = 1;
+  if (stage && stage.clientWidth > 0 && stage.clientHeight > 0) {
+    fit = Math.max(0.12, Math.min((stage.clientWidth - 8) / 1280, (stage.clientHeight - 8) / 960));
+  }
+  const next = "scale(" + fit.toFixed(4) + ") " + cameraOf(state.floor);
+  const prev = "scale(" + fit.toFixed(4) + ") " + cameraOf(from);
+  world.style.transition = "none";
+  world.style.transform = prev;
+  world.style.setProperty("--pitch", from.pitch + "deg");
+  world.style.setProperty("--yaw", from.yaw + "deg");
+  void world.offsetWidth;
+  world.style.transition = "transform 700ms ease";
+  world.style.transform = next;
+  world.style.setProperty("--pitch", state.floor.pitch + "deg");
+  world.style.setProperty("--yaw", state.floor.yaw + "deg");
+  window.setTimeout(() => {
+    if (!world.isConnected) return;
+    world.style.transition = "";
+    applyCamera();
+  }, 760);
+}
+
+function pulsing(id) {
+  return !!(runtime.pulse && runtime.pulse.id === id && Date.now() < runtime.pulse.until);
+}
+
+function armPulse(id) {
+  if (runtime.pulseTimer) clearTimeout(runtime.pulseTimer);
+  runtime.pulse = { id, until: Date.now() + 2000 };
+  runtime.pulseTimer = setTimeout(() => {
+    runtime.pulse = null;
+    runtime.pulseTimer = null;
+    document.querySelectorAll(".is-pulse").forEach((el) => el.classList.remove("is-pulse"));
+  }, 2000);
+}
+
+function locateAlarm(alarm) {
+  const id = alarm && alarm.device;
+  if (!id) return null;
+  const device = deviceById(id);
+  if (device && device.rack) {
+    const pod = podById("pod-a") || PODS[0];
+    const rack = rackById(pod, device.rack);
+    if (pod && rack) return { kind: "rack", pod, rack };
+  }
+  const entity = entityById(id);
+  if (!entity) return null;
+  const yard = YARD.find((item) => item.id === id);
+  if (entity.yard || yard) {
+    if (yard) return { kind: "yard", item: yard };
+  }
+  if (entity.pod && entity.rack) {
+    const pod = podById(entity.pod);
+    const rack = rackById(pod, entity.rack);
+    if (pod && rack) return { kind: "rack", pod, rack };
+  }
+  return null;
+}
+
+export function focusFloorAlarm(alarm) {
+  if (state.view !== "floor" || !alarm) return;
+  const place = locateAlarm(alarm);
+  if (!place) return;
+  if (runtime.walk) stopWalk(false, false);
+  const from = {
+    panX: state.floor.panX,
+    panY: state.floor.panY,
+    zoom: state.floor.zoom,
+    yaw: state.floor.yaw,
+    pitch: state.floor.pitch,
+  };
+  const same = place.kind === "rack"
+    ? state.floor.level === "hall" && state.floor.podId === place.pod.id
+    : state.floor.level === "site";
+  state.inspectorOpen = false;
+  state.floor.serverId = "";
+  state.floor.feedId = "";
+  state.floor.partId = "";
+  if (place.kind === "rack") {
+    state.floor.level = "hall";
+    state.floor.podId = place.pod.id;
+    state.floor.rackId = place.rack.id;
+    state.floor.rowId = place.rack.row || "";
+    Object.assign(state.floor, aimPoint(place.pod.x + place.rack.x + place.rack.w / 2, place.pod.y + place.rack.y + place.rack.d / 2));
+    armPulse(place.rack.id);
+  } else {
+    state.floor.level = "site";
+    state.floor.serverId = place.item.id;
+    Object.assign(state.floor, aimPoint(place.item.x + (place.item.w || 0) / 2, place.item.y + (place.item.d || 0) / 2));
+    armPulse(place.item.id);
+  }
+  if (!same) render();
+  glideCamera(from);
+  const selector = place.kind === "rack"
+    ? '.rackbox[data-rack="' + place.rack.id + '"]'
+    : '.rackbox[data-server="' + place.item.id + '"]';
+  const box = document.querySelector(selector);
+  if (box) box.classList.add("is-pulse");
 }
 
 function walkElapsed(now) {
@@ -623,8 +772,16 @@ function walkBar() {
     (runtime.walk.playing ? "Pause" : "Play") + '</button><button type="button" class="act" data-act="floor-walk-step" data-dir="next">Next</button><button type="button" class="act" data-act="floor-walk-stop">Stop</button></div>';
 }
 
+export function closeFloorDetail() {
+  state.inspectorOpen = false;
+  state.plan.selected = "";
+  state.plan.preview = "";
+}
+
 export function goFloor(level) {
   if (runtime.walk && (level === "site" || level === "hall")) stopWalk(true, false);
+  if (level === "site" || level === "hall") state.inspectorOpen = false;
+  else state.inspectorOpen = true;
   if (level === "site") {
     state.floor.level = "site";
     state.floor.serverId = "";
@@ -665,6 +822,7 @@ export function goFloor(level) {
 
 export function openRow(podId, rowId) {
   stopWalk(true, false);
+  state.inspectorOpen = true;
   if (state.floor.level === "hall" || state.floor.level === "site") state.floor.zoom = Math.max(state.floor.zoom, 1.15);
   state.floor.podId = podId;
   state.floor.rowId = rowId;
@@ -678,6 +836,7 @@ export function openRow(podId, rowId) {
 
 export function openFeed(podId, feedId) {
   state.view = "floor";
+  state.inspectorOpen = true;
   state.floor.feedId = feedId;
   state.floor.partId = "";
   state.floor.serverId = "";
@@ -703,6 +862,7 @@ export function placeServer(id) {
 
 export function openPod(id) {
   stopWalk(true, false);
+  state.inspectorOpen = true;
   if (state.floor.level === "hall") state.floor.zoom = Math.max(state.floor.zoom, 1.12);
   state.floor.podId = id;
   state.floor.level = "pod";
@@ -715,6 +875,7 @@ export function openPod(id) {
 
 export function openRack(podId, rackId) {
   stopWalk(true, false);
+  state.inspectorOpen = true;
   state.view = "floor";
   state.floor.podId = podId;
   state.floor.rackId = rackId;
@@ -731,6 +892,7 @@ export function openRack(podId, rackId) {
 export function openFloorServer(id) {
   const entity = entityById(id);
   if (!entity) return;
+  state.inspectorOpen = true;
   state.view = "floor";
   state.floor.serverId = id;
   state.floor.partId = "";
@@ -748,6 +910,7 @@ export function openFloorServer(id) {
 export function openPart(id, part) {
   const entity = entityById(id);
   if (!entity) return;
+  state.inspectorOpen = true;
   state.view = "floor";
   state.floor.serverId = id;
   state.floor.partId = part || "inlet";
@@ -793,7 +956,13 @@ function boxLabel(extra, band) {
   return band && band !== "ok" ? name + ", " + bandLabel(band) : name;
 }
 
-export function boxHtml(item, band, act, extra) {
+function simHitClass(report: SimImpact | null, ids: string[]) {
+  if (!report || !report.active) return "";
+  const hit = ids.some((id) => id && report.affected[id]);
+  return hit ? " sim-hit" : " sim-dim";
+}
+
+export function boxHtml(item, band, act, extra, report?: SimImpact | null) {
   const tone = extra.server ? conditionTone(entityById(extra.server)) : listTone(extra.leds || []);
   const leds = extra.face ? "" : (extra.leds || []).map((entity) => {
     const ledTone = conditionTone(entity);
@@ -806,42 +975,58 @@ export function boxHtml(item, band, act, extra) {
     : '" data-heat-rack="' + (extra.rack || "");
   const face = extra.face || "";
   const cap = extra.cap ? '<span class="cap-label">' + esc(extra.cap) + "</span>" : "";
+  const tag = extra.rack ? '<span class="rack-tag">' + esc(extra.rack) + "</span>" : "";
   const planAttr = extra.plan ? ' data-plan="' + extra.plan + '"' : "";
   const attrs = extra.attrs || "";
   const label = boxLabel(extra, band);
   const faceText = String(face || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   const capShown = extra.cap ? String(extra.cap).toUpperCase() : "";
   const named = [label, capShown, faceText, tone.pri ? String(tone.pri) : ""].filter(Boolean).join(" ");
-  return '<div class="rackbox' + (extra.plan ? " planned" : "") + (extra.klass ? " " + extra.klass : "") + '" role="button" tabindex="0" aria-label="' + esc(named) + '" data-act="' + act + '" data-band="' + band + heatAttr +
+  const simClass = simHitClass(report || null, [
+    extra.server || "",
+    extra.rack || "",
+    extra.pod || "",
+    item && item.id ? item.id : "",
+  ]);
+  return '<div class="rackbox' + (extra.plan ? " planned" : "") + (extra.klass ? " " + extra.klass : "") + simClass + '" role="button" tabindex="0" aria-label="' + esc(named) + '" data-act="' + act + '" data-band="' + band + '" data-pri="' + (tone.pri || 0) + heatAttr +
     '" style="--x:' + item.x + "px;--y:" + item.y + "px;--w:" + item.w + "px;--d:" + item.d + "px;--h:" + item.h +
-    "px;--heat:" + (extra.color || tone.color) +     '" data-pod="' + (extra.pod || "") + '" data-rack="' + (extra.rack || "") +
-    '" data-server="' + (extra.server || "") + '"' + planAttr + attrs + '><i class="ftop" aria-hidden="true">' + cap + '</i><i class="ffront" aria-hidden="true">' + mark + leds + face +
+    "px;--heat:" + (extra.color || tone.color) + '" data-pod="' + (extra.pod || "") + '" data-rack="' + (extra.rack || "") +
+    '" data-server="' + (extra.server || "") + '"' + planAttr + attrs + ">" + tag + '<i class="ftop" aria-hidden="true">' + cap + '</i><i class="ffront" aria-hidden="true">' + mark + leds + face +
     '</i><i class="fside" aria-hidden="true"></i></div>';
 }
 
-export function hudHtml() {
-  const alarms = activeAlarms();
+function hudPlace() {
+  if (state.floor.level === "site") return "Outside";
   const hall = podById(state.floor.podId) || PODS[0];
-  const levelName = {
-    site: "Outside · " + PLANT.halls + " halls",
-    hall: hall.name + " · " + PLANT.racksPerHall + " AI racks",
-    pod: "Level 2 · Pod",
-    row: "Level 2 · Row",
-    rack: "Level 3 · Rack",
-    server: "Level 3 · Device",
-    part: "Level 4 · Inside the device",
-    feed: "Power feed",
-  };
-  const level = levelName[state.floor.level] || hall.name;
+  return hall ? hall.name : "Hall";
+}
+
+function hudLine() {
+  if (runtime.walk && state.floor.level === "hall") return walkCaption();
+  const n = activeAlarms().length;
+  const name = hudPlace();
+  return n ? name + " · " + n + " abnormal" : name;
+}
+
+export function legendPop(body) {
+  return '<details class="legend-pop"><summary class="act" aria-label="Legend">?</summary><div class="legend">' + body + "</div></details>";
+}
+
+export function hudHtml(legend) {
   const outside = state.floor.level === "site";
   const walking = runtime.walk && state.floor.level === "hall";
   const walkBtn = outside || walking
     ? ""
     : '<button type="button" class="act walk-start" data-act="floor-walk">Walk through</button>';
-  return '<div class="hud"><div class="hud-score"><b data-abnormal>' + alarms.length +
-    '</b><span>Abnormal</span></div><p class="hud-mission">' + esc(walking ? walkCaption() : level) +
-    '. Color is reserved for conditions that need a response. Gray is nominal.</p><div class="hud-controls"><div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
-    walkBtn + '<div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>';
+  const addBtn = walking
+    ? ""
+    : '<button type="button" class="act" data-act="library-open" aria-pressed="' + (state.libraryOpen ? "true" : "false") + '">Add equipment</button>';
+  return simStripeHtml() + '<div class="hud">' + pills() + '<p class="hud-mission">' + esc(hudLine()) +
+    '</p><div class="hud-controls">' + themeButton() + '<div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
+    walkBtn + addBtn +
+    '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
+    (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
+    (runtime.sim.barOpen ? simBarHtml() : "");
 }
 
 export function makerColor(maker) {
@@ -957,13 +1142,9 @@ export function renderLibrary() {
     amps += specItem.amps;
   });
   const power = watts >= 1000 ? (watts / 1000).toFixed(1) + " kW" : watts + " W";
-  const phone = typeof matchMedia !== "undefined" && matchMedia("(max-width: 767px)").matches;
-  const existing = typeof document !== "undefined" ? document.querySelector("details.lib") : null;
-  const open = existing ? existing.open : !phone;
-  return '<details class="lib"' + (open ? " open" : "") +
-    '><summary><h2>Device library</h2></summary><div class="lib-body"><p class="fine">Drag a tile onto the view. Outside gear lands in the yard, floor gear on the hall, and rack gear in an enclosure. Pieces already in the view can be dragged to a new spot. A click still opens them.</p><div class="lib-filters">' +
+  return '<aside class="lib drawer" aria-label="Device library"><h2>Device library</h2><div class="lib-body"><p class="fine">Drag a tile onto the view. Outside gear lands in the yard, floor gear on the hall, and rack gear in an enclosure. Pieces already in the view can be dragged to a new spot. A click still opens them.</p><div class="lib-filters">' +
     filters + "</div>" + groups + '<p class="lib-total"><b>' + state.plan.placements.length + '</b><span>placed</span><b>' +
-    power + "</b><b>" + amps.toFixed(1) + " A</b></p></div></details>";
+    power + "</b><b>" + amps.toFixed(1) + " A</b></p></div></aside>";
 }
 
 export function renderPlanChassis(item) {
@@ -972,7 +1153,7 @@ export function renderPlanChassis(item) {
   return '<div class="scene chassis-scene thermal">' + hudHtml() + '<div class="chassis-wrap"><div class="rack-frame" data-plan-host="' +
     item.id + '" style="transform:rotateX(' + state.floor.chassisPitch + "deg) rotateY(" + state.floor.chassisYaw +
     "deg) scale(" + state.floor.chassisZoom + ')"><div class="rack-rail"><span>' + esc(item.name) + "</span><b>" + free +
-    'U free</b></div><div class="rack-bay">' + (blades || "") + "</div></div></div><p class=\"legend chassis-hint\">The open bay is the drop target. Drag the frame to turn it.</p></div>";
+    'U free</b></div><div class="rack-bay">' + (blades || "") + "</div></div></div></div>";
 }
 
 export function itemPoint(item) {
@@ -1023,26 +1204,82 @@ export function feedMode(id) {
   return "live";
 }
 
-export function feedHtml(from, to, mode, id, podId, extraClass?: string) {
+export function feedHtml(from, to, mode, id, podId, extraClass?: string, report?: SimImpact | null) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.max(12, Math.hypot(dx, dy));
   const ang = Math.atan2(dy, dx) * 180 / Math.PI;
   const on = state.floor.feedId === id ? " on" : "";
-  return '<div class="feed ' + mode + on + (extraClass ? " " + extraClass : "") + '" data-act="floor-feed" data-feed="' + id + '" data-pod="' +
+  const failed = !!(report && report.active && report.failedFeeds.indexOf(id) >= 0);
+  const feedMode = failed ? "failed" : mode;
+  return '<div class="feed ' + feedMode + on + (extraClass ? " " + extraClass : "") + '" data-act="floor-feed" data-feed="' + id + '" data-pod="' +
     (podId || "") + '" style="--x:' + from.x.toFixed(1) + "px;--y:" + from.y.toFixed(1) + "px;--len:" + len.toFixed(1) +
     "px;--ang:" + ang.toFixed(1) + 'deg" aria-hidden="true"></div>';
 }
 
-export function pipeHtml(from, to, kind) {
+export function pipeHtml(from, to, kind, marker, report?: SimImpact | null) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.max(12, Math.hypot(dx, dy));
   const ang = Math.atan2(dy, dx) * 180 / Math.PI;
   const id = kind === "return" ? "pipe-ret" : "pipe-sup";
-  return '<div class="pipe ' + kind + '" data-act="floor-server" data-server="' + id +
+  const key = marker || kind;
+  const failed = !!(report && report.active && report.failedPipes.indexOf(key) >= 0);
+  return '<div class="pipe ' + kind + (failed ? " failed" : "") + '" data-act="floor-server" data-server="' + id + '" data-pipe="' + key +
     '" style="--x:' + from.x.toFixed(1) + "px;--y:" + from.y.toFixed(1) + "px;--len:" + len.toFixed(1) +
     "px;--ang:" + ang.toFixed(1) + 'deg" aria-hidden="true"></div>';
+}
+
+function hallMidY(hall) {
+  const site = hall.site;
+  return site.y + (site.d || site.h || 0) / 2;
+}
+
+function serviceSpan(extra, halls?) {
+  const list = halls || PODS;
+  const ys = list.filter((hall) => hall.site).map(hallMidY).concat(extra || []);
+  if (!ys.length) return { min: 0, max: 0 };
+  return { min: Math.min.apply(null, ys), max: Math.max.apply(null, ys) };
+}
+
+function faceToward(site, towardX) {
+  const midY = site.y + (site.d || site.h || 0) / 2;
+  if (towardX <= site.x + site.w / 2) return { x: site.x - 8, y: midY };
+  return { x: site.x + site.w + 8, y: midY };
+}
+
+function paintSegment(el, from, to) {
+  if (!el) return;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.max(12, Math.hypot(dx, dy));
+  const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  el.style.setProperty("--x", from.x.toFixed(1) + "px");
+  el.style.setProperty("--y", from.y.toFixed(1) + "px");
+  el.style.setProperty("--len", len.toFixed(1) + "px");
+  el.style.setProperty("--ang", ang.toFixed(1) + "deg");
+}
+
+function syncSiteServices() {
+  const busX = -370;
+  const trunkS = 470;
+  const trunkR = 486;
+  const busY = itemPoint(yardById("pwr-mod")).y;
+  const gearYs = ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5", "heat-6", "hydro-1", "hydro-2"].map((id) => itemPoint(yardById(id)).y);
+  const powerSpan = serviceSpan([busY]);
+  const coolSpan = serviceSpan(gearYs);
+  paintSegment(document.querySelector('[data-feed="mod-riser"]'), { x: busX, y: powerSpan.min }, { x: busX, y: powerSpan.max });
+  paintSegment(document.querySelector('[data-pipe="supply-spine"]'), { x: trunkS, y: coolSpan.min }, { x: trunkS, y: coolSpan.max });
+  paintSegment(document.querySelector('[data-pipe="return-spine"]'), { x: trunkR, y: coolSpan.min }, { x: trunkR, y: coolSpan.max });
+  PODS.forEach((hall) => {
+    if (!hall.site) return;
+    const powerEnd = faceToward(hall.site, busX);
+    paintSegment(document.querySelector('[data-feed="feed-hall-' + hall.id + '"]'), { x: busX, y: powerEnd.y }, powerEnd);
+    const cool = faceToward(hall.site, trunkS);
+    paintSegment(document.querySelector('[data-pipe="supply-' + hall.id + '"]'), cool, { x: trunkS, y: cool.y });
+    const ret = { x: cool.x, y: cool.y + 12 };
+    paintSegment(document.querySelector('[data-pipe="return-' + hall.id + '"]'), ret, { x: trunkR, y: ret.y });
+  });
 }
 
 export function podShelf(pod) {
@@ -1052,21 +1289,21 @@ export function podShelf(pod) {
   });
 }
 
-export function podFeeds(pod) {
+export function podFeeds(pod, report?: SimImpact | null) {
   const shelf = podShelf(pod);
   const bus = pod.fit && pod.fit.busbar;
   if (!shelf || !bus) return "";
   const shelfPt = itemPoint(shelf);
-  let html = feedHtml(itemPoint(bus), shelfPt, shelfLive(pod), "bus-" + pod.id, pod.id);
+  let html = feedHtml(itemPoint(bus), shelfPt, shelfLive(pod), "bus-" + pod.id, pod.id, "", report);
   pod.racks.forEach((rack) => {
     if (rack.id === shelf.id) return;
-    html += feedHtml(shelfPt, itemPoint(rack), rackEnergized(pod, rack), "whip-" + rack.id, pod.id);
+    html += feedHtml(shelfPt, itemPoint(rack), rackEnergized(pod, rack), "whip-" + rack.id, pod.id, "", report);
   });
   (pod.boxes || []).forEach((box) => {
     if (box.id === shelf.id) return;
     const entity = entityById(box.id);
     if (!entity || entity.kind !== "Powershelf") return;
-    html += feedHtml(itemPoint(bus), itemPoint(box), "live", "bus-" + pod.id, pod.id);
+    html += feedHtml(itemPoint(bus), itemPoint(box), "live", "bus-" + pod.id, pod.id, "", report);
   });
   return html;
 }
@@ -1077,7 +1314,8 @@ export function yardById(id) {
   return gear[id];
 }
 
-export function siteFeedHtml() {
+export function siteFeedHtml(halls?, report?: SimImpact | null) {
+  const list = halls || PODS;
   const pairs = [
     ["grid-1", "xfmr-1", "grid-xfmr-a"],
     ["xfmr-1", "pwr-mod", "xfmr-mod-a"],
@@ -1088,43 +1326,46 @@ export function siteFeedHtml() {
     ["batt-1", "pwr-mod", "batt-a"],
     ["batt-2", "pwr-2", "batt-b"],
   ];
-  let html = pairs.map((pair) => feedHtml(itemPoint(yardById(pair[0])), itemPoint(yardById(pair[1])), "live", pair[2], "", "cable")).join("");
+  let html = pairs.map((pair) => feedHtml(itemPoint(yardById(pair[0])), itemPoint(yardById(pair[1])), "live", pair[2], "", "cable", report)).join("");
   const bus = { x: -370, y: itemPoint(yardById("pwr-mod")).y };
-  html += feedHtml(itemPoint(yardById("pwr-mod")), bus, "live", "mod-bus", "", "cable");
-  html += feedHtml(itemPoint(yardById("pwr-2")), bus, "live", "mod-bus-b", "", "cable");
-  const rows = [0, 1].map((row) => PODS.filter((hall, index) => Math.floor(index / 5) === row));
-  const yTop = rows[0][0].site.y + rows[0][0].site.d / 2;
-  const yBot = rows[1][0].site.y + rows[1][0].site.d / 2;
-  html += feedHtml({ x: bus.x, y: yTop }, { x: bus.x, y: yBot }, "live", "mod-riser", "", "cable");
-  rows.forEach((row, index) => {
-    const hall = row[0];
-    const y = hall.site.y + hall.site.d / 2;
-    html += feedHtml({ x: bus.x, y }, { x: hall.site.x - 8, y }, "live", "feed-row-" + index, "", "cable");
+  html += feedHtml(itemPoint(yardById("pwr-mod")), bus, "live", "mod-bus", "", "cable", report);
+  html += feedHtml(itemPoint(yardById("pwr-2")), bus, "live", "mod-bus-b", "", "cable", report);
+  const span = serviceSpan([bus.y], list);
+  html += feedHtml({ x: bus.x, y: span.min }, { x: bus.x, y: span.max }, "live", "mod-riser", "", "cable", report);
+  list.forEach((hall) => {
+    if (!hall.site) return;
+    const end = faceToward(hall.site, bus.x);
+    html += feedHtml({ x: bus.x, y: end.y }, end, "live", "feed-hall-" + hall.id, hall.id, "cable", report);
   });
   return html;
 }
 
-export function sitePipesHtml() {
-  const rows = [0, 1].map((row) => PODS.filter((hall, index) => Math.floor(index / 5) === row));
+export function sitePipesHtml(halls?, plantIds?, report?: SimImpact | null) {
+  const list = halls || PODS;
+  const ids = plantIds || ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5", "heat-6", "hydro-1", "hydro-2"];
   const trunkS = 470;
   const trunkR = 486;
-  const y0 = rows[0][0].site.y + rows[0][0].site.d / 2;
-  const y1 = rows[1][0].site.y + rows[1][0].site.d / 2;
-  let html = pipeHtml({ x: trunkS, y: y0 }, { x: trunkS, y: y1 }, "supply") +
-    pipeHtml({ x: trunkR, y: y0 }, { x: trunkR, y: y1 }, "return");
-  rows.forEach((row) => {
-    const hall = row[row.length - 1];
-    const y = hall.site.y + hall.site.d / 2;
-    const east = hall.site.x + hall.site.w + 8;
-    html += pipeHtml({ x: east, y }, { x: trunkS, y }, "supply");
-    html += pipeHtml({ x: east, y: y + 10 }, { x: trunkR, y: y + 10 }, "return");
+  const gearYs = ids.map((id) => itemPoint(yardById(id)).y);
+  const span = serviceSpan(gearYs, list);
+  let html = pipeHtml({ x: trunkS, y: span.min }, { x: trunkS, y: span.max }, "supply", "supply-spine", report) +
+    pipeHtml({ x: trunkR, y: span.min }, { x: trunkR, y: span.max }, "return", "return-spine", report);
+  list.forEach((hall) => {
+    if (!hall.site) return;
+    const cool = faceToward(hall.site, trunkS);
+    const ret = { x: cool.x, y: cool.y + 12 };
+    html += pipeHtml(cool, { x: trunkS, y: cool.y }, "supply", "supply-" + hall.id, report);
+    html += pipeHtml(ret, { x: trunkR, y: ret.y }, "return", "return-" + hall.id, report);
   });
-  ["heat-1", "heat-2", "heat-3", "heat-4", "heat-5", "heat-6", "hydro-1", "hydro-2"].forEach((id) => {
+  ids.forEach((id) => {
     const gear = itemPoint(yardById(id));
-    html += pipeHtml({ x: trunkS, y: gear.y }, { x: gear.x - 4, y: gear.y }, "supply");
-    html += pipeHtml({ x: trunkR, y: gear.y + 8 }, { x: gear.x - 4, y: gear.y + 8 }, "return");
+    html += pipeHtml({ x: trunkS, y: gear.y }, { x: gear.x - 4, y: gear.y }, "supply", kindMarker(id, "supply"), report);
+    html += pipeHtml({ x: trunkR, y: gear.y + 8 }, { x: gear.x - 4, y: gear.y + 8 }, "return", kindMarker(id, "return"), report);
   });
   return html;
+}
+
+function kindMarker(id, kind) {
+  return kind + "-" + id;
 }
 
 export function rowRecord(pod, rowId) {
@@ -1132,7 +1373,7 @@ export function rowRecord(pod, rowId) {
   return pod.fit.rows.find((row) => row.id === rowId) || null;
 }
 
-export function fitHtml(pod) {
+export function fitHtml(pod, report?: SimImpact | null) {
   const fit = pod.fit;
   if (!fit) return "";
   const aisles = (fit.aisles || []).map((band) => '<div class="aisle ' + band.tone + '" data-act="floor-server" data-server="' +
@@ -1140,10 +1381,10 @@ export function fitHtml(pod) {
     esc(band.label) + "</span></div>").join("");
   const containment = fit.containment ? boxHtml(fit.containment, heatBand(entityById(fit.containment.id)), "floor-server", {
     pod: pod.id, server: fit.containment.id, klass: "containment", cap: "Containment", leds: [],
-  }) : "";
+  }, report) : "";
   const bus = fit.busbar ? boxHtml(fit.busbar, heatBand(entityById(fit.busbar.id)), "floor-server", {
     pod: pod.id, server: fit.busbar.id, klass: "busbar", cap: "Bus bar", leds: [],
-  }) : "";
+  }, report) : "";
   const rows = (fit.rows || []).map((row) => '<button type="button" class="row-tag" data-act="floor-row" data-pod="' +
     pod.id + '" data-row="' + row.id + '" style="--y:' + row.y + 'px">' + esc(row.name) + "</button>").join("");
   return aisles + containment + bus + rows;
@@ -1221,6 +1462,7 @@ function renderPov(pod) {
 export function renderHall() {
   const open = podById(state.floor.podId) || PODS[0];
   if (runtime.walk && runtime.walk.podId === open.id) return renderPov(open);
+  const report = impact(runtime.sim);
   const pods = [open].map((pod) => {
     const racks = pod.racks.map((rack) => {
       const facing = (rack.row || "").slice(-1) === "s" ? "face-south" : "face-north";
@@ -1229,11 +1471,11 @@ export function renderHall() {
       const planned = state.horizon === "future" && (runtime.futureChanges || []).some((change) => change.rackId === rack.id);
       return boxHtml(rack, worstBand(rackEntities(rack)), "floor-rack", {
         pod: pod.id, rack: rack.id, leds: rackEntities(rack),
-        klass: (power ? "powershelf " : "loaded ") + facing + (here ? " walk-here" : ""),
+        klass: (power ? "powershelf " : "loaded ") + facing + (here ? " walk-here" : "") + (pulsing(rack.id) ? " is-pulse" : ""),
         cap: power ? "50 VDC" : (planned ? "Planned" : "Front"),
         plan: planned ? "future" : "",
         face: power ? "" : gearFace(rack),
-      });
+      }, report);
     }).join("");
     const boxes = (pod.boxes || []).map((box) => {
       const entity = entityById(box.id);
@@ -1241,34 +1483,35 @@ export function renderHall() {
       return boxHtml(box, heatBand(entity), "floor-server", {
         pod: pod.id, server: box.id, leds: [],
         klass: shelf ? "powershelf" : "",
-        cap: shelf ? "DC shelf" : PLANT.cduMw + " MW CDU",
-      });
+        cap: box.name || (shelf ? "DC shelf" : PLANT.cduMw + " MW CDU"),
+      }, report);
     }).join("");
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
     return '<div class="pod' + current + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + fitHtml(pod) + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod) + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod, report) + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
-  const hint = runtime.walk
-    ? "Walking the cold aisle, one rack at a time."
-    : (open.name + " · " + PLANT.racksPerHall + " AI racks · " + PLANT.hallItMw + " MW IT · " + PLANT.cduMw + " MW CDU. Click the floor to walk the racks.");
-  return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+  const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
+  return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
+    (report.active ? " sim-active" : "") + '" data-lod="' + floorLod() + '" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + planBoxes("floor") +
-    '</div></div>' + walkBar() + '<div class="legend"><span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span><span class="legend-hint">' +
-    hint + "</span></div></div>";
+    "</div></div>" + walkBar() + "</div>";
 }
 
 export function renderSite() {
+  const report = impact(runtime.sim);
   const shell = PODS.map((hall) => boxHtml(hall.site, "ok", "floor-hall", {
     klass: "building", color: hall.managed ? "#d9d2c8" : "#e4ddd4", cap: hall.name,
     pod: hall.id, attrs: ' data-level="hall"', leds: [],
-  })).join("");
+  }, report)).join("");
   const gear = YARD.map((item) => boxHtml(item, heatBand(entityById(item.id)), "floor-server", {
-    server: item.id, klass: item.klass, cap: item.name, color: item.klass === "heat-yard" ? "#2f4a3c" : (item.klass === "core-block" ? "#1c1c1c" : "#3a342e"), leds: [],
-  })).join("");
-  return '<div class="scene thermal site-scene">' + hudHtml() + '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+    server: item.id, klass: (item.klass || "") + (pulsing(item.id) ? " is-pulse" : ""), cap: item.name, color: item.klass === "heat-yard" ? "#2f4a3c" : (item.klass === "core-block" ? "#1c1c1c" : "#3a342e"), leds: [],
+  }, report)).join("");
+  const legend = legendPop('<span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span>');
+  return '<div class="scene thermal site-scene">' + hudHtml(legend) + '<div class="stage"><div class="world' +
+    (report.active ? " sim-active" : "") + '" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab yard-slab"></div>' + shell + gear + futureYardHtml() + planBoxes("yard") +
-    siteFeedHtml() + sitePipesHtml() + '</div></div><div class="legend"><span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span><span class="legend-hint">Drag a piece to move it. Click it to open it.</span></div></div>';
+    siteFeedHtml(undefined, report) + sitePipesHtml(undefined, undefined, report) + "</div></div></div>";
 }
 
 function unitKind(item) {
@@ -1333,8 +1576,7 @@ function cabinetBay(rack) {
 export function renderChassis(rack, pod) {
   return '<div class="scene chassis-scene thermal elevation" data-rack-host="' + esc(rack.id) + '">' + hudHtml() +
     '<div class="rack-view" aria-label="' + esc(pod.name) + " " + esc(rack.name) + '"><div class="rack-cab">' +
-    cabinetBay(rack) + '<div class="rack-post bus" aria-hidden="true"></div></div></div>' +
-    '<p class="legend chassis-hint">Front of the rack. The bus bar is the rail on the right.</p></div>';
+    cabinetBay(rack) + '<div class="rack-post bus" aria-hidden="true"></div></div></div></div>';
 }
 
 export function gaugeRow(entity, key, label) {
@@ -1427,8 +1669,9 @@ export function serverInspector(entity) {
   const heatNote = !isFacility(entity) && entity.load ? thermalCard(entity) : "";
   const faces = !isFacility(entity) && entity.load ? deviceFaces(entity) : "";
   const inside = faces ? "" : (!isFacility(entity) && entity.load ? deviceParts(entity) : "");
+  const breaks = breakThisHtml(entity.id, breakEventsForEntity(entity));
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + powerHtml(entity.id) + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + breaks + powerHtml(entity.id) + "</div>";
 }
 
 export function deviceParts(entity) {
@@ -1496,6 +1739,9 @@ export function feedPanel() {
     copy = "Medium-voltage transformer to the power module. Energized.";
   } else if (id === "batt-mod") {
     copy = "Battery skid onto the power module. Energized for ride-through.";
+  } else if (id.indexOf("feed-hall-") === 0) {
+    const hall = podById(id.slice(10));
+    copy = "Power to " + (hall ? hall.name : "this hall") + ". The feeder follows the hall when it moves. Each hall draws " + PLANT.hallItMw + " MW.";
   } else if (id.indexOf("feed-") === 0) {
     copy = "Power module bus to a hall wall. Energized. Each hall draws " + PLANT.hallItMw + " MW.";
   }
@@ -1539,7 +1785,7 @@ export function renderInspector() {
     crumbs.push('<button type="button" data-act="floor-go" data-level="row">' + esc(row.name) + "</button>");
   }
   if (rack && ["rack", "server", "part"].indexOf(level) >= 0) {
-    crumbs.push('<button type="button" data-act="floor-go" data-level="rack">' + esc(rack.name) + "</button>");
+    crumbs.push('<button type="button" data-act="floor-go" data-level="rack">' + esc(rack.id) + "</button>");
   }
   if ((level === "server" || level === "part") && state.floor.serverId && entityById(state.floor.serverId)) {
     const current = entityById(state.floor.serverId);
@@ -1553,7 +1799,10 @@ export function renderInspector() {
   }
   let body = "";
   const sheet = planSheet();
-  if (level === "site" && state.floor.serverId && entityById(state.floor.serverId)) {
+  const planOnly = !!(state.plan.selected || state.plan.preview) && level !== "rack" && level !== "server" && level !== "part";
+  if (planOnly) {
+    body = "";
+  } else if (level === "site" && state.floor.serverId && entityById(state.floor.serverId)) {
     body = serverInspector(entityById(state.floor.serverId));
   } else if (level === "site") {
     body = "<h2>Ten halls</h2><p class=\"fine\">" + PLANT.halls + " halls × " + PLANT.racksPerHall + " AI racks × " + PLANT.kwPerRack + " kW = " + PLANT.itMw + " MW of IT. Two " + PLANT.feederMw + " MW feeders (either one can carry the site) and " + PLANT.coolMw + " MW of heat rejection sit outside. Each hall has a " + PLANT.cduMw + " MW CDU for " + PLANT.hallItMw + " MW of racks.</p><h3>Halls</h3>" +
@@ -1574,6 +1823,7 @@ export function renderInspector() {
     body = "<h2>" + esc(rack.name) + "</h2><p class=\"fine\">" + esc(pod.name) +
       ". The cabinet is the equipment. The bus bar is the rail on the right.</p>" +
       powerHtml(rack.id) +
+      breakThisHtml(rack.id, breakEventsForRack(rack.id)) +
       '<p class="elev-actions"><button type="button" class="act" data-act="rack-positions">U positions</button></p>';
   } else if (level === "rack" && planOpen && !rack) {
     const gear = state.plan.placements.filter((item) => item.host === planOpen.id);
@@ -1604,7 +1854,7 @@ export function renderInspector() {
       "<h3>Power and cooling</h3>" + infra.filter((item) => item.pod === hall.id && item.kind !== "Aisle").map(rowButton).join("") +
       "<h3>Watch list</h3>" + (managed.map(rowButton).join("") || '<p class="fine">All rack A14 servers are nominal.</p>');
   }
-  return '<aside class="inspector"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
+  return '<aside class="inspector drawer"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
 }
 
 export function planSheet() {
@@ -1636,15 +1886,27 @@ export function planSheet() {
   return "";
 }
 
+export function floorDetailOpen() {
+  if (!state.inspectorOpen && !state.plan.selected && !state.plan.preview) return false;
+  if (state.plan.selected || state.plan.preview) return true;
+  const level = state.floor.level;
+  if (level === "site") return !!state.floor.serverId;
+  if (level === "hall" || level === "elevation") return false;
+  return level === "pod" || level === "row" || level === "rack" || level === "server" || level === "part" || level === "feed";
+}
+
+function mountScene(html) {
+  const drawers = (state.libraryOpen ? renderLibrary() : "") + (floorDetailOpen() ? renderInspector() : "");
+  const cut = html.lastIndexOf("</div>");
+  if (cut < 0) return html + drawers;
+  return html.slice(0, cut) + drawers + html.slice(cut);
+}
+
 export function renderFloor() {
   if (state.floor.level === "elevation") {
     const elev = elevationParts();
-    const pod = podById(state.floor.podId);
-    const title = (pod ? pod.name : "Hall") + " · " + state.floor.rackId;
-    return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + esc(title) +
-      '</h1><p class="sub">Front and rear elevation. Devices are drawn to their U height. Zero-U rPDUs sit on the rails.</p></div>' +
-      themeButton() + '</div>' + pills() + '</div><div class="plan-layout"><div class="floor-layout">' + elev.scene + elev.detail +
-      "</div></div>" + watchTable() + "</div>";
+    return '<div class="floor-page"><div class="page-head"><div class="top">' + themeButton() + "</div>" + pills() +
+      '</div><div class="plan-layout"><div class="floor-layout">' + elev.scene + elev.detail + "</div></div></div>";
   }
   const planOpen = placementById(state.floor.rackId);
   const deep = state.floor.level === "rack" || state.floor.level === "server" || state.floor.level === "part";
@@ -1654,21 +1916,7 @@ export function renderFloor() {
   const rack = rackById(pod, state.floor.rackId);
   const onSite = state.floor.level === "site" || (state.floor.level === "feed" && !pod);
   const scene = onSite ? renderSite() : (openedPlan ? renderPlanChassis(planOpen) : (chassis && rack ? renderChassis(rack, pod) : renderHall()));
-  const outside = state.floor.level === "site";
-  const future = state.horizon === "future";
-  const inside = chassis && rack && state.floor.level === "rack";
-  const hallName = (podById(state.floor.podId) || PODS[0]).name;
-  const title = inside
-    ? (pod ? pod.name : hallName) + " · " + rack.id
-    : (future ? (outside ? "Future · ten halls" : "Future · " + hallName) : (outside ? "Outside the building" : hallName + " · " + PLANT.racksPerHall + " AI racks"));
-  const planned = (runtime.futureChanges || []).map((change) => change.rackId).filter(Boolean);
-  const sub = inside
-    ? "The front of the rack. The equipment is drawn in place, and the bus bar is the rail on the right."
-    : (future
-      ? (planned.length ? "Planned changes are outlined on " + planned.join(", ") + ". Promoting them creates work orders." : "The ten halls are already built. Future restores dark BMC paths until a scenario is compared.")
-      : (outside ? "Ten halls, each with " + PLANT.racksPerHall + " AI racks. Drag a hall to move it. Click it to go inside." : "Drag a rack to move it inside the hall. Click it to see the equipment inside."));
-  return '<div class="floor-page"><div class="page-head"><div class="top"><div><h1>' + title + '</h1><p class="sub">' + sub + "</p></div>" + themeButton() + "</div>" +
-    pills() + '</div><div class="plan-layout">' + (inside ? "" : renderLibrary()) + '<div class="floor-layout" data-floor-level="' + esc(state.floor.level) + '">' + scene + renderInspector() + "</div></div>" + watchTable() + "</div>";
+  return '<div class="floor-page"><div class="plan-layout"><div class="floor-layout floor-fill" data-floor-level="' + esc(state.floor.level) + '">' + mountScene(scene) + "</div></div></div>";
 }
 
 export function zoomFloor(dir) {
@@ -1804,6 +2052,7 @@ export function podForRack(rackId) {
 export function openPlan(id) {
   const item = placementById(id);
   if (!item) return;
+  state.inspectorOpen = true;
   state.view = "floor";
   state.floor.level = "rack";
   state.floor.rackId = id;

@@ -3,10 +3,11 @@ import { authHeaders } from "../data/repository";
 import { outlets } from "../data/outlets";
 import { audit, userAudit } from "../domain/audit";
 import { clearDemo, demoPanel } from "../domain/demo";
-import { applyCapacitySeed } from "../domain/failover";
+import { resetSimulation, simBarHtml } from "../domain/events";
 import { state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
+import { powerHtml } from "./power";
 
 export function toggleMaint() {
   if (state.maintenance) {
@@ -54,7 +55,7 @@ export function saveAsset() {
 }
 
 export function resetWorld() {
-  applyCapacitySeed();
+  resetSimulation();
   outlets.forEach((o) => { o.power = "on"; });
   state.floor.level = "site";
   state.floor.podId = "pod-a";
@@ -93,6 +94,9 @@ export function resetWorld() {
   state.plan.preview = "";
   state.plan.seq = 1;
   state.horizon = "now";
+  state.buildDate = "2026-11-16";
+  state.libraryOpen = false;
+  state.inspectorOpen = false;
   state.manage = { layer: "bmc", device: "tray-01" };
   state.containment = "hac";
   state.toast = "Simulated world reset. BMC paths are up and RM1048 is healthy.";
@@ -130,33 +134,29 @@ export async function postLabReadings() {
   render();
 }
 
-export function lab() {
-  const gear = devices.map((d) => '<div class="lab-row"><div><strong>' + esc(d.name) + '</strong><div class="fine">' +
-    (d.bmc === "up" ? "BMC up" : "BMC dark · on ACS") + '</div></div><button type="button" class="act" data-act="bmc-toggle" data-device="' +
-    d.id + '">' + (d.bmc === "up" ? "Drop BMC" : "Restore BMC") + "</button></div>").join("");
-  return '<button type="button" class="backdrop" data-act="lab-close" aria-label="Close lab"></button><aside class="lab" aria-label="Lab" tabindex="0">' +
-    demoPanel() +
-    '<div class="lab-head"><div><p class="kicker">Simulated world</p><h2>Lab</h2></div>' +
-    '<button type="button" class="act" data-act="lab-close">Close</button></div>' +
-    '<p class="fine">External gear only. This drawer is not an Access screen. Drop a BMC to fail that device over to ACS. Drop RDP to move the desktop onto ACS KVM. RM1048 does not take either failover.</p>' +
-    '<button type="button" class="act" data-act="lab-post">Post readings</button>' +
-    '<div class="lab-row"><div><strong>RM1048 plane</strong><div class="fine">' +
-    (state.rm1048 === "healthy" ? "Healthy" : "Dark") + '</div></div><button type="button" class="act" data-act="rm-toggle">' +
-    (state.rm1048 === "healthy" ? "Mark dark" : "Mark healthy") + "</button></div>" +
-    '<div class="lab-row"><div><strong>DI-1 leak rope</strong><div class="fine">' +
-    (state.leak ? "Asserted" : "Quiet") + '</div></div><button type="button" class="act" data-act="leak-toggle">' +
-    (state.leak ? "Clear DI-1" : "Trip DI-1") + "</button></div>" +
+function simBody() {
+  return demoPanel() +
+    '<p class="fine">Inject faults with the bar below. Feeder loss runs the capacity redundancy check. Break events stay on the floor model; RM1048 does not take BMC or RDP failover.</p>' +
+    '<section class="panel"><h2>Fault bar</h2>' + simBarHtml() + "</section>" +
+    '<section class="panel"><h2>Power redundancy</h2>' + powerHtml("A14") + "</section>" +
+    '<section class="panel"><h2>Planes and sensors</h2><button type="button" class="act" data-act="lab-post">Post readings</button>' +
     '<div class="lab-block"><label class="field">Window name<input id="maint-name" data-focus-key="maint-name"></label><label class="field">Window work order<input id="maint-wo" data-focus-key="maint-wo"></label><button type="button" class="act primary" data-act="maint-toggle">' +
     (state.maintenance ? "Close maintenance window" : "Open maintenance window") + "</button>" +
     (state.maintenance ? '<p class="fine">Open now: ' + esc(state.maintenance.name) + "</p>" : "") +
-    "</div><h3>BMC paths</h3>" + gear +
-    "<h3>RDP desktops</h3>" + devices.filter((d) => d.kind === "GPU tray").map((d) => '<div class="lab-row"><div><strong>' +
-      esc(d.name) + '</strong><div class="fine">' + (d.rdp === "up" ? "RDP up" : "RDP down · KVM") +
-      '</div></div><button type="button" class="act" data-act="rdp-toggle" data-device="' + d.id + '">' +
-      (d.rdp === "up" ? "Drop RDP" : "Restore RDP") + "</button></div>").join("") +
-    "<h3>Serial auto-login</h3>" + devices.map((d) => '<div class="lab-row"><div><strong>' +
-      esc(d.name) + '</strong><div class="fine mono">' + esc(d.tty) + " · " + (d.watchDeny ? "acs.watch denied" : "acs.watch allowed") +
-      '</div></div><button type="button" class="act" data-act="watch-toggle" data-device="' + d.id + '">' +
-      (d.watchDeny ? "Allow auto-login" : "Reject auto-login") + "</button></div>").join("") +
-    '<button type="button" class="act danger" data-act="reset-world">Reset world</button></aside>';
+    "</div></section>" +
+    '<button type="button" class="act danger" data-act="reset-world">Reset world</button>';
+}
+
+export function renderSimulate() {
+  const noc = state.theme === "noc";
+  return '<div class="page-head"><div class="top"><div><h1>Simulate</h1>' +
+    '<p class="sub">Capacity and redundancy faults against the live campus model.</p></div>' +
+    '<button type="button" class="act theme-toggle" data-act="theme" aria-pressed="' + (noc ? "true" : "false") +
+    '">NOC theme</button></div></div>' + simBody();
+}
+
+export function lab() {
+  return '<button type="button" class="backdrop" data-act="lab-close" aria-label="Close lab"></button><aside class="lab" aria-label="Lab" tabindex="0">' +
+    '<div class="lab-head"><div><p class="kicker">Simulated world</p><h2>Lab</h2></div>' +
+    '<button type="button" class="act" data-act="lab-close">Close</button></div>' + simBody() + "</aside>";
 }
