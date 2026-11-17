@@ -2296,6 +2296,155 @@ button.act.launch.primary small { color: #d9d0c6; }
   color: var(--hud-ink);
   letter-spacing: 0.01em;
 }
+.oneline-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.oneline-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.oneline-head h2 {
+  margin: 0 0 4px;
+  font-size: var(--text-lg);
+}
+.oneline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ol-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.oneline-sheet {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--panel) 92%, #9aa4b2 8%), var(--panel));
+  padding: 8px;
+}
+.ol-svg {
+  display: block;
+  width: 100%;
+  min-width: 860px;
+  height: auto;
+  color: var(--ink);
+}
+.ol-title {
+  fill: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.ol-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: 650;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.ol-sub {
+  fill: var(--muted);
+  font-size: 10px;
+  text-anchor: middle;
+  pointer-events: none;
+}
+.ol-hall .ol-label,
+.ol-hall .ol-sub {
+  text-anchor: start;
+}
+.ol-line {
+  stroke: #3d4a3a;
+  stroke-width: 2.5;
+  fill: none;
+  stroke-linecap: square;
+}
+.ol-line.hit { stroke: #a85a24; }
+.ol-line.failed {
+  stroke: #8a3030;
+  stroke-dasharray: 6 4;
+}
+.ol-line.dim { stroke: color-mix(in srgb, #3d4a3a 35%, transparent); }
+.ol-node rect,
+.ol-utility rect {
+  fill: color-mix(in srgb, var(--panel) 88%, #d7d2c8 12%);
+  stroke: #2f3a32;
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+.ol-node:focus,
+.ol-hall:focus,
+.ol-node:hover rect,
+.ol-utility:hover rect {
+  outline: none;
+}
+.ol-node:hover rect,
+.ol-hall:hover circle {
+  stroke: var(--action);
+}
+.ol-breaker circle {
+  fill: var(--panel);
+  stroke: #2f3a32;
+  stroke-width: 1.5;
+}
+.ol-breaker line,
+.ol-xfmr circle,
+.ol-batt line {
+  stroke: #2f3a32;
+  stroke-width: 1.5;
+  fill: none;
+}
+.ol-hall circle {
+  fill: var(--panel);
+  stroke: #2f3a32;
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+.ol-hit {
+  fill: rgba(0, 0, 0, 0.001);
+  cursor: pointer;
+}
+.ol-line,
+.ol-breaker,
+.ol-xfmr,
+.ol-batt,
+.ol-legend {
+  pointer-events: none;
+}
+.ol-node,
+.ol-hall,
+.ol-utility,
+.ol-hit {
+  pointer-events: auto;
+}
+.ol-node.failed rect,
+.ol-hall.failed circle,
+.ol-breaker.failed circle,
+.ol-xfmr.failed circle {
+  stroke: #8a3030;
+  fill: color-mix(in srgb, #8a3030 16%, var(--panel));
+}
+.ol-node.hit rect,
+.ol-hall.hit circle {
+  stroke: #a85a24;
+  fill: color-mix(in srgb, #a85a24 14%, var(--panel));
+}
+.ol-node.dim rect,
+.ol-hall.dim circle,
+.ol-line.dim + .ol-node rect {
+  opacity: 0.55;
+}
+.ol-node.hot rect { stroke: #8a3030; }
+.ol-node.warm rect { stroke: #a85a24; }
+.oneline-sheet.sim-active .ol-line.live { stroke: #3d4a3a; }
 .world.sim-active .rackbox.sim-dim {
   opacity: 0.35;
 }

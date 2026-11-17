@@ -13,6 +13,7 @@ import { renderManage } from "../views/manage";
 import { renderMap } from "../views/portmap";
 import { renderRack } from "../views/rack";
 import { renderSessions } from "../views/sessions";
+import { renderOneline } from "../views/oneline";
 import { renderSimulate } from "../views/lab";
 import { OPERATE_VIEWS, PLAN_VIEWS, operateHead, planHead } from "./rail";
 
@@ -63,7 +64,8 @@ export function viewHtml() {
     const body = state.view === "map" ? renderMap()
       : state.view === "control" ? renderControl()
         : state.view === "sessions" ? renderSessions()
-          : renderRack();
+          : state.view === "oneline" ? renderOneline()
+            : renderRack();
     return operateHead() + body;
   }
   if (PLAN_VIEWS.indexOf(state.view) >= 0) {

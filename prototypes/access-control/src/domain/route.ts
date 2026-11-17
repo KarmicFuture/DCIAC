@@ -127,6 +127,10 @@ export function applyRoute(raw) {
     state.highlightOutlet = outlet > 0 ? outlet : 0;
     return;
   }
+  if (head === "oneline" || head === "one-line") {
+    state.view = "oneline";
+    return;
+  }
   if (head === "audit") {
     state.view = "audit";
     return;
@@ -179,6 +183,7 @@ export function routeFromState() {
     return query.length ? path + "?" + query.join("&") : path;
   }
   if (state.view === "control") return state.highlightOutlet ? "#/control?outlet=" + state.highlightOutlet : "#/control";
+  if (state.view === "oneline") return "#/oneline";
   if (state.view === "audit") return "#/audit";
   if (state.view === "simulate") return "#/simulate";
   if (state.view === "models") return "#/models";

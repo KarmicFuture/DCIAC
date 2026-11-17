@@ -33,6 +33,7 @@ import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
 import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
 import { advanceDemo, loadTheme, startDemo, stopDemo, toggleTheme } from "../domain/demo";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
@@ -308,6 +309,9 @@ export function onClick(event) {
     runtime.sim.paused = false;
     fireEvent(el.dataset.event || "", el.dataset.target || "", { stay: true });
   }
+  else if (act === "oneline-open") openOnelineNode(el.dataset.server || "");
+  else if (act === "oneline-hall") openOnelineHall(el.dataset.pod || "");
+  else if (act === "oneline-site") { openOnelineSite(); render(); }
   else if (act === "lab-close") { state.labOpen = false; render(); }
   else if (act === "bmc-toggle") toggleBmc(el.dataset.device);
   else if (act === "floor-pod") {

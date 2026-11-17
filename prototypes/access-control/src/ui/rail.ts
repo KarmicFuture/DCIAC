@@ -3,7 +3,7 @@ import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
 
-export const OPERATE_VIEWS = ["rack", "map", "control", "sessions"];
+export const OPERATE_VIEWS = ["rack", "map", "control", "sessions", "oneline"];
 export const PLAN_VIEWS = ["plan", "models", "dcim"];
 
 const OPERATE_TABS = [
@@ -11,6 +11,7 @@ const OPERATE_TABS = [
   ["map", "Port map"],
   ["control", "Control"],
   ["sessions", "Sessions"],
+  ["oneline", "One-line"],
 ];
 
 const PLAN_TABS = [
@@ -34,6 +35,7 @@ const VIEW_TITLE = {
   map: "Operate",
   control: "Operate",
   sessions: "Operate",
+  oneline: "Operate",
   audit: "Audit",
   models: "Plan",
   dcim: "Plan",
