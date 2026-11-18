@@ -32,6 +32,29 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await expect(page.locator(".oneline-sheet")).toBeVisible();
   await expect(page.locator("#demo-caption")).toContainText("one-line");
 
+  // Skip ahead to the Plan date progression.
+  for (let i = 0; i < 8; i += 1) {
+    await page.evaluate(() => window.AccessDemo.advanceDemo());
+  }
+  await expect(page.locator(".shell")).toHaveAttribute("data-view", "plan");
+  await expect(page.locator("#demo-caption")).toContainText("Nov 2026");
+  await expect(page.locator(".build-scene")).toBeVisible();
+  await expect(page.locator(".plan-day")).toContainText("16 Nov 2026");
+
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("Feb 2027");
+  await expect(page.locator(".plan-day")).toContainText("15 Feb 2027");
+
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("Apr 2027");
+
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("Jul 2027");
+
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("Oct 2027");
+  await expect(page.locator(".plan-day")).toContainText("1 Oct 2027");
+
   await page.evaluate(() => window.AccessDemo.stopDemo());
   await expect(page.locator(".demo-tour")).toHaveCount(0);
 });

@@ -49,7 +49,7 @@ window.AccessDemo = {
   loadScenario,
   encodeSimPayload,
   scenarioPayload,
-  setDemoPauseMs(ms) { runtime.demoPauseMs = Math.max(50, Number(ms) || 10000); },
+  setDemoPauseMs(ms) { runtime.demoPauseMs = Math.max(50, Number(ms) || 4000); },
   startFullDemo,
   advanceDemo,
   stopDemo,

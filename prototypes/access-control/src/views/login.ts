@@ -81,7 +81,7 @@ export function login() {
   const demo = '<button type="button" class="login-demo" data-act="demo-full">' +
     '<span class="login-demo-kicker">See the product</span>' +
     '<span class="login-demo-title">Full demo</span>' +
-    '<span class="login-demo-hint">Campus, power one-line, Operate, Control, Plan — auto tour on phone or desktop.</span>' +
+    '<span class="login-demo-hint">Campus → power → Operate → Plan build dates. Auto tour, phone or desktop.</span>' +
     '<span class="login-demo-go">Play</span></button>';
   return '<a class="skip" href="#content">Skip to content</a><div class="login-wrap" id="content" data-screen="login" tabindex="-1"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +

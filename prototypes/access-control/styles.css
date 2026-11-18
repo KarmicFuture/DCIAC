@@ -1209,7 +1209,7 @@ button.act.launch.primary small { color: #d9d0c6; }
   width: 100%;
   transform-origin: left center;
   background: var(--action, #b42318);
-  animation: demo-meter var(--demo-ms, 10s) linear forwards;
+  animation: demo-meter var(--demo-ms, 4s) linear forwards;
 }
 .demo-pop .demo-actions {
   justify-content: flex-end;

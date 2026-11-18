@@ -236,7 +236,7 @@ type TourBeat = {
 
 const FULL_TOUR: TourBeat[] = [
   {
-    pop: "Outside view of the 100 MW campus — ten halls, dual utility feeders, and yard plant sized for the IT load.",
+    pop: "100 MW campus — ten halls, dual feeders, yard sized for the IT load.",
     target: ".scene",
     enter() {
       tidyFullDemo();
@@ -245,7 +245,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Hall 1 is the operable hall. Twenty AI racks sit here; rack A14 is the out-of-band ACS domain.",
+    pop: "Hall 1: twenty AI racks. A14 is the ACS out-of-band domain.",
     target: ".scene",
     enter() {
       showFloor("hall");
@@ -253,14 +253,14 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Facility power one-line: Feeder A and B through transformers and modules onto the MV bus that feeds every hall.",
+    pop: "Power one-line — Feeders A/B through transformers onto the MV bus.",
     target: ".oneline-sheet, .ol-svg",
     enter() {
       state.view = "oneline";
     },
   },
   {
-    pop: "Operate is the rack surface — consoles, port map, and sessions for devices in A14.",
+    pop: "Operate — consoles, ports, and sessions for A14.",
     target: ".view, .rack-wrap, .workspace",
     enter() {
       state.view = "rack";
@@ -268,7 +268,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "BMC path on GPU Tray 06 is dark. Failover is ACS serial out of band — not RM1048.",
+    pop: "BMC dark on Tray 06. Failover is ACS serial — not RM1048.",
     target: ".view, .device-card, .rack-wrap",
     enter() {
       ensureBmcUp("tray-06");
@@ -282,8 +282,7 @@ const FULL_TOUR: TourBeat[] = [
   {
     pop: () => {
       const mapped = deviceById("tray-06");
-      return "ACS serial on " + ((mapped && mapped.tty) || "ttyS8") +
-        " is up. This session is the operator’s out-of-band console while the BMC is dark.";
+      return "ACS serial on " + ((mapped && mapped.tty) || "ttyS8") + " — out-of-band while BMC is dark.";
     },
     target: ".view, .session, .term-path, .workspace",
     enter() {
@@ -293,7 +292,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Control gates outlet power. Changes need policy: role, BMC plane, and often a maintenance window.",
+    pop: "Control gates outlet power by role, BMC plane, and maintenance.",
     target: ".view, .control, table",
     enter() {
       const mapped = deviceById("tray-06");
@@ -309,7 +308,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "DI-1 leak is asserted. Outlets 1 and 2 lock while RM1048 still owns them — no plant-wide trip.",
+    pop: "DI-1 leak — outlets 1–2 lock. No plant-wide trip.",
     target: ".view, .alarm-banner, table",
     enter() {
       fireEvent("leak-trip", "", { quiet: true, stay: true });
@@ -318,7 +317,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "A named maintenance window lifts the hold. Bound outlets can be cycled, and every act is audited.",
+    pop: "Maintenance lifts the hold. Bound outlets cycle; every act is audited.",
     target: ".view, table",
     enter() {
       openMaintenance();
@@ -326,7 +325,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Feeder A is open on the live campus. Redundancy is gone; the other side still carries load. Failed feeds are painted on Outside.",
+    pop: "Feeder A open — redundancy gone. Outside paints the failed feed.",
     target: ".scene, .sim-bar, .sim-dock",
     enter() {
       if (state.leak) setLeak(false, true);
@@ -339,16 +338,42 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Plan is the year-long build — grass pads to live halls — so capacity arrives with the schedule.",
-    target: ".view, .build-scene, .plan-layout",
+    pop: "Plan · Nov 2026 — grass field. Survey stakes only; nothing energized.",
+    target: ".build-scene, .stage-bar, .plan-day",
     enter() {
-      resetSimulation();
-      runtime.sim.barOpen = false;
-      state.view = "plan";
+      showPlanDate("2026-11-16");
     },
   },
   {
-    pop: "DCIM holds capacity, cables, work orders, monitoring, and reports on one working page.",
+    pop: "Feb 2027 — both utility feeders and transformers on the west yard.",
+    target: ".build-scene, .stage-bar, .plan-day",
+    enter() {
+      showPlanDate("2027-02-15");
+    },
+  },
+  {
+    pop: "Apr 2027 — halls 1–5 dried in. Coolers start the heat yard.",
+    target: ".build-scene, .stage-bar, .plan-day",
+    enter() {
+      showPlanDate("2027-04-01");
+    },
+  },
+  {
+    pop: "Jul 2027 — first 40 MW live. Halls 1–4 take IT load.",
+    target: ".build-scene, .stage-bar, .plan-day",
+    enter() {
+      showPlanDate("2027-07-01");
+    },
+  },
+  {
+    pop: "Oct 2027 — 100 MW. All ten halls match the live campus.",
+    target: ".build-scene, .stage-bar, .plan-day",
+    enter() {
+      showPlanDate("2027-10-01");
+    },
+  },
+  {
+    pop: "DCIM — capacity, cables, work orders, monitoring, reports.",
     target: ".view, .dcim",
     enter() {
       state.view = "dcim";
@@ -356,14 +381,14 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Audit is the record after an incident: person, asset, console open, outlet act, and work order.",
+    pop: "Audit — who, asset, console, outlet, work order.",
     target: ".view",
     enter() {
       state.view = "audit";
     },
   },
   {
-    pop: "Demo complete. Floor, one-line, Operate, Control, Simulate, Plan, DCIM, and Audit are the surfaces an operator uses day to day.",
+    pop: "Done. Floor, one-line, Operate, Control, Plan, DCIM, Audit — day to day.",
     target: ".scene",
     enter() {
       tidyFullDemo();
@@ -417,7 +442,17 @@ function clearDemoTimer() {
 
 function demoPauseMs() {
   const ms = Number(runtime.demoPauseMs);
-  return ms > 0 ? ms : 10000;
+  return ms > 0 ? ms : 4000;
+}
+
+function showPlanDate(iso: string) {
+  resetSimulation();
+  runtime.sim.barOpen = false;
+  state.view = "plan";
+  state.buildDate = iso;
+  state.menuOpen = false;
+  state.labOpen = false;
+  state.toast = "";
 }
 
 function fullBeat() {
