@@ -1091,8 +1091,60 @@ button.act.launch.primary small { color: #d9d0c6; }
 .demo-step { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 .demo-caption { margin: 0; font-size: var(--text-md); line-height: 1.45; }
 .demo-actions, .demo-picks { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.demo-full-btn {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 8px;
+}
+.demo-coach {
+  position: fixed;
+  z-index: 60;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--hud-bg, var(--panel));
+  color: var(--hud-ink, var(--ink));
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+}
+.demo-coach-copy {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.demo-coach .demo-kicker {
+  margin: 0 0 4px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.demo-coach .demo-caption {
+  font-size: var(--text-sm);
+}
+.demo-coach .demo-actions {
+  flex: 0 0 auto;
+}
+.shell[data-menu="open"] .demo-coach {
+  left: max(12px, calc(var(--rail, 220px) + 12px));
+}
+@media (max-width: 900px) {
+  .demo-coach {
+    bottom: max(64px, calc(12px + env(safe-area-inset-bottom)));
+  }
+}
 .rail .theme-toggle { color: var(--ink); background: var(--panel); }
 .page-head .theme-toggle { flex: none; align-self: flex-start; white-space: nowrap; }
+.topbar-demo {
+  margin-left: auto;
+  white-space: nowrap;
+}
 .topbar .theme-toggle {
   margin-left: var(--s2);
   color: #1a1a1a;
