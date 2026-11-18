@@ -1,5 +1,4 @@
 import { briefingButton } from "../domain/briefing";
-import { operatorDemoButton } from "../domain/demo";
 import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
@@ -75,12 +74,9 @@ export function planHead() {
 export function topbar() {
   const title = VIEW_TITLE[state.view] || "Access";
   const open = state.menuOpen ? "true" : "false";
-  const demo = state.user && state.user.role === "Operator"
-    ? '<button type="button" class="act primary topbar-demo" data-act="demo-full">Full demo</button>'
-    : "";
   return '<div class="topbar">' + briefingButton() + '<button type="button" class="menu-btn" data-act="menu" aria-expanded="' + open +
     '" aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></button><strong>Access</strong><span class="topbar-view">' +
-    esc(title) + "</span>" + demo + themeButton() + "</div>" +
+    esc(title) + "</span>" + themeButton() + "</div>" +
     '<button type="button" class="menu-back" data-act="menu-close" aria-label="Close menu"></button>';
 }
 
@@ -107,7 +103,6 @@ export function rail() {
     navButton("audit", "Audit") +
     "</nav>" +
     '<div class="rail-foot">' + leak +
-    operatorDemoButton() +
     themeButton() +
     '<button type="button" class="lab-open" data-act="simulate">Simulate</button>' +
     '<div class="who"><strong>' + esc(state.user.id) + "</strong><span>" + esc(state.user.role) +

@@ -484,6 +484,7 @@ export function startFullDemo() {
   state.demoId = "full";
   state.demoDone = false;
   state.labOpen = false;
+  state.menuOpen = false;
   state.toast = "";
   state.focusField = "";
   enterFullBeat(0);
@@ -575,34 +576,46 @@ export function placeDemoHighlights() {
     el = document.querySelector(selectors[i]);
     if (el) break;
   }
-  if (!el) el = document.querySelector(".view") || document.querySelector("main");
+  if (!el) el = document.querySelector(".view") || document.querySelector("main") || document.querySelector(".scene");
   if (!el) {
     spot.style.display = "none";
     return;
   }
+  const phone = window.innerWidth < 768;
   const rect = el.getBoundingClientRect();
-  const pad = 10;
+  const pad = phone ? 6 : 10;
+  const safeBottom = phone ? 12 : 8;
   const left = Math.max(8, rect.left - pad);
-  const top = Math.max(8, rect.top - pad);
+  const top = Math.max(phone ? 52 : 8, rect.top - pad);
   const width = Math.min(window.innerWidth - left - 8, rect.width + pad * 2);
-  const height = Math.min(window.innerHeight - top - 8, rect.height + pad * 2);
+  const height = Math.min(window.innerHeight - top - (phone ? 150 : 8), rect.height + pad * 2);
   spot.style.display = "block";
   spot.style.left = left + "px";
   spot.style.top = top + "px";
   spot.style.width = Math.max(48, width) + "px";
-  spot.style.height = Math.max(48, height) + "px";
+  spot.style.height = Math.max(phone ? 120 : 48, height) + "px";
 
+  if (phone) {
+    pop.classList.add("is-docked");
+    pop.style.width = "";
+    pop.style.left = "";
+    pop.style.top = "";
+    pop.style.bottom = "";
+    return;
+  }
+  pop.classList.remove("is-docked");
   const popW = Math.min(340, window.innerWidth - 24);
   pop.style.width = popW + "px";
   let popLeft = left + Math.max(0, (width - popW) / 2);
   popLeft = Math.min(Math.max(12, popLeft), window.innerWidth - popW - 12);
   let popTop = top + height + 14;
   const popHeight = pop.offsetHeight || 140;
-  if (popTop + popHeight > window.innerHeight - 12) {
+  if (popTop + popHeight > window.innerHeight - safeBottom) {
     popTop = Math.max(12, top - popHeight - 14);
   }
   pop.style.left = popLeft + "px";
   pop.style.top = popTop + "px";
+  pop.style.bottom = "";
 }
 
 export function demoPanel() {
@@ -611,17 +624,10 @@ export function demoPanel() {
     esc(item.title) + "</button>").join("");
   if (!state.demoId || state.demoId === "full") {
     return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
-      '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step. Operators can also run Full demo from the rail for an auto tour.</p>' +
+      '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step. Full demo starts from the sign-in screen.</p>' +
       '<div class="demo-picks">' + picks + "</div></section>";
   }
   return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
     demoChrome(false) +
     '<div class="demo-picks">' + picks + "</div></section>";
-}
-
-export function operatorDemoButton() {
-  if (!state.user || state.user.role !== "Operator") return "";
-  const on = state.demoId === "full";
-  return '<button type="button" class="act primary demo-full-btn" data-act="demo-full"' +
-    (on ? ' aria-pressed="true"' : "") + ">Full demo</button>";
 }

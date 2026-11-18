@@ -78,9 +78,16 @@ export function login() {
     (choice.start ? '<span class="role-kicker">Start here</span>' : "") +
     '<span class="role-title">' + esc(choice.title) + '</span><span class="role-hint">' +
     esc(choice.hint) + '</span></span><span class="role-go">Sign in</span></button>').join("");
+  const demo = '<button type="button" class="login-demo" data-act="demo-full">' +
+    '<span class="login-demo-kicker">See the product</span>' +
+    '<span class="login-demo-title">Full demo</span>' +
+    '<span class="login-demo-hint">Campus, power one-line, Operate, Control, Plan — auto tour on phone or desktop.</span>' +
+    '<span class="login-demo-go">Play</span></button>';
   return '<a class="skip" href="#content">Skip to content</a><div class="login-wrap" id="content" data-screen="login" tabindex="-1"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +
     '<div class="login-body"><h1>Sign in</h1><p class="sub">Password for every role is hall-a14. A colo customer only sees Hall 10. OIDC and SAML stay off until DCIAC_OIDC_ISSUER is set.</p>' +
     themeButton() +
+    demo +
+    '<p class="login-or" role="separator">Or sign in</p>' +
     '<div class="role-list">' + roles + "</div></div></div></div>";
 }

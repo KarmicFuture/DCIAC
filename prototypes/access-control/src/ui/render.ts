@@ -186,7 +186,7 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}</div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}</div>`, root);
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
@@ -229,6 +229,18 @@ export function onClick(event) {
   }
   if (act === "theme") {
     toggleTheme();
+    return;
+  }
+  if (act === "demo-full") {
+    if (state.user) {
+      startFullDemo();
+      return;
+    }
+    signIn("dsvs.operator").then(() => {
+      state.offerBriefing = false;
+      state.briefingStep = -1;
+      startFullDemo();
+    });
     return;
   }
   if (!state.user) return;
@@ -283,7 +295,6 @@ export function onClick(event) {
   else if (act === "screen") setScreen(el.dataset.session, el.dataset.screen);
   else if (act === "close-session") closeSession(el.dataset.session);
   else if (act === "demo-start") startDemo(el.dataset.demo);
-  else if (act === "demo-full") startFullDemo();
   else if (act === "demo-next") advanceDemo();
   else if (act === "demo-stop") stopDemo();
   else if (act === "briefing-start") startBriefing();

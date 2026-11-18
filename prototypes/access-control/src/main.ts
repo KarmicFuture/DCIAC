@@ -9,7 +9,7 @@ import { deviceById, devices } from "./data/devices";
 import { outlets } from "./data/outlets";
 import { entityById } from "./data/pods";
 import { setAnalyzer } from "./domain/analyzer";
-import { startFullDemo, stopDemo } from "./domain/demo";
+import { advanceDemo, startFullDemo, stopDemo } from "./domain/demo";
 import {
   encodeSimPayload,
   fireEvent,
@@ -51,6 +51,7 @@ window.AccessDemo = {
   scenarioPayload,
   setDemoPauseMs(ms) { runtime.demoPauseMs = Math.max(50, Number(ms) || 10000); },
   startFullDemo,
+  advanceDemo,
   stopDemo,
   setAnalyzer,
   finishOutletHold,
