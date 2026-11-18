@@ -35,7 +35,7 @@ import { toastHtml } from "./toast";
 import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
-import { advanceDemo, demoCoachHtml, loadTheme, startDemo, startFullDemo, stopDemo, toggleTheme } from "../domain/demo";
+import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFullDemo, stopDemo, toggleTheme } from "../domain/demo";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
 import { loadWorld } from "../data/repository";
@@ -196,6 +196,7 @@ function paint() {
   settle();
   applyCamera();
   paintHeat();
+  placeDemoHighlights();
   syncHash();
   saveWorld();
 }
@@ -213,7 +214,7 @@ export function syncFields() {
 
 export function onClick(event) {
   let el = event.target.closest("[data-act]");
-  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing")) {
+  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour")) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }

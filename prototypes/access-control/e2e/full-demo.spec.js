@@ -11,24 +11,27 @@ async function signInOperator(page) {
   if (await briefing.count()) await briefing.click();
 }
 
-test("Operator Full demo walks product surfaces", async ({ page }) => {
+test("Operator Full demo auto-advances with highlight pops", async ({ page }) => {
   await signInOperator(page);
+  await page.evaluate(() => window.AccessDemo.setDemoPauseMs(250));
   await expect(page.locator('.rail [data-act="demo-full"]')).toBeVisible();
   await page.locator('.rail [data-act="demo-full"]').click();
-  await expect(page.locator(".demo-coach")).toBeVisible();
+
+  await expect(page.locator(".demo-tour")).toBeVisible();
+  await expect(page.locator(".demo-pop")).toBeVisible();
+  await expect(page.locator(".demo-spot")).toBeVisible();
   await expect(page.locator("#demo-caption")).toContainText("100 MW campus");
+  await expect(page.locator("#demo-advance")).toHaveCount(0);
 
-  await page.locator("#demo-advance").click();
+  await expect.poll(async () => page.locator("#demo-caption").textContent(), { timeout: 5000 })
+    .toContain("Hall 1");
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "floor");
-  await expect(page.locator("#demo-caption")).toContainText("Hall 1");
 
-  await page.locator("#demo-advance").click();
-  await expect(page.locator(".shell")).toHaveAttribute("data-view", "oneline");
+  await expect.poll(async () => page.locator(".shell").getAttribute("data-view"), { timeout: 5000 })
+    .toBe("oneline");
   await expect(page.locator(".oneline-sheet")).toBeVisible();
+  await expect(page.locator("#demo-caption")).toContainText("one-line");
 
-  await page.locator("#demo-advance").click();
-  await expect(page.locator(".shell")).toHaveAttribute("data-view", "rack");
-
-  await page.locator('[data-act="demo-stop"]').click();
-  await expect(page.locator(".demo-coach")).toHaveCount(0);
+  await page.evaluate(() => window.AccessDemo.stopDemo());
+  await expect(page.locator(".demo-tour")).toHaveCount(0);
 });

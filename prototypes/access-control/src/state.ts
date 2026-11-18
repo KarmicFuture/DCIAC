@@ -15,6 +15,8 @@ export const runtime = {
   pulse: null as { id: string; until: number } | null,
   pulseTimer: 0 as any,
   consolePass: false,
+  demoPauseMs: 10000,
+  demoTimer: 0 as any,
   dcim: { tab: "capacity", home: null as any, scenarioId: "", workId: "", note: "", rows: [] as any[] },
   sim: {
     seed: 1,

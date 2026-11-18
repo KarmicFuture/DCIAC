@@ -226,132 +226,150 @@ const SCENARIOS = [
     ],
     done: "The cycle was refused. ReadOnly cannot cycle outlets. Power was not changed.",
   },
+];
+
+type TourBeat = {
+  pop: string | (() => string);
+  target?: string;
+  enter: () => void;
+};
+
+const FULL_TOUR: TourBeat[] = [
   {
-    id: "full",
-    title: "Full product demo",
-    intro() {
+    pop: "Outside view of the 100 MW campus — ten halls, dual utility feeders, and yard plant sized for the IT load.",
+    target: ".scene",
+    enter() {
       tidyFullDemo();
       showFloor("site");
       calmChrome();
-      state.labOpen = false;
     },
-    steps: [
-      {
-        caption: () => "This is the 100 MW campus outside. Next opens Hall 1, the hall an operator can work.",
-        run() {
-          showFloor("hall");
-          state.floor.podId = "pod-a";
-        },
-      },
-      {
-        caption: () => "Hall 1 holds twenty AI racks. Rack A14 is the out-of-band domain. Next opens the facility power one-line.",
-        run() {
-          state.view = "oneline";
-        },
-      },
-      {
-        caption: () => "Utility feeders A and B feed transformers, modules, and every hall bus. Next opens Operate on rack A14.",
-        run() {
-          state.view = "rack";
-          state.selected = "tray-01";
-        },
-      },
-      {
-        caption: () => "Operate is consoles, ports, and sessions for the rack. Next drops the BMC on GPU Tray 06 — failover is ACS serial, not RM1048.",
-        run() {
-          ensureBmcUp("tray-06");
-          state.view = "rack";
-          state.selected = "tray-06";
-          fireEvent("bmc-loss", "tray-06", { quiet: true, stay: true });
-          state.view = "rack";
-          state.selected = "tray-06";
-        },
-      },
-      {
-        caption: () => {
-          const mapped = deviceById("tray-06");
-          return "Tray 06 is dark on the BMC. ACS serial on " + ((mapped && mapped.tty) || "ttyS8") +
-            " is coming up. Next finishes failover and opens that console.";
-        },
-        run() {
-          finishSerial("tray-06");
-          openSession("tray-06", "acs", "serial", "rs232");
-          state.view = "sessions";
-        },
-      },
-      {
-        caption: () => "ACS serial is the out-of-band path. Next restores the BMC and opens Control for power and leak policy.",
-        run() {
-          const mapped = deviceById("tray-06");
-          if (mapped && mapped.bmc === "down") {
-            revertEvent("bmc-loss", "tray-06");
-            if (mapped.bmc === "down") toggleBmc("tray-06");
-          }
-          closeDemoSessions();
-          closeMaintenance();
-          if (state.leak) setLeak(false, true);
-          state.view = "control";
-          state.highlightOutlet = 1;
-        },
-      },
-      {
-        caption: () => "Control gates outlet changes. Next trips DI-1. Outlets 1 and 2 lock until a maintenance window is open.",
-        run() {
-          fireEvent("leak-trip", "", { quiet: true, stay: true });
-          state.view = "control";
-          state.highlightOutlet = 1;
-        },
-      },
-      {
-        caption: () => "Outlets 1 and 2 stay locked while RM1048 owns them. Next opens a maintenance window so an operator can cycle them.",
-        run() {
-          openMaintenance();
-          state.highlightOutlet = 1;
-        },
-      },
-      {
-        caption: () => "With the window open, bound outlets can be cycled under audit. Next shows the live floor with Feeder A lost — redundancy gone, load still carried.",
-        run() {
-          if (state.leak) setLeak(false, true);
-          closeMaintenance();
-          showFloor("site");
-          runtime.sim.barOpen = true;
-          fireEvent("feeder-a-loss", "", { quiet: true, stay: true });
-          state.view = "floor";
-          state.floor.level = "site";
-        },
-      },
-      {
-        caption: () => "The Outside view dims unaffected gear and paints the failed feed. Next opens Plan — the year-long campus build.",
-        run() {
-          resetSimulation();
-          runtime.sim.barOpen = false;
-          state.view = "plan";
-        },
-      },
-      {
-        caption: () => "Plan walks grass to live halls. Next opens DCIM capacity, cables, work, and reports on one page.",
-        run() {
-          state.view = "dcim";
-          runtime.dcim.tab = "capacity";
-        },
-      },
-      {
-        caption: () => "DCIM is the working record for capacity and change. Next opens Audit — every console open and outlet act with the person and work order.",
-        run() {
-          state.view = "audit";
-        },
-      },
-      {
-        caption: () => "Audit is what you ask for after an incident. Next clears the demo faults and returns you to Hall 1.",
-        run() {
-          tidyFullDemo();
-          showFloor("hall");
-          state.floor.podId = "pod-a";
-        },
-      },
-    ],
-    done: "Full demo complete. Floor, one-line, Operate, Control, Simulate, Plan, DCIM, and Audit are the product surfaces an operator uses.",
+  },
+  {
+    pop: "Hall 1 is the operable hall. Twenty AI racks sit here; rack A14 is the out-of-band ACS domain.",
+    target: ".scene",
+    enter() {
+      showFloor("hall");
+      state.floor.podId = "pod-a";
+    },
+  },
+  {
+    pop: "Facility power one-line: Feeder A and B through transformers and modules onto the MV bus that feeds every hall.",
+    target: ".oneline-sheet, .ol-svg",
+    enter() {
+      state.view = "oneline";
+    },
+  },
+  {
+    pop: "Operate is the rack surface — consoles, port map, and sessions for devices in A14.",
+    target: ".view, .rack-wrap, .workspace",
+    enter() {
+      state.view = "rack";
+      state.selected = "tray-01";
+    },
+  },
+  {
+    pop: "BMC path on GPU Tray 06 is dark. Failover is ACS serial out of band — not RM1048.",
+    target: ".view, .device-card, .rack-wrap",
+    enter() {
+      ensureBmcUp("tray-06");
+      state.view = "rack";
+      state.selected = "tray-06";
+      fireEvent("bmc-loss", "tray-06", { quiet: true, stay: true });
+      state.view = "rack";
+      state.selected = "tray-06";
+    },
+  },
+  {
+    pop: () => {
+      const mapped = deviceById("tray-06");
+      return "ACS serial on " + ((mapped && mapped.tty) || "ttyS8") +
+        " is up. This session is the operator’s out-of-band console while the BMC is dark.";
+    },
+    target: ".view, .session, .term-path, .workspace",
+    enter() {
+      finishSerial("tray-06");
+      openSession("tray-06", "acs", "serial", "rs232");
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "Control gates outlet power. Changes need policy: role, BMC plane, and often a maintenance window.",
+    target: ".view, .control, table",
+    enter() {
+      const mapped = deviceById("tray-06");
+      if (mapped && mapped.bmc === "down") {
+        revertEvent("bmc-loss", "tray-06");
+        if (mapped.bmc === "down") toggleBmc("tray-06");
+      }
+      closeDemoSessions();
+      closeMaintenance();
+      if (state.leak) setLeak(false, true);
+      state.view = "control";
+      state.highlightOutlet = 1;
+    },
+  },
+  {
+    pop: "DI-1 leak is asserted. Outlets 1 and 2 lock while RM1048 still owns them — no plant-wide trip.",
+    target: ".view, .alarm-banner, table",
+    enter() {
+      fireEvent("leak-trip", "", { quiet: true, stay: true });
+      state.view = "control";
+      state.highlightOutlet = 1;
+    },
+  },
+  {
+    pop: "A named maintenance window lifts the hold. Bound outlets can be cycled, and every act is audited.",
+    target: ".view, table",
+    enter() {
+      openMaintenance();
+      state.highlightOutlet = 1;
+    },
+  },
+  {
+    pop: "Feeder A is open on the live campus. Redundancy is gone; the other side still carries load. Failed feeds are painted on Outside.",
+    target: ".scene, .sim-bar, .sim-dock",
+    enter() {
+      if (state.leak) setLeak(false, true);
+      closeMaintenance();
+      showFloor("site");
+      runtime.sim.barOpen = true;
+      fireEvent("feeder-a-loss", "", { quiet: true, stay: true });
+      state.view = "floor";
+      state.floor.level = "site";
+    },
+  },
+  {
+    pop: "Plan is the year-long build — grass pads to live halls — so capacity arrives with the schedule.",
+    target: ".view, .build-scene, .plan-layout",
+    enter() {
+      resetSimulation();
+      runtime.sim.barOpen = false;
+      state.view = "plan";
+    },
+  },
+  {
+    pop: "DCIM holds capacity, cables, work orders, monitoring, and reports on one working page.",
+    target: ".view, .dcim",
+    enter() {
+      state.view = "dcim";
+      runtime.dcim.tab = "capacity";
+    },
+  },
+  {
+    pop: "Audit is the record after an incident: person, asset, console open, outlet act, and work order.",
+    target: ".view",
+    enter() {
+      state.view = "audit";
+    },
+  },
+  {
+    pop: "Demo complete. Floor, one-line, Operate, Control, Simulate, Plan, DCIM, and Audit are the surfaces an operator uses day to day.",
+    target: ".scene",
+    enter() {
+      tidyFullDemo();
+      showFloor("hall");
+      state.floor.podId = "pod-a";
+    },
   },
 ];
 
@@ -384,25 +402,75 @@ export function toggleTheme() {
 }
 
 export function clearDemo() {
+  clearDemoTimer();
   state.demoId = "";
   state.demoStep = 0;
   state.demoDone = false;
 }
 
-function keepLabOpen(id) {
-  return id !== "full";
+function clearDemoTimer() {
+  if (runtime.demoTimer) {
+    clearTimeout(runtime.demoTimer);
+    runtime.demoTimer = 0;
+  }
+}
+
+function demoPauseMs() {
+  const ms = Number(runtime.demoPauseMs);
+  return ms > 0 ? ms : 10000;
+}
+
+function fullBeat() {
+  if (state.demoId !== "full") return null;
+  if (state.demoStep < 0 || state.demoStep >= FULL_TOUR.length) return null;
+  return FULL_TOUR[state.demoStep];
+}
+
+function scheduleFullAdvance() {
+  clearDemoTimer();
+  if (state.demoId !== "full") return;
+  runtime.demoTimer = setTimeout(() => {
+    runtime.demoTimer = 0;
+    advanceFullTour();
+  }, demoPauseMs());
+}
+
+function enterFullBeat(index: number) {
+  const beat = FULL_TOUR[index];
+  if (!beat) return;
+  state.demoStep = index;
+  state.demoDone = false;
+  state.labOpen = false;
+  calmChrome();
+  beat.enter();
+}
+
+export function advanceFullTour() {
+  if (state.demoId !== "full") return;
+  const next = state.demoStep + 1;
+  if (next >= FULL_TOUR.length) {
+    stopDemo();
+    return;
+  }
+  enterFullBeat(next);
+  render();
+  scheduleFullAdvance();
 }
 
 export function startDemo(id) {
+  if (id === "full") {
+    startFullDemo();
+    return;
+  }
   const scenario = scenarioById(id);
   if (!scenario) return;
+  clearDemoTimer();
   state.demoId = id;
   state.demoStep = 0;
   state.demoDone = false;
-  state.labOpen = keepLabOpen(id);
+  state.labOpen = true;
   scenario.intro();
-  if (id === "full") state.labOpen = false;
-  else state.labOpen = true;
+  state.labOpen = true;
   state.toast = "";
   state.focusField = "demo-advance";
   render();
@@ -412,10 +480,22 @@ export function startFullDemo() {
   if (!state.user || state.user.role !== "Operator") return;
   state.offerBriefing = false;
   state.briefingStep = -1;
-  startDemo("full");
+  clearDemoTimer();
+  state.demoId = "full";
+  state.demoDone = false;
+  state.labOpen = false;
+  state.toast = "";
+  state.focusField = "";
+  enterFullBeat(0);
+  render();
+  scheduleFullAdvance();
 }
 
 export function advanceDemo() {
+  if (state.demoId === "full") {
+    advanceFullTour();
+    return;
+  }
   const scenario = scenarioById(state.demoId);
   if (!scenario || state.demoDone) {
     clearDemo();
@@ -426,14 +506,15 @@ export function advanceDemo() {
   if (step) step.run();
   state.demoStep += 1;
   state.demoDone = state.demoStep >= scenario.steps.length;
-  state.labOpen = keepLabOpen(state.demoId) && state.demoId !== "full";
-  if (state.demoId === "full") state.labOpen = false;
+  state.labOpen = true;
   state.focusField = "demo-advance";
   render();
 }
 
 export function stopDemo() {
-  if (state.demoId === "full") tidyFullDemo();
+  const wasFull = state.demoId === "full";
+  clearDemoTimer();
+  if (wasFull) tidyFullDemo();
   clearDemo();
   state.focusField = "";
   render();
@@ -463,17 +544,74 @@ function demoChrome(compact) {
 }
 
 export function demoCoachHtml() {
+  if (state.demoId === "full") {
+    const beat = fullBeat();
+    if (!beat) return "";
+    const progress = (state.demoStep + 1) + " of " + FULL_TOUR.length;
+    const ms = demoPauseMs();
+    return '<div class="demo-tour" role="region" aria-label="Product demo">' +
+      '<div class="demo-veil" aria-hidden="true"></div>' +
+      '<div class="demo-spot" aria-hidden="true"></div>' +
+      '<div class="demo-pop">' +
+      '<p class="demo-kicker">Full demo · ' + esc(progress) + "</p>" +
+      '<p class="demo-caption" id="demo-caption" aria-live="polite">' + esc(textOf(beat.pop)) + "</p>" +
+      '<div class="demo-pop-meter" style="--demo-ms:' + ms + 'ms" aria-hidden="true"><i></i></div>' +
+      '<div class="demo-actions"><button type="button" class="act" data-act="demo-stop">Stop</button></div>' +
+      "</div></div>";
+  }
   if (!state.demoId || state.labOpen) return "";
   return demoChrome(true);
+}
+
+export function placeDemoHighlights() {
+  if (state.demoId !== "full") return;
+  const beat = fullBeat();
+  const spot = document.querySelector(".demo-spot") as HTMLElement | null;
+  const pop = document.querySelector(".demo-pop") as HTMLElement | null;
+  if (!spot || !pop) return;
+  const selectors = String((beat && beat.target) || ".view").split(",").map((part) => part.trim()).filter(Boolean);
+  let el: Element | null = null;
+  for (let i = 0; i < selectors.length; i += 1) {
+    el = document.querySelector(selectors[i]);
+    if (el) break;
+  }
+  if (!el) el = document.querySelector(".view") || document.querySelector("main");
+  if (!el) {
+    spot.style.display = "none";
+    return;
+  }
+  const rect = el.getBoundingClientRect();
+  const pad = 10;
+  const left = Math.max(8, rect.left - pad);
+  const top = Math.max(8, rect.top - pad);
+  const width = Math.min(window.innerWidth - left - 8, rect.width + pad * 2);
+  const height = Math.min(window.innerHeight - top - 8, rect.height + pad * 2);
+  spot.style.display = "block";
+  spot.style.left = left + "px";
+  spot.style.top = top + "px";
+  spot.style.width = Math.max(48, width) + "px";
+  spot.style.height = Math.max(48, height) + "px";
+
+  const popW = Math.min(340, window.innerWidth - 24);
+  pop.style.width = popW + "px";
+  let popLeft = left + Math.max(0, (width - popW) / 2);
+  popLeft = Math.min(Math.max(12, popLeft), window.innerWidth - popW - 12);
+  let popTop = top + height + 14;
+  const popHeight = pop.offsetHeight || 140;
+  if (popTop + popHeight > window.innerHeight - 12) {
+    popTop = Math.max(12, top - popHeight - 14);
+  }
+  pop.style.left = popLeft + "px";
+  pop.style.top = popTop + "px";
 }
 
 export function demoPanel() {
   const picks = SCENARIOS.map((item) => '<button type="button" class="act' +
     (state.demoId === item.id ? " primary" : "") + '" data-act="demo-start" data-demo="' + item.id + '">' +
     esc(item.title) + "</button>").join("");
-  if (!state.demoId) {
+  if (!state.demoId || state.demoId === "full") {
     return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
-      '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step.</p>' +
+      '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step. Operators can also run Full demo from the rail for an auto tour.</p>' +
       '<div class="demo-picks">' + picks + "</div></section>";
   }
   return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
