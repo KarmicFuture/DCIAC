@@ -4,7 +4,7 @@ import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
 
 export const OPERATE_VIEWS = ["rack", "map", "control", "sessions", "oneline", "fleet"];
-export const PLAN_VIEWS = ["plan", "models", "dcim"];
+export const PLAN_VIEWS = ["plan", "halls", "models", "dcim"];
 
 const OPERATE_TABS = [
   ["rack", "Rack"],
@@ -17,6 +17,7 @@ const OPERATE_TABS = [
 
 const PLAN_TABS = [
   ["plan", "Campus"],
+  ["halls", "Halls"],
   ["models", "Models"],
   ["dcim", "DCIM"],
 ];
@@ -42,6 +43,7 @@ const VIEW_TITLE = {
   fleet: "Operate",
   audit: "Audit",
   models: "Plan",
+  halls: "Plan",
   dcim: "Plan",
   simulate: "Simulate",
 };

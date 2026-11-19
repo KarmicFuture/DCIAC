@@ -174,6 +174,10 @@ export function applyRoute(raw) {
     state.view = "simulate";
     return;
   }
+  if (head === "halls") {
+    state.view = "halls";
+    return;
+  }
   if (head === "models") {
     state.view = "models";
     return;
@@ -227,6 +231,7 @@ export function routeFromState() {
   if (state.view === "fleet") return "#/fleet";
   if (state.view === "audit") return "#/audit";
   if (state.view === "simulate") return "#/simulate";
+  if (state.view === "halls") return "#/halls";
   if (state.view === "models") return "#/models";
   if (state.view === "dcim") return "#/dcim";
   if (state.view === "plan") return state.buildHall ? "#/plan/" + encodeURIComponent(state.buildHall) : "#/plan";

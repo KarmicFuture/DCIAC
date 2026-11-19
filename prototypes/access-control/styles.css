@@ -3452,3 +3452,18 @@ button.act.launch.primary small { color: #d9d0c6; }
 [data-theme="noc"] .hb-aisle.hot { fill: #3d2a20; }
 .hall-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 16px; }
 .hall-picks .fine { margin-right: 4px; }
+
+.gantt-page { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.gantt-scroll { overflow-x: auto; }
+.gantt-grid { position: relative; min-width: 760px; display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
+.gantt-row { display: grid; grid-template-columns: 110px 1fr 170px; align-items: center; gap: 10px; }
+.gantt-track { position: relative; height: 28px; background: var(--line); border-radius: 4px; }
+.gantt-axis .gantt-track { background: none; height: 20px; }
+.gantt-month { position: absolute; top: 2px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.gantt-bar { position: absolute; top: 2px; bottom: 2px; min-width: 2px; border: 0; border-radius: 3px; padding: 0 4px; color: #1c1c1c; font: inherit; font-size: 10px; cursor: pointer; overflow: hidden; }
+.gantt-bar span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-bar.now { outline: 2px solid var(--ink); z-index: 1; }
+.gantt-name { display: flex; flex-direction: column; align-items: flex-start; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.gantt-name small { color: var(--muted); font-size: 11px; }
+.gantt-dates { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
+.gantt-now { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); pointer-events: none; z-index: 2; }
