@@ -2,6 +2,16 @@
 
 ## 2026-11-19
 
+Hall build schedule (Plan › Halls, `#/halls`):
+
+- A Gantt-style schedule with one row per hall and one bar per phase, from Field and Pad
+  through Empty shell, Power and cooling, Racks set and Commissioning to Live. Each row
+  lists its shell and live dates.
+- A line marks the plan date chosen on the campus timeline. Each hall shows the phase it
+  is in on that day, and the header counts how many halls are live.
+- Click a phase to open that hall's timeline on the phase's first day. Click a hall name
+  to open it on the current plan date.
+
 One-line build timeline (Operate › One-line › Build timeline):
 
 - A Build timeline button switches the one-line to a plan date, with the same stage bar

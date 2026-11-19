@@ -9,6 +9,7 @@ import { renderModels } from "../views/models";
 import { renderControl } from "../views/control";
 import { renderFloor } from "../views/floor";
 import { renderPlan } from "../views/plan";
+import { renderHalls } from "../views/halls";
 import { renderManage } from "../views/manage";
 import { renderMap } from "../views/portmap";
 import { renderRack } from "../views/rack";
@@ -73,7 +74,8 @@ export function viewHtml() {
   if (PLAN_VIEWS.indexOf(state.view) >= 0) {
     const body = state.view === "models" ? renderModels()
       : state.view === "dcim" ? renderDcim()
-        : renderPlan();
+        : state.view === "halls" ? renderHalls()
+          : renderPlan();
     return planHead() + body;
   }
   return renderRack();
