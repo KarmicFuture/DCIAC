@@ -87,6 +87,10 @@ function calendarHtml(currentIso) {
   }).join("");
 }
 
+export function stageBarHtml(current) {
+  return '<div class="stage-bar" role="group" aria-label="Build stages">' + barHtml(current) + "</div>";
+}
+
 function barHtml(current) {
   return STAGES.map((stage) => '<button type="button" class="s-' + stage.id + (stage.id === current.id ? " on" : "") +
     '" data-act="build-stage" data-date="' + stage.start + '" style="--days:' + spanDays(stage) + '"' +

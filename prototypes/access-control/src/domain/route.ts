@@ -160,6 +160,9 @@ export function applyRoute(raw) {
   }
   if (head === "oneline" || head === "one-line") {
     state.view = "oneline";
+    const day = params.get("build") || "";
+    state.onelineBuild = !!day;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day)) state.buildDate = day;
     return;
   }
   if (head === "fleet") {
@@ -227,7 +230,7 @@ export function routeFromState() {
     return query.length ? path + "?" + query.join("&") : path;
   }
   if (state.view === "control") return state.highlightOutlet ? "#/control?outlet=" + state.highlightOutlet : "#/control";
-  if (state.view === "oneline") return "#/oneline";
+  if (state.view === "oneline") return state.onelineBuild ? "#/oneline?build=" + state.buildDate : "#/oneline";
   if (state.view === "fleet") return "#/fleet";
   if (state.view === "audit") return "#/audit";
   if (state.view === "simulate") return "#/simulate";

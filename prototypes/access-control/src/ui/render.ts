@@ -290,6 +290,13 @@ export function onClick(event) {
     state.toast = "";
     render();
   }
+  else if (act === "oneline-build") { state.onelineBuild = !state.onelineBuild; render(); }
+  else if (act === "oneline-build-hall" && el.dataset.pod) {
+    state.view = "plan";
+    state.buildHall = el.dataset.pod;
+    state.toast = "";
+    render();
+  }
   else if (act === "build-live" && el.dataset.pod) { openOnelineHall(el.dataset.pod); render(); }
   else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
   else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); loadFuturePlan(); }
