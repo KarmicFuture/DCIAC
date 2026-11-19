@@ -137,7 +137,8 @@ class Dual(ThreadingHTTPServer):
     daemon_threads = True
 
     def server_bind(self):
-        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        if self.address_family == socket.AF_INET6:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         super().server_bind()
 
     def get_request(self):
@@ -172,7 +173,11 @@ def main():
         chain.write(open(CA).read())
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(fullchain, KEY)
-    server = Dual(("::", PORT), Handler)
+    try:
+        server = Dual(("::", PORT), Handler)
+    except OSError:
+        Dual.address_family = socket.AF_INET
+        server = Dual(("0.0.0.0", PORT), Handler)
     server.ssl_context = ctx
     print("Access preview on http://127.0.0.1:%s/ and https://127.0.0.1:%s/" % (PORT, PORT), flush=True)
     server.serve_forever()

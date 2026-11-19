@@ -1,4 +1,5 @@
-import { PODS } from "../data/pods";
+import { deviceById } from "../data/devices";
+import { PODS, entityById } from "../data/pods";
 import { state } from "../state";
 import { render } from "../ui/schedule";
 import { loadElevation } from "../views/elevation";
@@ -18,6 +19,10 @@ function parseHash(raw) {
   const params = new URLSearchParams(cut >= 0 ? text.slice(cut + 1) : "");
   const parts = path.split("/").filter(Boolean);
   return { parts, params };
+}
+
+function missing(message) {
+  state.toast = message;
 }
 
 function applyFloor(rest) {
@@ -46,7 +51,14 @@ function applyFloor(rest) {
     state.floor.podId = "";
     return;
   }
-  state.floor.podId = decodeURIComponent(rest[0]);
+  const podId = decodeURIComponent(rest[0]);
+  const pod = PODS.find((item) => item.id === podId);
+  if (!pod) {
+    state.floor.level = "hall";
+    missing("There is no hall called " + podId + ". Showing the hall view.");
+    return;
+  }
+  state.floor.podId = podId;
   if (rest[1] === "row") {
     state.floor.level = "row";
     state.floor.rowId = decodeURIComponent(rest[2] || "");
@@ -61,14 +73,27 @@ function applyFloor(rest) {
     state.floor.level = "pod";
     return;
   }
-  state.floor.rackId = decodeURIComponent(rest[1]);
+  const rackId = decodeURIComponent(rest[1]);
+  if (!(pod.racks || []).some((item) => item.id === rackId)) {
+    state.floor.level = "pod";
+    missing("Rack " + rackId + " is not in " + (pod.name || podId) + ". Showing the hall.");
+    return;
+  }
+  state.floor.rackId = rackId;
   state.floor.rowId = rowFor(state.floor.podId, state.floor.rackId);
   if (!rest[2]) {
     state.floor.level = "elevation";
     loadElevation(state.floor.rackId);
     return;
   }
-  state.floor.serverId = decodeURIComponent(rest[2]);
+  const serverId = decodeURIComponent(rest[2]);
+  if (!entityById(serverId)) {
+    state.floor.level = "elevation";
+    loadElevation(state.floor.rackId);
+    missing("There is no device " + serverId + " in rack " + rackId + ". Showing the rack.");
+    return;
+  }
+  state.floor.serverId = serverId;
   if (!rest[3]) {
     state.floor.level = "server";
     return;
@@ -98,7 +123,10 @@ export function applyRoute(raw) {
     state.view = "rack";
     const rack = parts[1] || "";
     const device = parts[2] || (rack && rack !== "A14" ? rack : "");
-    if (device) state.selected = decodeURIComponent(device);
+    if (!device) return;
+    const deviceId = decodeURIComponent(device);
+    if (deviceById(deviceId)) state.selected = deviceId;
+    else missing("There is no device " + deviceId + " in rack A14. Showing " + (deviceById(state.selected) ? deviceById(state.selected).name : "the rack") + ".");
     return;
   }
   if (head === "portmap" || head === "map") {
@@ -109,7 +137,10 @@ export function applyRoute(raw) {
   }
   if (head === "sessions") {
     state.view = "sessions";
-    state.focusSession = parts[1] ? decodeURIComponent(parts[1]) : "";
+    const sessionId = parts[1] ? decodeURIComponent(parts[1]) : "";
+    const open = sessionId && state.sessions.some((item) => item.id === sessionId);
+    state.focusSession = open ? sessionId : "";
+    if (sessionId && !open) missing("That session is closed. Showing open sessions.");
     return;
   }
   if (head === "manage") {
@@ -151,6 +182,8 @@ export function applyRoute(raw) {
     state.view = "plan";
     return;
   }
+  applyFloor([]);
+  missing("There is no page at #/" + parts.join("/") + ". Showing the floor.");
 }
 
 export function routeFromState() {
@@ -192,23 +225,37 @@ export function routeFromState() {
   return "#/floor";
 }
 
+/* The hash this module last wrote or applied. If location.hash differs, someone
+   else (a link, the address bar, Back) changed it and a hashchange event is on its
+   way, so syncHash must not overwrite it with the page being left. */
+let knownHash = "";
+
 export function syncHash() {
   if (!state.user) return;
+  const current = location.hash || "";
+  if (knownHash && current !== knownHash) return;
   const next = routeFromState();
-  if ((location.hash || "") === next) return;
+  if (current === next) {
+    knownHash = next;
+    return;
+  }
   const bare = !location.hash || location.hash === "#" || location.hash === "#/";
   const url = location.pathname + location.search + next;
+  knownHash = next;
   if (bare) history.replaceState(null, "", url);
   else location.hash = next;
 }
 
 export function onHashChange() {
+  knownHash = location.hash || "";
   if (!state.user) return;
-  if ((location.hash || "") === routeFromState()) return;
+  if (knownHash === routeFromState()) return;
+  state.toast = "";
   applyRoute(location.hash);
   const next = routeFromState();
-  if ((location.hash || "") !== next) {
+  if (knownHash !== next) {
     history.replaceState(null, "", location.pathname + location.search + next);
   }
+  knownHash = next;
   render();
 }

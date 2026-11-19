@@ -11,6 +11,7 @@ import { esc } from "./format";
 import { render } from "./schedule";
 import { go } from "./shell";
 import { floorSerial, openFloorServer, openPart } from "../views/floor";
+import { launchAlarmSerial } from "../domain/autofix";
 import { thermalReading } from "../views/rack";
 
 export function serialFinding(d) {
@@ -22,6 +23,9 @@ export function serialFinding(d) {
   }
   if (d.bmc === "down") {
     return { login: "ok", pri: 1, text: "Automatic login on " + d.tty + " read: BMC path dark. Failover is ACS serial.", act: "floor-serial", response: "Open serial" };
+  }
+  if (d.bootStuck) {
+    return { login: "ok", pri: 1, text: "Automatic login on " + d.tty + " read: stopped at the UEFI shell after a reboot. No operating system loaded.", act: "alarm-serial", response: "Open serial" };
   }
   if (state.leak && (d.id === "tray-01" || d.id === "tray-02")) {
     return { login: "ok", pri: 1, text: "Automatic login on " + d.tty + " read: DI-1 leak rope asserted.", go: "control", response: "Open control" };
@@ -181,6 +185,7 @@ export function goAlarm(id) {
   state.acked[id] = true;
   if (alarm.go) go(alarm.go);
   else if (alarm.act === "floor-serial") floorSerial(alarm.device);
+  else if (alarm.act === "alarm-serial") launchAlarmSerial(alarm.device);
   else if (alarm.act === "rdp-failover") failRdpToKvm(alarm.device);
   else if (alarm.act === "floor-part") openPart(alarm.device, alarm.part);
   else if (alarm.act === "floor-server") openFloorServer(alarm.device);

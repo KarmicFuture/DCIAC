@@ -35,7 +35,8 @@ import { toastHtml } from "./toast";
 import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
-import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFullDemo, stopDemo, toggleTheme } from "../domain/demo";
+import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, stopDemo, toggleTheme } from "../domain/demo";
+import { diagnoseBoot, runBootFix } from "../domain/autofix";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
 import { loadWorld } from "../data/repository";
@@ -231,15 +232,16 @@ export function onClick(event) {
     toggleTheme();
     return;
   }
-  if (act === "demo-full") {
+  if (act === "demo-full" || act === "demo-fix") {
+    const start = act === "demo-fix" ? startFixDemo : startFullDemo;
     if (state.user) {
-      startFullDemo();
+      start();
       return;
     }
     signIn("dsvs.operator").then(() => {
       state.offerBriefing = false;
       state.briefingStep = -1;
-      startFullDemo();
+      start();
     });
     return;
   }
@@ -528,6 +530,8 @@ function runExplain(kind, id) {
     state.selected = input.deviceId || state.selected;
     go("rack");
   }
+  else if (gate.suggestion === "diagnose-boot") diagnoseBoot(input.id, false);
+  else if (gate.suggestion === "fix-boot-order") runBootFix(input.id, false);
   else if (gate.suggestion === "open-server") openFloorServer(input.deviceId);
   else if (gate.suggestion === "open-inlet") openPart(input.deviceId, "inlet");
   else go("control");

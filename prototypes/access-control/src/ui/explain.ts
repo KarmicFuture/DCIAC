@@ -37,6 +37,7 @@ export function alarmSignal(alarm: Alarm) {
   if (alarm.id.indexOf("recirc-") === 0) return "recirc";
   if (alarm.id.indexOf("cap-") === 0) return "outside-critical";
   const text = alarm.text || "";
+  if (text.indexOf("UEFI shell after a reboot") !== -1) return "boot-stuck";
   if (text.indexOf("leak") !== -1) return "leak";
   if (text.indexOf("still coming up") !== -1) return "bmc-wait";
   if (text.indexOf("BMC path dark") !== -1) return "bmc-down";
@@ -73,6 +74,8 @@ export function serialInput(session): ExplainInput {
   if (sessionBlocked(session)) signal = "blocked";
   else if (acsWaiting(session)) signal = "waiting";
   else if (device && device.watch && device.watch.login === "reject") signal = "deny";
+  else if (session.bootFixed) signal = "boot-fixed";
+  else if (device && device.bootStuck) signal = session.bootDiagnosed ? "boot-order" : "boot-stuck";
   else if (kind === "uefi") signal = "uefi";
   else if (kind === "ios") signal = "ios";
   else if (device && device.bmc === "down") signal = "bmc-down";

@@ -146,6 +146,19 @@ export function mountTerminals() {
   });
 }
 
+/* Write new lines into a mounted console without rebuilding it, so streamed
+   output scrolls in like a real serial line. Lines must already be in
+   session.lines; a later render rebuilds the console from that list. */
+export function writeTermLines(id, lines) {
+  const slot = live.get(id);
+  const session = sessionById(id);
+  if (!slot || !session || !slot.host.isConnected) return false;
+  const mapped = deviceById(session.deviceId);
+  if (!mapped) return false;
+  slot.term.write("\r\x1b[2K" + lines.join("\r\n") + "\r\n" + serialPrompt(mapped, session) + " ");
+  return true;
+}
+
 export function focusTerm(id) {
   const slot = live.get(id);
   if (!slot || slot.term.options.disableStdin) return;

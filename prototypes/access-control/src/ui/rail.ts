@@ -20,6 +20,8 @@ const PLAN_TABS = [
   ["dcim", "DCIM"],
 ];
 
+export const FLOOR_VIEWS = ["floor", "manage"];
+
 const TAB_VIEWS = [
   ["floor", "Floor"],
   ["rack", "Operate"],
@@ -82,7 +84,7 @@ export function topbar() {
 
 export function tabbar() {
   const tabs = TAB_VIEWS.map((pair) => {
-    const views = pair[0] === "rack" ? OPERATE_VIEWS : (pair[0] === "plan" ? PLAN_VIEWS : [pair[0]]);
+    const views = pair[0] === "rack" ? OPERATE_VIEWS : (pair[0] === "plan" ? PLAN_VIEWS : (pair[0] === "floor" ? FLOOR_VIEWS : [pair[0]]));
     const current = groupCurrent(views);
     return '<button type="button" data-act="nav" data-view="' + pair[0] + '"' + current + ">" +
       esc(pair[1]) + "</button>";
@@ -97,14 +99,14 @@ export function rail() {
     wordmark() +
     '<div class="product-name">Access</div>' +
     "<nav>" +
-    navButton("floor", "Floor") +
+    navButton("floor", "Floor", FLOOR_VIEWS) +
     navButton("rack", "Operate", OPERATE_VIEWS) +
     navButton("plan", "Plan", PLAN_VIEWS) +
     navButton("audit", "Audit") +
     "</nav>" +
     '<div class="rail-foot">' + leak +
     themeButton() +
-    '<button type="button" class="lab-open" data-act="simulate">Simulate</button>' +
+    '<button type="button" class="lab-open" data-act="simulate"' + (state.view === "simulate" ? ' aria-current="page"' : "") + ">Simulate</button>" +
     '<div class="who"><strong>' + esc(state.user.id) + "</strong><span>" + esc(state.user.role) +
     "</span>" + (state.user.expiresAt ? '<small>until ' + esc(String(state.user.expiresAt).slice(11, 16)) + " UTC</small>" : "") +
     '<button type="button" class="act" data-act="signout">Sign out</button></div></div></header>';

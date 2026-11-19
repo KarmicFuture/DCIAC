@@ -3,6 +3,8 @@ import { outletByN } from "../data/outlets";
 import { outletReason } from "./outlet-policy";
 import { state } from "../state";
 
+export const BOOT_RUNBOOK = "RB-UEFI-01";
+
 /* Plug-in point for a later model. The mock below is deterministic and makes
    no network calls. A real adapter replaces it with setAnalyzer and returns
    the same ExplainResult. gateAction still decides whether the button runs. */
@@ -39,6 +41,8 @@ export type Suggestion =
   | "open-rack"
   | "open-server"
   | "open-inlet"
+  | "diagnose-boot"
+  | "fix-boot-order"
   | "none";
 
 export interface ExplainResult {
@@ -115,6 +119,36 @@ export function mockExplain(input: ExplainInput): ExplainResult {
         "open-acs-serial"
       );
     }
+    if (input.signal === "boot-stuck") {
+      return result(
+        name + " rebooted after a BIOS update and stopped at the UEFI shell. No operating system loaded, so SSH and RDP cannot reach it.",
+        input.lines,
+        ["no dhcp", "not found", "no bootable", "uefi shell", "bios update"],
+        "Network boot ran first and failed. The local Ubuntu entry never ran. The next step is a read-only look at the boot order.",
+        78,
+        "diagnose-boot"
+      );
+    }
+    if (input.signal === "boot-order") {
+      return result(
+        "The boot order puts network boot first. Ubuntu on the NVMe drive (Boot0003) is last.",
+        input.lines,
+        ["boot0003", "pxe ipv4", "no bootable"],
+        "The BIOS update reset the boot order to factory defaults. There is no PXE server on this network, so the tray falls through to the UEFI shell. Fix: move Boot0003 first and reset. Runbook " + BOOT_RUNBOOK + " covers this with no power change.",
+        93,
+        "fix-boot-order"
+      );
+    }
+    if (input.signal === "boot-fixed") {
+      return result(
+        name + " booted Ubuntu from Boot0003 and is at the login prompt.",
+        input.lines,
+        ["moved", "boot0003 ubuntu", "reached target", "acs.watch"],
+        "Runbook " + BOOT_RUNBOOK + " restored the boot order. acs.watch logged in and the alarm cleared.",
+        97,
+        "none"
+      );
+    }
     if (input.signal === "uefi") {
       return result(
         name + " printed a BMC serial redirect and a UEFI boot log, then stopped at the UEFI shell.",
@@ -164,6 +198,16 @@ export function mockExplain(input: ExplainInput): ExplainResult {
       "The cold-plate leak rope is asserted. Plant-wide trip is not the policy. Suggested control stays on the bound outlets.",
       98,
       input.outlet ? "shed-outlet" : "open-control"
+    );
+  }
+  if (input.signal === "boot-stuck") {
+    return result(
+      "The automatic login on " + tty + " found " + name + " at the UEFI shell after a reboot. No operating system loaded.",
+      input.lines,
+      ["uefi shell", "reboot", "no operating system"],
+      "With no OS, in-band paths are dark. ACS serial is the only way to see and fix it.",
+      90,
+      "open-acs-serial"
     );
   }
   if (input.signal === "bmc-wait") {
@@ -299,8 +343,20 @@ function blockedOutlet(n, verb, suggestion): GatedAction {
   return { suggestion, label: verb + " outlet " + n + " – " + short, enabled: false, reason };
 }
 
+function consoleRunbook(input: ExplainInput, suggestion: Suggestion, label: string): GatedAction {
+  if (input.kind !== "serial") {
+    return { suggestion, label, enabled: false, reason: "Runbooks run inside an open serial session." };
+  }
+  if (!state.user || state.user.role === "ReadOnly") {
+    return { suggestion, label: label + " – requires Operator", enabled: false, reason: "Read only can watch this console but cannot send commands." };
+  }
+  return { suggestion, label, enabled: true, reason: "" };
+}
+
 export function gateAction(input: ExplainInput, result: ExplainResult): GatedAction {
   const suggestion = result.suggestion;
+  if (suggestion === "diagnose-boot") return consoleRunbook(input, suggestion, "Read the boot order (read-only)");
+  if (suggestion === "fix-boot-order") return consoleRunbook(input, suggestion, "Run " + BOOT_RUNBOOK + ": Ubuntu first, then reset");
   if (suggestion === "cycle-outlet") return blockedOutlet(input.outlet, "Cycle", suggestion);
   if (suggestion === "shed-outlet") return blockedOutlet(input.outlet, "Shed", suggestion);
   if (suggestion === "none") {
