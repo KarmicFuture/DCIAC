@@ -81,6 +81,8 @@ export interface Session {
   screen: string;
   keys: string;
   rdpFailover?: boolean;
+  /* "mp1000" when the MP1000 management platform launched this session. */
+  via?: string;
 }
 
 export interface AuditEntry {

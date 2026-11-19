@@ -9,7 +9,7 @@ import { deviceById, devices } from "./data/devices";
 import { outlets } from "./data/outlets";
 import { entityById } from "./data/pods";
 import { setAnalyzer } from "./domain/analyzer";
-import { advanceDemo, startFixDemo, startFullDemo, stopDemo } from "./domain/demo";
+import { advanceDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo } from "./domain/demo";
 import { breakBoot, setFixLineMs } from "./domain/autofix";
 import {
   encodeSimPayload,
@@ -53,6 +53,7 @@ window.AccessDemo = {
   setDemoPauseMs(ms) { runtime.demoPauseMs = Math.max(50, Number(ms) || 4000); },
   startFullDemo,
   startFixDemo,
+  startMp1000Demo,
   setFixLineMs,
   breakBoot,
   advanceDemo,

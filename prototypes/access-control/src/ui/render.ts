@@ -35,8 +35,9 @@ import { toastHtml } from "./toast";
 import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
-import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, stopDemo, toggleTheme } from "../domain/demo";
+import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo, toggleTheme } from "../domain/demo";
 import { diagnoseBoot, runBootFix } from "../domain/autofix";
+import { launchMp1000Kvm } from "../domain/mp1000";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
 import { loadWorld } from "../data/repository";
@@ -232,8 +233,8 @@ export function onClick(event) {
     toggleTheme();
     return;
   }
-  if (act === "demo-full" || act === "demo-fix") {
-    const start = act === "demo-fix" ? startFixDemo : startFullDemo;
+  if (act === "demo-full" || act === "demo-fix" || act === "demo-mp1000") {
+    const start = act === "demo-fix" ? startFixDemo : (act === "demo-mp1000" ? startMp1000Demo : startFullDemo);
     if (state.user) {
       start();
       return;
@@ -416,6 +417,7 @@ export function onClick(event) {
   else if (act === "floor-serial") floorSerial(el.dataset.device);
   else if (act === "rdp-open") openSession(el.dataset.device, "rdp", "desktop", "");
   else if (act === "rdp-drop" || act === "rdp-failover") failRdpToKvm(el.dataset.device);
+  else if (act === "mp1000-kvm") launchMp1000Kvm(el.dataset.device);
   else if (act === "rdp-toggle") {
     const mapped = deviceById(el.dataset.device);
     if (mapped && mapped.rdp === "up") failRdpToKvm(mapped.id);

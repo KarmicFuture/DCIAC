@@ -9,7 +9,8 @@ import { fireEvent, resetSimulation, revertEvent } from "./events";
 import { toggleBmc } from "./failover";
 import { setLeak } from "./leak";
 import { actOutlet } from "./outlet-policy";
-import { closeSession, openSession } from "./sessions";
+import { closeSession, openSession, setScreen } from "./sessions";
+import { launchMp1000Kvm } from "./mp1000";
 import { breakBoot, cancelFix, clearBoot, diagnoseBoot, finishFix, fixBoot, launchAlarmSerial, verifyBoot } from "./autofix";
 
 const THEME_KEY = "dciac.theme";
@@ -522,11 +523,106 @@ const FIX_TOUR: TourBeat[] = [
   },
 ];
 
+const KVM_DEVICE = "tray-02";
+
+function tidyMp1000Demo() {
+  closeDemoSessions();
+  closeMaintenance();
+  resetSimulation();
+  runtime.sim.barOpen = false;
+  calmChrome();
+}
+
+function mp1000Session() {
+  return (state.sessions || []).find((s) => s.deviceId === KVM_DEVICE && s.via === "mp1000") || null;
+}
+
+const MP1000_TOUR: TourBeat[] = [
+  {
+    pop: "Hall 1. Every rack has an RM1048 rack manager. One MP1000 management platform runs them all.",
+    target: ".scene",
+    enter() {
+      tidyMp1000Demo();
+      showFloor("hall");
+      state.floor.podId = "pod-a";
+    },
+  },
+  {
+    pop: "The MP1000 device list: every server behind every RM1048, with its KVM status. No hunting for IPs.",
+    target: ".mp1000-panel",
+    enter() {
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "Consoles open only inside a maintenance window or an in-progress work order. The operator opens a window for rack A14.",
+    target: ".mp1000-panel, .view",
+    enter() {
+      const name = state.maintName;
+      state.maintName = "Rack A14 KVM access";
+      openMaintenance();
+      state.maintName = name;
+      state.toast = "";
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "The operator picks GPU Tray 02 and clicks Launch KVM.",
+    target: '.mp1000-panel tr[data-device="' + KVM_DEVICE + '"], .mp1000-panel',
+    enter() {
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "MP1000 checks the operator's role and window, then brokers the session through rack A14's RM1048 to the tray's BMC.",
+    target: ".session.kvm, .mp1000-panel",
+    weight: 1.5,
+    enter() {
+      if (!mp1000Session()) launchMp1000Kvm(KVM_DEVICE);
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "The HTML5 viewer shows the tray's screen, with keyboard and mouse. No Java, no VPN into the rack.",
+    target: ".session.kvm .bios, .session.kvm",
+    enter() {
+      state.view = "sessions";
+      const s = mp1000Session();
+      if (s) s.screen = "os";
+    },
+  },
+  {
+    pop: "The same session reaches BIOS setup, before any OS loads. SSH and RDP can't do that.",
+    target: ".session.kvm .bios, .session.kvm",
+    enter() {
+      state.view = "sessions";
+      const s = mp1000Session();
+      if (s) setScreen(s.id, "bios");
+    },
+  },
+  {
+    pop: "Audit: the MP1000 launch and the KVM session, each with who opened it and the path it took.",
+    target: ".view",
+    enter() {
+      state.view = "audit";
+    },
+  },
+  {
+    pop: "Done. Device list, launch KVM, brokered through RM1048, HTML5 viewer, audited.",
+    target: ".mp1000-panel, .view",
+    enter() {
+      tidyMp1000Demo();
+      state.view = "sessions";
+    },
+  },
+];
+
 type Tour = { title: string; beats: TourBeat[]; tidy: () => void };
 
 const TOURS: Record<string, Tour> = {
   full: { title: "Full demo", beats: FULL_TOUR, tidy: tidyFullDemo },
   fix: { title: "AI fix demo", beats: FIX_TOUR, tidy: tidyFixDemo },
+  mp1000: { title: "MP1000 KVM demo", beats: MP1000_TOUR, tidy: tidyMp1000Demo },
 };
 
 function currentTour(): Tour | null {
@@ -683,6 +779,10 @@ export function startFixDemo() {
   startTour("fix");
 }
 
+export function startMp1000Demo() {
+  startTour("mp1000");
+}
+
 export function advanceDemo() {
   if (currentTour()) {
     advanceTour();
@@ -828,7 +928,8 @@ export function demoPanel() {
     return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
       '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step. Full demo starts from the sign-in screen.</p>' +
       '<div class="demo-picks">' + picks +
-      '<button type="button" class="act" data-act="demo-fix">AI fix demo</button></div></section>';
+      '<button type="button" class="act" data-act="demo-fix">AI fix demo</button>' +
+      '<button type="button" class="act" data-act="demo-mp1000">MP1000 KVM demo</button></div></section>';
   }
   return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
     demoChrome(false) +
