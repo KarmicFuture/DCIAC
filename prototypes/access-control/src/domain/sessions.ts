@@ -20,8 +20,13 @@ export function rmKvmUri(d) {
   return "/redfish/v1/Managers/RMC/GraphicalConsole/" + d.redfishId;
 }
 
+/* Launches the MP1000 has asked for, keyed device:path:type. openSession tags the
+   session it creates for one of these, so the card shows where it came from. */
+export const mp1000Launches = new Set<string>();
+
 export function sessionTitle(s) {
   if (s.type === "desktop") return "In-band · RDP";
+  if (s.via === "mp1000") return "MP1000 · KVM";
   if (s.path === "rm1048" && s.type === "serial") return "RM1048 · Redfish serial";
   if (s.path === "rm1048" && s.type === "kvm") return "RM1048 · KVM";
   if (s.type === "kvm" && s.rdpFailover) return "Path ACS · KVM failover";
@@ -42,13 +47,20 @@ export function sessionLocator(d, s) {
 export function sessionDetail(d, path, type, medium) {
   if (type === "desktop") return d.host + " · RDP 3389 · in-band";
   if (path === "rm1048" && type === "serial") return rmSerialUri(d);
-  if (path === "rm1048" && type === "kvm") return rmKvmUri(d);
+  if (path === "rm1048" && type === "kvm") return rmKvmUri(d) + (mp1000Launches.has(deviceId(d) + ":rm1048:kvm") ? " · launched from MP1000" : "");
   if (type === "kvm") return "MPU port " + d.mpu + " · HTML5 · path ACS";
   if (medium === "usb") return "USB-1 · path ACS";
   return d.tty + " · port " + d.port + " · path ACS";
 }
 
+function deviceId(d) {
+  return d ? d.id : "";
+}
+
 export function sessionNote(d, s) {
+  if (s.via === "mp1000") {
+    return "Launched from the MP1000 device list. MP1000 checked the role and the maintenance window, then brokered this HTML5 session through the RM1048 in rack A14 to the server's BMC graphical console.";
+  }
   if (s.type === "desktop") {
     return d.rdp === "down"
       ? "In-band remote desktop is down. The failover is ACS KVM, not RM1048."
@@ -218,6 +230,7 @@ export function openSession(deviceId, path, type, medium) {
   }
   const mediumNorm = medium || "";
   if (path === "rm1048" && (state.rm1048 !== "healthy" || mapped.bmc === "down")) {
+    mp1000Launches.delete(deviceId + ":" + path + ":" + type);
     state.fails[deviceId + ":" + type] = true;
     state.selected = deviceId;
     state.view = "rack";
@@ -238,6 +251,7 @@ export function openSession(deviceId, path, type, medium) {
     s.deviceId === deviceId && s.path === path && s.type === type && (s.medium || "") === mediumNorm
   );
   if (existing) {
+  if (mp1000Launches.delete(deviceId + ":" + path + ":" + type)) existing.via = "mp1000";
 state.view = "sessions";
   state.focusSession = existing.id;
   state.focusTerm = existing.type === "serial" && !acsWaiting(existing) && !sessionBlocked(existing) ? existing.id : "";
@@ -261,6 +275,7 @@ state.view = "sessions";
     }).then(async (response) => {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
+        mp1000Launches.delete(deviceId + ":" + path + ":" + type);
         state.toast = body.error || "An in-progress work order is required to open this console.";
         render();
         return;
@@ -288,6 +303,7 @@ state.view = "sessions";
     mediaChoice: MEDIA[0],
     screen: mapped.bmc === "down" ? "bios" : "os",
     keys: "",
+    via: mp1000Launches.has(deviceId + ":" + path + ":" + type) ? "mp1000" : "",
   };
   state.sessions.push(session);
   delete state.fails[deviceId + ":" + type];
@@ -296,6 +312,7 @@ state.view = "sessions";
     asset: mapped.name,
     detail: sessionDetail(mapped, path, type, mediumNorm) + waitingNote,
   });
+  mp1000Launches.delete(deviceId + ":" + path + ":" + type);
   state.view = "sessions";
   state.focusSession = id;
   state.focusTerm = type === "serial" && !acsWaiting(session) ? id : "";

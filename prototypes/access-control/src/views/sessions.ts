@@ -7,6 +7,7 @@ import { explainHtml, serialInput } from "../ui/explain";
 import { esc } from "../ui/format";
 import { watchTable } from "../ui/alarms";
 import { launcher } from "./rack";
+import { mp1000Panel } from "../domain/mp1000";
 
 export function mediaControls(s) {
   const reason = mediaReason();
@@ -161,5 +162,5 @@ export function renderSessions() {
   const body = state.sessions.length
     ? '<p class="fine">A dark BMC fails over to ACS serial and ACS KVM. A lost RDP desktop fails over to ACS KVM. RM1048 stays the in-band plane.</p><div class="workspace">' + cards + "</div>"
     : '<p class="empty">No sessions open. On the port map, choose any of the 48 ACS serial ports.</p>';
-  return body + watchTable();
+  return body + mp1000Panel() + watchTable();
 }

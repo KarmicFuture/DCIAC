@@ -10,6 +10,19 @@ New Fleet view (Operate › Fleet, `#/fleet`), the first slice of the fleet summ
 - Alarm counts match the alarm banner exactly; each alarm is counted in the hall it is in.
 - Each hall name opens that hall on the floor. Readings update with the live simulation.
 
+New MP1000 KVM demo, on the sign-in screen and in the Lab drawer:
+
+- A guided tour of how an operator reaches any server through the MP1000 management
+  platform. It shows Hall 1 and its RM1048 rack managers, then the MP1000 device list. The
+  operator opens a maintenance window for rack A14, picks GPU Tray 02, and launches KVM.
+  MP1000 brokers the session through rack A14's RM1048 to the tray's BMC graphical
+  console. The HTML5 viewer shows the OS, then BIOS from the same session. The audit
+  log shows the request and the session.
+- Operate › Sessions now has an MP1000 devices panel. Each row has Launch KVM. A dark BMC
+  or RM1048 plane disables the button and points to ACS KVM.
+- MP1000 launches go through the same console check as every other launch. Without a
+  maintenance window or an in-progress work order, the launch is refused.
+
 Navigation fixes, found by crawling every route and navigation control as all three
 roles on desktop and iPhone widths:
 
