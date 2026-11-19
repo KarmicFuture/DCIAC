@@ -121,6 +121,7 @@ export const state: AppState = {
   buildDate: "2026-11-16",
   buildHall: "",
   onelineBuild: false,
+  rackView: "angle",
   libraryOpen: false,
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },
