@@ -124,6 +124,8 @@ export function bootLines(d, s) {
     lines.push("Username: " + who);
     lines.push("Password:");
     lines.push("");
+  } else if (kind === "uefi" && d.bootStuck) {
+    stuckBootLines(d).forEach((line) => lines.push(line));
   } else if (kind === "uefi") {
     lines.push("");
     lines.push("[BMC] " + d.name + " serial redirect");
@@ -152,6 +154,30 @@ export function bootLines(d, s) {
   return lines;
 }
 
+/* A GPU tray that rebooted after a firmware update and fell through network boot
+   to the UEFI shell. Only the serial console can see this: the OS never loaded, so
+   SSH and RDP have nothing to answer. */
+export function stuckBootLines(d) {
+  return [
+    "",
+    "[BMC] " + d.name + " serial redirect",
+    "[BMC] Manager up. Firmware 1.8.4.",
+    "[BMC] BIOS update stage 2 complete. Host reset.",
+    "[UEFI] Boot mode UEFI",
+    "[UEFI] Secure Boot off",
+    "[UEFI] Mapping PCI devices",
+    "[UEFI] Boot0000 UEFI PXE IPv4 (net0): no DHCP offer after 4 tries",
+    "[UEFI] Boot0001 UEFI HTTP IPv4 (net0): boot file not found",
+    "[UEFI] No bootable option succeeded. Starting the UEFI shell.",
+    "UEFI Interactive Shell v2.2",
+    "EDK II",
+    "Mapping table",
+    "      FS0: Alias(s):HD0a1:;BLK1:",
+    "          PciRoot(0x0)/Pci(0x1,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)/HD(1,GPT)",
+    "Press ESC in 1 seconds to skip startup.nsh or any other key to continue.",
+  ];
+}
+
 export function hydrateSerial(s) {
   if (!s || s.type !== "serial" || s.lines) return;
   if (acsWaiting(s)) return;
@@ -163,6 +189,7 @@ export function hydrateSerial(s) {
 }
 
 export function serialPrompt(d, s) {
+  if (s && s.prompt) return s.prompt;
   const kind = consoleKind(d);
   if (kind === "ios") return iosHost(d) + "#";
   if (kind === "uefi") return "Shell>";

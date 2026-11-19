@@ -9,7 +9,8 @@ import { deviceById, devices } from "./data/devices";
 import { outlets } from "./data/outlets";
 import { entityById } from "./data/pods";
 import { setAnalyzer } from "./domain/analyzer";
-import { advanceDemo, startFullDemo, stopDemo } from "./domain/demo";
+import { advanceDemo, startFixDemo, startFullDemo, stopDemo } from "./domain/demo";
+import { breakBoot, setFixLineMs } from "./domain/autofix";
 import {
   encodeSimPayload,
   fireEvent,
@@ -51,6 +52,9 @@ window.AccessDemo = {
   scenarioPayload,
   setDemoPauseMs(ms) { runtime.demoPauseMs = Math.max(50, Number(ms) || 4000); },
   startFullDemo,
+  startFixDemo,
+  setFixLineMs,
+  breakBoot,
   advanceDemo,
   stopDemo,
   setAnalyzer,

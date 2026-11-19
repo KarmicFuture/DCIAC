@@ -51,6 +51,7 @@ export interface Device {
   serialAnnounced: boolean;
   serialOnly?: boolean;
   watchDeny?: boolean;
+  bootStuck?: boolean;
   watch?: DeviceWatch | null;
   load?: DeviceLoad;
   pod?: string;

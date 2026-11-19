@@ -82,6 +82,11 @@ export function login() {
     '<span class="login-demo-kicker">See the product</span>' +
     '<span class="login-demo-title">Full demo</span>' +
     '<span class="login-demo-hint">Campus → power → Operate → Plan build dates. Auto tour, phone or desktop.</span>' +
+    '<span class="login-demo-go">Play</span></button>' +
+    '<button type="button" class="login-demo login-demo-alt" data-act="demo-fix">' +
+    '<span class="login-demo-kicker">See AI fix a fault</span>' +
+    '<span class="login-demo-title">AI fix demo</span>' +
+    '<span class="login-demo-hint">Alarm → serial session → AI diagnosis → automatic fix → verified.</span>' +
     '<span class="login-demo-go">Play</span></button>';
   return '<a class="skip" href="#content">Skip to content</a><div class="login-wrap" id="content" data-screen="login" tabindex="-1"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +

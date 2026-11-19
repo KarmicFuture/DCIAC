@@ -10,6 +10,7 @@ import { toggleBmc } from "./failover";
 import { setLeak } from "./leak";
 import { actOutlet } from "./outlet-policy";
 import { closeSession, openSession } from "./sessions";
+import { breakBoot, cancelFix, clearBoot, diagnoseBoot, finishFix, fixBoot, launchAlarmSerial, verifyBoot } from "./autofix";
 
 const THEME_KEY = "dciac.theme";
 
@@ -231,6 +232,10 @@ const SCENARIOS = [
 type TourBeat = {
   pop: string | (() => string);
   target?: string;
+  /* Details elements to open after the beat paints, such as the alarm list. */
+  open?: string;
+  /* How long this beat stays up, as a multiple of the demo pause. */
+  weight?: number;
   enter: () => void;
 };
 
@@ -398,6 +403,136 @@ const FULL_TOUR: TourBeat[] = [
   },
 ];
 
+let fixSessionId = "";
+const FIX_DEVICE = "tray-05";
+
+function tidyFixDemo() {
+  cancelFix();
+  clearBoot(FIX_DEVICE);
+  closeDemoSessions();
+  fixSessionId = "";
+  resetSimulation();
+  runtime.sim.barOpen = false;
+  calmChrome();
+}
+
+function fixTty() {
+  const mapped = deviceById(FIX_DEVICE);
+  return (mapped && mapped.tty) || "ttyS7";
+}
+
+const FIX_TOUR: TourBeat[] = [
+  {
+    pop: "Serial watch: acs.watch logs in to every ACS serial port in rack A14, around the clock.",
+    target: ".watch-panel, .view",
+    enter() {
+      tidyFixDemo();
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "GPU Tray 05 reboots after a BIOS update and never comes back. SSH and RDP go dark.",
+    target: ".view, .rack-wrap",
+    enter() {
+      finishFix();
+      breakBoot(FIX_DEVICE);
+      state.view = "rack";
+      state.selected = FIX_DEVICE;
+    },
+  },
+  {
+    pop: () => "acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1.",
+    target: 'details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"]), .alarm-banner',
+    open: '.alarm-banner, details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"])',
+    enter() {
+      state.view = "rack";
+      state.selected = FIX_DEVICE;
+    },
+  },
+  {
+    pop: () => "The alarm launches an ACS serial session on " + fixTty() + ". Out-of-band, so it works with no OS.",
+    target: ".session, .xterm-host",
+    enter() {
+      finishFix();
+      fixSessionId = launchAlarmSerial(FIX_DEVICE);
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "The console shows why: network boot got no DHCP answer, HTTP boot failed, and the tray fell to the UEFI shell.",
+    target: ".xterm-host, .session",
+    enter() {
+      finishFix();
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "AI reads the session, then runs one read-only check: bcfg boot dump.",
+    target: ".xterm-host, .session",
+    weight: 1.5,
+    enter() {
+      finishFix();
+      state.view = "sessions";
+      if (fixSessionId) diagnoseBoot(fixSessionId, true);
+    },
+  },
+  {
+    pop: "Diagnosis, 93%: the BIOS update reset the boot order. Ubuntu (Boot0003) is last.",
+    target: ".session .explain, .session",
+    enter() {
+      finishFix();
+      state.view = "sessions";
+    },
+  },
+  {
+    pop: "Automatic response: runbook RB-UEFI-01 moves Ubuntu first and resets the tray. Boot order only, no power change.",
+    target: ".xterm-host, .session",
+    weight: 2,
+    enter() {
+      finishFix();
+      state.view = "sessions";
+      if (fixSessionId) fixBoot(fixSessionId, true);
+    },
+  },
+  {
+    pop: "Verified: Ubuntu is up, acs.watch logs in, and the P1 clears.",
+    target: ".session .explain, .session",
+    enter() {
+      finishFix();
+      state.view = "sessions";
+      if (fixSessionId) verifyBoot(fixSessionId, true);
+    },
+  },
+  {
+    pop: "Audit: alarm, session, AI check, diagnosis, runbook, and verification, each with who ran it.",
+    target: ".view",
+    enter() {
+      finishFix();
+      state.view = "audit";
+    },
+  },
+  {
+    pop: "Done. Alarm, serial session, AI diagnosis, automatic fix, verified.",
+    target: ".view",
+    enter() {
+      tidyFixDemo();
+      state.view = "rack";
+      state.selected = FIX_DEVICE;
+    },
+  },
+];
+
+type Tour = { title: string; beats: TourBeat[]; tidy: () => void };
+
+const TOURS: Record<string, Tour> = {
+  full: { title: "Full demo", beats: FULL_TOUR, tidy: tidyFullDemo },
+  fix: { title: "AI fix demo", beats: FIX_TOUR, tidy: tidyFixDemo },
+};
+
+function currentTour(): Tour | null {
+  return TOURS[state.demoId] || null;
+}
+
 function textOf(value) {
   return typeof value === "function" ? value() : value;
 }
@@ -455,23 +590,29 @@ function showPlanDate(iso: string) {
   state.toast = "";
 }
 
-function fullBeat() {
-  if (state.demoId !== "full") return null;
-  if (state.demoStep < 0 || state.demoStep >= FULL_TOUR.length) return null;
-  return FULL_TOUR[state.demoStep];
+function tourBeat() {
+  const tour = currentTour();
+  if (!tour) return null;
+  if (state.demoStep < 0 || state.demoStep >= tour.beats.length) return null;
+  return tour.beats[state.demoStep];
 }
 
-function scheduleFullAdvance() {
+function beatMs(beat) {
+  return Math.round(demoPauseMs() * ((beat && beat.weight) || 1));
+}
+
+function scheduleTourAdvance() {
   clearDemoTimer();
-  if (state.demoId !== "full") return;
+  if (!currentTour()) return;
   runtime.demoTimer = setTimeout(() => {
     runtime.demoTimer = 0;
-    advanceFullTour();
-  }, demoPauseMs());
+    advanceTour();
+  }, beatMs(tourBeat()));
 }
 
-function enterFullBeat(index: number) {
-  const beat = FULL_TOUR[index];
+function enterTourBeat(index: number) {
+  const tour = currentTour();
+  const beat = tour ? tour.beats[index] : null;
   if (!beat) return;
   state.demoStep = index;
   state.demoDone = false;
@@ -480,21 +621,44 @@ function enterFullBeat(index: number) {
   beat.enter();
 }
 
-export function advanceFullTour() {
-  if (state.demoId !== "full") return;
+export function advanceTour() {
+  const tour = currentTour();
+  if (!tour) return;
   const next = state.demoStep + 1;
-  if (next >= FULL_TOUR.length) {
+  if (next >= tour.beats.length) {
     stopDemo();
     return;
   }
-  enterFullBeat(next);
+  enterTourBeat(next);
   render();
-  scheduleFullAdvance();
+  scheduleTourAdvance();
+}
+
+/* Kept for callers that predate the second tour. */
+export const advanceFullTour = advanceTour;
+
+function startTour(id: string) {
+  if (!state.user || state.user.role !== "Operator") return;
+  const tour = TOURS[id];
+  if (!tour) return;
+  if (currentTour()) currentTour()!.tidy();
+  state.offerBriefing = false;
+  state.briefingStep = -1;
+  clearDemoTimer();
+  state.demoId = id;
+  state.demoDone = false;
+  state.labOpen = false;
+  state.menuOpen = false;
+  state.toast = "";
+  state.focusField = "";
+  enterTourBeat(0);
+  render();
+  scheduleTourAdvance();
 }
 
 export function startDemo(id) {
-  if (id === "full") {
-    startFullDemo();
+  if (TOURS[id]) {
+    startTour(id);
     return;
   }
   const scenario = scenarioById(id);
@@ -512,24 +676,16 @@ export function startDemo(id) {
 }
 
 export function startFullDemo() {
-  if (!state.user || state.user.role !== "Operator") return;
-  state.offerBriefing = false;
-  state.briefingStep = -1;
-  clearDemoTimer();
-  state.demoId = "full";
-  state.demoDone = false;
-  state.labOpen = false;
-  state.menuOpen = false;
-  state.toast = "";
-  state.focusField = "";
-  enterFullBeat(0);
-  render();
-  scheduleFullAdvance();
+  startTour("full");
+}
+
+export function startFixDemo() {
+  startTour("fix");
 }
 
 export function advanceDemo() {
-  if (state.demoId === "full") {
-    advanceFullTour();
+  if (currentTour()) {
+    advanceTour();
     return;
   }
   const scenario = scenarioById(state.demoId);
@@ -548,9 +704,9 @@ export function advanceDemo() {
 }
 
 export function stopDemo() {
-  const wasFull = state.demoId === "full";
+  const tour = currentTour();
   clearDemoTimer();
-  if (wasFull) tidyFullDemo();
+  if (tour) tour.tidy();
   clearDemo();
   state.focusField = "";
   render();
@@ -580,16 +736,17 @@ function demoChrome(compact) {
 }
 
 export function demoCoachHtml() {
-  if (state.demoId === "full") {
-    const beat = fullBeat();
+  const tour = currentTour();
+  if (tour) {
+    const beat = tourBeat();
     if (!beat) return "";
-    const progress = (state.demoStep + 1) + " of " + FULL_TOUR.length;
-    const ms = demoPauseMs();
+    const progress = (state.demoStep + 1) + " of " + tour.beats.length;
+    const ms = beatMs(beat);
     return '<div class="demo-tour" role="region" aria-label="Product demo">' +
       '<div class="demo-veil" aria-hidden="true"></div>' +
       '<div class="demo-spot" aria-hidden="true"></div>' +
       '<div class="demo-pop">' +
-      '<p class="demo-kicker">Full demo · ' + esc(progress) + "</p>" +
+      '<p class="demo-kicker">' + esc(tour.title) + " · " + esc(progress) + "</p>" +
       '<p class="demo-caption" id="demo-caption" aria-live="polite">' + esc(textOf(beat.pop)) + "</p>" +
       '<div class="demo-pop-meter" style="--demo-ms:' + ms + 'ms" aria-hidden="true"><i></i></div>' +
       '<div class="demo-actions"><button type="button" class="act" data-act="demo-stop">Stop</button></div>' +
@@ -600,8 +757,13 @@ export function demoCoachHtml() {
 }
 
 export function placeDemoHighlights() {
-  if (state.demoId !== "full") return;
-  const beat = fullBeat();
+  if (!currentTour()) return;
+  const beat = tourBeat();
+  if (beat && beat.open) {
+    document.querySelectorAll(beat.open).forEach((node) => {
+      if (node instanceof HTMLDetailsElement) node.open = true;
+    });
+  }
   const spot = document.querySelector(".demo-spot") as HTMLElement | null;
   const pop = document.querySelector(".demo-pop") as HTMLElement | null;
   if (!spot || !pop) return;
@@ -617,7 +779,12 @@ export function placeDemoHighlights() {
     return;
   }
   const phone = window.innerWidth < 768;
-  const rect = el.getBoundingClientRect();
+  let rect = el.getBoundingClientRect();
+  const fits = rect.height < window.innerHeight * 0.8;
+  if (fits && (rect.top < (phone ? 52 : 0) || rect.bottom > window.innerHeight - (phone ? 160 : 0))) {
+    el.scrollIntoView({ block: phone ? "start" : "center" });
+    rect = el.getBoundingClientRect();
+  }
   const pad = phone ? 6 : 10;
   const safeBottom = phone ? 12 : 8;
   const left = Math.max(8, rect.left - pad);
@@ -657,10 +824,11 @@ export function demoPanel() {
   const picks = SCENARIOS.map((item) => '<button type="button" class="act' +
     (state.demoId === item.id ? " primary" : "") + '" data-act="demo-start" data-demo="' + item.id + '">' +
     esc(item.title) + "</button>").join("");
-  if (!state.demoId || state.demoId === "full") {
+  if (!state.demoId || currentTour()) {
     return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
       '<p class="fine">Scripted walks through Access. Each step has a caption. Next runs that step. Full demo starts from the sign-in screen.</p>' +
-      '<div class="demo-picks">' + picks + "</div></section>";
+      '<div class="demo-picks">' + picks +
+      '<button type="button" class="act" data-act="demo-fix">AI fix demo</button></div></section>';
   }
   return '<section class="demo" aria-labelledby="demo-title"><h3 id="demo-title">Guided demo</h3>' +
     demoChrome(false) +
