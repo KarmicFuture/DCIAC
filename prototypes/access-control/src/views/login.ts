@@ -87,6 +87,11 @@ export function login() {
     '<span class="login-demo-kicker">See AI fix a fault</span>' +
     '<span class="login-demo-title">AI fix demo</span>' +
     '<span class="login-demo-hint">Alarm → serial session → AI diagnosis → automatic fix → verified.</span>' +
+    '<span class="login-demo-go">Play</span></button>' +
+    '<button type="button" class="login-demo login-demo-alt" data-act="demo-mp1000">' +
+    '<span class="login-demo-kicker">Reach any server</span>' +
+    '<span class="login-demo-title">MP1000 KVM demo</span>' +
+    '<span class="login-demo-hint">Device list → launch KVM → through RM1048 → HTML5 viewer → audited.</span>' +
     '<span class="login-demo-go">Play</span></button>';
   return '<a class="skip" href="#content">Skip to content</a><div class="login-wrap" id="content" data-screen="login" tabindex="-1"><div class="login-card"><div class="login-head">' + wordmark() +
     '<div class="product-name">Access</div><p class="rack-id">Rack A14</p></div>' +
