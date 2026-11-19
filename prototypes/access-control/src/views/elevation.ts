@@ -5,6 +5,8 @@ import { authHeaders } from "../data/repository";
 import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
+import { conditionTone } from "./floor";
+import { R3_LEGEND, a14Sockets, rackSceneHtml, type Rack3dPdu, type Rack3dUnit } from "./rack3d";
 
 let request = 0;
 
@@ -220,6 +222,60 @@ function detail(data) {
     '<p class="elev-actions"><button type="button" class="act" data-act="elev-chassis">3D chassis</button></p>';
 }
 
+/* Model names from the repository can carry vendor branding. The 3D rack shows the
+   product line only. */
+function unbranded(text) {
+  return String(text || "").replace(/\b(vertiv|avocent|geist|liebert)\b/gi, "").replace(/\s+/g, " ").trim();
+}
+
+function unitKlass(category) {
+  const c = String(category || "").toLowerCase();
+  if (c.indexOf("switch") >= 0) return "net";
+  if (c.indexOf("shelf") >= 0 || c.indexOf("power") >= 0) return "shelf";
+  if (c.indexOf("gpu") >= 0) return "gpu";
+  return "srv";
+}
+
+function rack3dScene(data, items) {
+  const units: Rack3dUnit[] = items.filter((item) => item.uHeight && item.uPosition).map((item) => {
+    const device = deviceById(item.assetTag);
+    const entity = device ? entityById(device.id) : null;
+    const model = unbranded(item.model);
+    return {
+      id: item.id,
+      label: item.assetTag,
+      u: Number(item.uPosition),
+      units: Math.max(1, Number(item.uHeight) || 1),
+      klass: unitKlass(item.category),
+      led: entity ? conditionTone(entity).color : undefined,
+      act: 'data-act="elev-device" data-asset="' + esc(item.id) + '" data-tag="' + esc(item.assetTag) + '"',
+      rear: item.assetTag + (model ? " · " + model : ""),
+      aria: item.assetTag + (model ? ", " + model : "") + ", U" + item.uPosition + (item.face === "rear" ? ", rear mounted" : ""),
+    };
+  });
+  const a14 = data.rackId === "A14";
+  let live = a14;
+  const pdus: Rack3dPdu[] = items.filter((item) => !item.uHeight && String(item.category || "").toUpperCase() === "PDU").map((item, index) => {
+    const count = Math.max(1, Math.min(48, Number(item.powerPorts) || 24));
+    const side = item.side || (index % 2 === 0 ? "right" : "left");
+    let sockets;
+    if (live) {
+      /* Rack A14's first rPDU carries the live outlets shown on Control. */
+      const known = a14Sockets();
+      sockets = Array.from({ length: count }, (_, i) => known[i] || { n: i + 1, state: "idle", title: item.assetTag + " port " + (i + 1) + " · Unbound" });
+      live = false;
+    } else {
+      sockets = Array.from({ length: count }, (_, i) => ({ n: i + 1, state: "idle", title: item.assetTag + " port " + (i + 1) + " · No live reading" }));
+    }
+    return { id: item.id, label: item.assetTag, side, sockets };
+  });
+  const note = pdus.length
+    ? (a14 ? "Rack PDU sockets show live outlet state for rack A14. Click a lit socket to open it on Control." : "Rack PDUs show their ports. This rack has no live outlet readings.")
+    : "No rack PDU is recorded on this rack.";
+  return '<div class="rack3d elev-3d">' + rackSceneHtml(data.name || data.rackId, units, pdus) + R3_LEGEND +
+    '<p class="fine">' + esc(note) + " Switch to 2D to move devices or export.</p></div>";
+}
+
 export function elevationParts() {
   const data = runtime.elevation;
   if (!data) {
@@ -230,7 +286,16 @@ export function elevationParts() {
   }
   const items = mounts();
   const face = state.floor.elevationFace === "rear" ? "rear" : "front";
-  const scene = '<div class="scene elev-scene"><div class="elev-tools"><button type="button" class="act" data-act="elev-face" data-face="front"' +
+  const is3d = state.floor.elevation3d !== false;
+  const mode = '<button type="button" class="act" data-act="elev-3d" data-mode="3d"' + (is3d ? ' aria-pressed="true"' : "") + ">3D</button>" +
+    '<button type="button" class="act" data-act="elev-3d" data-mode="2d"' + (is3d ? "" : ' aria-pressed="true"') + ">2D</button>";
+  if (is3d) {
+    return {
+      scene: '<div class="scene elev-scene is-3d"><div class="elev-tools">' + mode + "</div>" + rack3dScene(data, items) + "</div>",
+      detail: '<aside class="inspector">' + detail(data) + "</aside>",
+    };
+  }
+  const scene = '<div class="scene elev-scene"><div class="elev-tools">' + mode + '<button type="button" class="act" data-act="elev-face" data-face="front"' +
     (face === "front" ? ' aria-pressed="true"' : "") + '>Front</button><button type="button" class="act" data-act="elev-face" data-face="rear"' +
     (face === "rear" ? ' aria-pressed="true"' : "") + '>Rear</button><button type="button" class="act" data-act="elev-png">PNG</button><button type="button" class="act" data-act="elev-pdf">PDF</button></div>' +
     '<div class="elev-stage">' + rail("left", items) + grid(items) + rail("right", items) + "</div></div>";

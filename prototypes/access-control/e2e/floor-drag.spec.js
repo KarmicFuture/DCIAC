@@ -55,6 +55,9 @@ test("floor pieces drag inside the view and a click still opens them", async ({ 
   expect(moved.ny + moved.d).toBeLessThanOrEqual(moved.podH + 1);
   await expect(page.locator(".chassis-top")).toHaveCount(0);
 
+  // A drag swallows the click that ends it, then clears the flag on the next task.
+  // Wait for that before sending a fresh click, or the click can land first.
+  await expect.poll(() => page.evaluate(() => window.AccessDemo.state.floor.suppressClick)).toBe(false);
   await page.locator('.rackbox[data-act="floor-rack"][data-rack="A13"]').dispatchEvent("click");
   await expect(page.locator(".inspector .crumbs")).toContainText("A13");
 });
