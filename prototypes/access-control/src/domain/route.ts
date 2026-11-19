@@ -162,6 +162,10 @@ export function applyRoute(raw) {
     state.view = "oneline";
     return;
   }
+  if (head === "fleet") {
+    state.view = "fleet";
+    return;
+  }
   if (head === "audit") {
     state.view = "audit";
     return;
@@ -217,6 +221,7 @@ export function routeFromState() {
   }
   if (state.view === "control") return state.highlightOutlet ? "#/control?outlet=" + state.highlightOutlet : "#/control";
   if (state.view === "oneline") return "#/oneline";
+  if (state.view === "fleet") return "#/fleet";
   if (state.view === "audit") return "#/audit";
   if (state.view === "simulate") return "#/simulate";
   if (state.view === "models") return "#/models";

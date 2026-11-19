@@ -2,6 +2,14 @@
 
 ## 2026-11-19
 
+New Fleet view (Operate › Fleet, `#/fleet`), the first slice of the fleet summary:
+
+- One row per hall with its open alarms and worst priority, IT power against the hall's
+  capacity, power headroom, and how many racks are critical or near capacity.
+- Tiles across the top total the campus: halls, open alarms, IT load, critical racks.
+- Alarm counts match the alarm banner exactly; each alarm is counted in the hall it is in.
+- Each hall name opens that hall on the floor. Readings update with the live simulation.
+
 New MP1000 KVM demo, on the sign-in screen and in the Lab drawer:
 
 - A guided tour of how an operator reaches any server through the MP1000 management

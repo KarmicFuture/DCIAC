@@ -14,6 +14,7 @@ import { renderMap } from "../views/portmap";
 import { renderRack } from "../views/rack";
 import { renderSessions } from "../views/sessions";
 import { renderOneline } from "../views/oneline";
+import { renderFleet } from "../views/fleet";
 import { renderSimulate } from "../views/lab";
 import { OPERATE_VIEWS, PLAN_VIEWS, operateHead, planHead } from "./rail";
 
@@ -65,6 +66,7 @@ export function viewHtml() {
       : state.view === "control" ? renderControl()
         : state.view === "sessions" ? renderSessions()
           : state.view === "oneline" ? renderOneline()
+            : state.view === "fleet" ? renderFleet()
             : renderRack();
     return operateHead() + body;
   }
