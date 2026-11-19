@@ -3452,3 +3452,11 @@ button.act.launch.primary small { color: #d9d0c6; }
 [data-theme="noc"] .hb-aisle.hot { fill: #3d2a20; }
 .hall-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 16px; }
 .hall-picks .fine { margin-right: 4px; }
+
+.ol-line.future { stroke: color-mix(in srgb, #3d4a3a 30%, transparent); stroke-dasharray: 4 5; }
+.ol-line.dead { stroke: #9a9387; }
+.ol-node.future, .ol-hall.future, .ol-breaker.future, .ol-xfmr.future, .ol-batt.future { opacity: 0.35; }
+.ol-node.future rect, .ol-hall.future circle { stroke-dasharray: 4 3; }
+.ol-hall.dead circle, .ol-breaker.dead circle { stroke: #9a9387; fill: color-mix(in srgb, #9a9387 18%, var(--panel)); }
+.oneline-build .ol-hall.live circle { fill: color-mix(in srgb, #3f6d4e 30%, var(--panel)); }
+.oneline-build .stage-bar { margin: 0; }

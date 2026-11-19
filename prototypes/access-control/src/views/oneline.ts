@@ -2,6 +2,41 @@ import { PLANT, PODS, YARD, entityById, heatBand } from "../data/pods";
 import { impact, type SimImpact } from "../domain/events";
 import { runtime, state } from "../state";
 import { esc } from "../ui/format";
+import { BUILD_END, BUILD_START, formatDay, hallPhaseOn, stageOn, yardShown } from "../domain/buildplan";
+import { stageBarHtml } from "./plan";
+
+/* Build timeline mode: the same one-line on a plan date. Gear not yet set is drawn
+   dashed and faint, a hall that is built but not yet carrying load is grey, and
+   energized gear is drawn as live. Faults from the simulator are not shown here. */
+let buildStage: any = null;
+
+const EDGE_NEEDS: Record<string, string[]> = {
+  "grid-1": ["grid-1"],
+  "grid-2": ["grid-2"],
+  "grid-xfmr-a": ["grid-1", "xfmr-1"],
+  "grid-xfmr-b": ["grid-2", "xfmr-2"],
+  "xfmr-mod-a": ["xfmr-1", "pwr-mod"],
+  "xfmr-mod-b": ["xfmr-2", "pwr-2"],
+  "mod-bus": ["pwr-mod", "@feeds"],
+  "mod-bus-b": ["pwr-2", "@feeds"],
+  "mod-riser": ["@feeds"],
+  "mod-c": ["pwr-3"],
+  "mod-d": ["pwr-4"],
+  "batt-a": ["batt-1"],
+  "batt-b": ["batt-2"],
+};
+
+function builtOn(id: string) {
+  if (!buildStage) return true;
+  if (id === "@feeds") return !!buildStage.feeds;
+  const item = YARD.find((row) => row.id === id) || { id };
+  return yardShown(item, buildStage);
+}
+
+function buildEdgeTone(ids: string[]) {
+  const needs = ids.reduce((all, id) => all.concat(EDGE_NEEDS[id] || []), [] as string[]);
+  return needs.every(builtOn) ? "live" : "future";
+}
 import { openFloorServer, openPod } from "./floor";
 
 type Pt = { x: number; y: number };
@@ -12,6 +47,7 @@ function yardName(id: string, fallback: string) {
 }
 
 function nodeTone(id: string, report: SimImpact) {
+  if (buildStage) return builtOn(id) ? "live" : "future";
   if (runtime.sim.feedersDown && runtime.sim.feedersDown[id]) return "failed";
   if (report.active && report.failedFeeds.indexOf(id) >= 0) return "failed";
   if (report.active && report.affected[id]) return "hit";
@@ -24,6 +60,7 @@ function nodeTone(id: string, report: SimImpact) {
 }
 
 function edgeTone(ids: string[], report: SimImpact) {
+  if (buildStage) return buildEdgeTone(ids);
   if (ids.some((id) => report.active && report.failedFeeds.indexOf(id) >= 0)) return "failed";
   if (ids.some((id) => runtime.sim.feedersDown && runtime.sim.feedersDown[id])) return "failed";
   if (report.active && ids.some((id) => report.affected[id])) return "hit";
@@ -67,12 +104,13 @@ function deviceBox(at: Pt, label: string, sub: string, tone: string, serverId: s
     '<text class="ol-sub" x="' + at.x + '" y="' + (at.y + 14) + '">' + esc(sub) + "</text></g>";
 }
 
-function hallTap(at: Pt, hall, tone: string) {
-  return '<g class="ol-hall ' + tone + '" data-act="oneline-hall" data-pod="' + esc(hall.id) + '" role="button" tabindex="0">' +
+function hallTap(at: Pt, hall, tone: string, sub = PLANT.hallItMw + " MW IT") {
+  const act = buildStage ? "oneline-build-hall" : "oneline-hall";
+  return '<g class="ol-hall ' + tone + '" data-act="' + act + '" data-pod="' + esc(hall.id) + '" role="button" tabindex="0">' +
     '<rect class="ol-hit" x="' + (at.x - 12) + '" y="' + (at.y - 14) + '" width="160" height="30" />' +
     '<circle cx="' + at.x + '" cy="' + at.y + '" r="6" />' +
     '<text class="ol-label" x="' + (at.x + 14) + '" y="' + (at.y + 4) + '">' + esc(hall.name) + "</text>" +
-    '<text class="ol-sub" x="' + (at.x + 14) + '" y="' + (at.y + 18) + '">' + PLANT.hallItMw + " MW IT</text></g>";
+    '<text class="ol-sub" x="' + (at.x + 14) + '" y="' + (at.y + 18) + '">' + esc(sub) + "</text></g>";
 }
 
 function summaryHtml(report: SimImpact) {
@@ -126,8 +164,9 @@ function diagramSvg(report: SimImpact) {
   body += '<text class="ol-sub" x="48" y="54">Utility to hall busway · click a node to open it on the floor</text>';
 
   // Utility stem
-  body += line(utility, { x: 90, y: utility.y }, "live");
-  body += line({ x: 90, y: aY }, { x: 90, y: bY }, "live");
+  const stem = buildStage ? buildEdgeTone(["grid-1"]) : "live";
+  body += line(utility, { x: 90, y: utility.y }, stem);
+  body += line({ x: 90, y: aY }, { x: 90, y: bY }, stem);
   body += line({ x: 90, y: aY }, { x: gridA.x - 54, y: aY }, toneA, "grid-xfmr-a");
   body += line({ x: 90, y: bY }, { x: gridB.x - 54, y: bY }, toneB, "grid-xfmr-b");
   body += '<g class="ol-utility"><rect x="24" y="148" width="48" height="34" rx="3" /><text class="ol-label" x="48" y="169">UTIL</text></g>';
@@ -193,6 +232,16 @@ function diagramSvg(report: SimImpact) {
   halls.forEach((hall, index) => {
     const y = hallStartY + index * hallGap;
     const feedId = "feed-hall-" + hall.id;
+    if (buildStage) {
+      const phase = hallPhaseOn(index, state.buildDate, (hall.racks || []).length).phase;
+      const built = phase.id !== "field" && phase.id !== "pad";
+      const hallTone = phase.id === "live" ? "live" : (built && buildStage.feeds ? "dead" : "future");
+      const feedTone = buildStage.feeds && built ? hallTone : "future";
+      body += line({ x: busX, y }, { x: hallX - 8, y }, feedTone, feedId);
+      body += breaker({ x: hallX - 28, y }, feedTone);
+      body += hallTap({ x: hallX, y }, hall, hallTone, phase.id === "live" ? PLANT.hallItMw + " MW IT" : phase.name);
+      return;
+    }
     const tone = report.active && report.failedFeeds.indexOf(feedId) >= 0 ? "failed" : hallEdge;
     body += line({ x: busX, y }, { x: hallX - 8, y }, tone, feedId);
     body += breaker({ x: hallX - 28, y }, tone);
@@ -201,6 +250,14 @@ function diagramSvg(report: SimImpact) {
 
   // Legend
   const legendY = height - 28;
+  if (buildStage) {
+    body += '<g class="ol-legend" transform="translate(48 ' + legendY + ')">' +
+      '<line class="ol-line live" x1="0" y1="0" x2="28" y2="0" /><text class="ol-sub" x="34" y="4" style="text-anchor:start">Energized</text>' +
+      '<line class="ol-line dead" x1="120" y1="0" x2="148" y2="0" /><text class="ol-sub" x="154" y="4" style="text-anchor:start">Built, no load</text>' +
+      '<line class="ol-line future" x1="260" y1="0" x2="288" y2="0" /><text class="ol-sub" x="294" y="4" style="text-anchor:start">Not yet built</text></g>';
+    return '<svg class="ol-svg" viewBox="0 0 980 ' + height + '" role="img" aria-label="Facility power one-line diagram on ' +
+      esc(formatDay(state.buildDate)) + '">' + body + "</svg>";
+  }
   body += '<g class="ol-legend" transform="translate(48 ' + legendY + ')">' +
     '<line class="ol-line live" x1="0" y1="0" x2="28" y2="0" /><text class="ol-sub" x="34" y="4">Live</text>' +
     '<line class="ol-line hit" x1="90" y1="0" x2="118" y2="0" /><text class="ol-sub" x="124" y="4">At risk</text>' +
@@ -235,11 +292,32 @@ export function openOnelineSite() {
   state.inspectorOpen = false;
 }
 
+function buildSummary(stage) {
+  const feeders = ["grid-1", "grid-2"].filter(builtOn).length;
+  const modules = ["pwr-mod", "pwr-2", "pwr-3", "pwr-4"].filter(builtOn).length;
+  const live = PODS.filter((hall, index) => hallPhaseOn(index, state.buildDate, (hall.racks || []).length).phase.id === "live").length;
+  return '<p class="ol-summary" role="status">' + esc(formatDay(state.buildDate) + " · " + stage.name) + ": " + feeders + " of 2 feeders, " +
+    modules + " of 4 power modules · " + live + " of " + PODS.length + " halls energized · " + live * PLANT.hallItMw + " MW IT</p>";
+}
+
 export function renderOneline() {
+  const building = !!state.onelineBuild;
+  if (building && !(state.buildDate >= BUILD_START && state.buildDate <= BUILD_END)) state.buildDate = BUILD_START;
+  buildStage = building ? stageOn(state.buildDate) : null;
   const report = impact(runtime.sim);
+  const toggle = '<button type="button" class="act" data-act="oneline-build" aria-pressed="' + (building ? "true" : "false") + '">Build timeline</button>';
+  if (building) {
+    const html = '<div class="oneline-page oneline-build">' +
+      '<div class="oneline-head"><div><h2>One-line · build timeline</h2>' + buildSummary(buildStage) + "</div>" +
+      '<div class="oneline-actions">' + toggle + "</div></div>" +
+      stageBarHtml(buildStage) +
+      '<div class="oneline-sheet">' + diagramSvg(report) + "</div></div>";
+    buildStage = null;
+    return html;
+  }
   return '<div class="oneline-page">' +
     '<div class="oneline-head"><div><h2>One-line</h2>' + summaryHtml(report) + "</div>" +
-    '<div class="oneline-actions">' +
+    '<div class="oneline-actions">' + toggle +
     '<button type="button" class="act" data-act="oneline-site">Outside floor</button>' +
     '<button type="button" class="act" data-act="sim-open">Simulate</button>' +
     "</div></div>" +

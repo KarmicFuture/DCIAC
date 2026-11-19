@@ -120,6 +120,7 @@ export const state: AppState = {
   horizon: "now",
   buildDate: "2026-11-16",
   buildHall: "",
+  onelineBuild: false,
   libraryOpen: false,
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },
