@@ -91,6 +91,9 @@ Mark items done here in the same pull request that finishes them.
 
 1. Fix any failing test, console error, or broken layout on desktop or iPhone width.
 2. Fleet view: a summary across halls and racks showing alarms, power, and capacity at a glance.
+   *In progress.* Shipped 2026-11-19: Operate › Fleet (`#/fleet`) lists every hall with open
+   alarms, IT power, headroom, and hot-rack counts. Still to do: a per-rack drill-down list
+   (sortable by power or alarms) inside each hall row.
 3. SLA and escalation timers on alarms, so it's clear how long each has been open and when it escalates.
 4. Shift handover summary: what happened, what's still open, and what the next shift should watch.
 5. Liquid-cooling telemetry: CDU supply and return temperatures, flow, and kW-per-rack budget.

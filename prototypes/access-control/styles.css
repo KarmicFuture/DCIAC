@@ -3393,3 +3393,30 @@ button.act.launch.primary small { color: #d9d0c6; }
   .build-scene { height: 360px; min-height: 360px; }
 }
 
+.fleet-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.fleet-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.fleet-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.fleet-tile span, .fleet-tile small {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.fleet-tile b { font-size: var(--text-lg); }
+.fleet-table td { white-space: nowrap; }
+.fleet-clear { color: var(--muted); }
