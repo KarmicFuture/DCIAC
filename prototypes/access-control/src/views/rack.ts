@@ -8,6 +8,7 @@ import { render } from "../ui/schedule";
 import { fruSummary } from "../ui/shell";
 import { conditionTone } from "./floor";
 import { rdpLauncher } from "./sessions";
+import { rack3dHtml } from "./rack3d";
 
 export function uLabel(n) {
   return "U" + String(n).padStart(2, "0");
@@ -148,7 +149,7 @@ export function elevation() {
 export function renderRack() {
   const d = deviceById(state.selected);
   return containSwitch() +
-    '<div class="rack-wrap"><section class="panel"><h2>Cold aisle front</h2><div class="elevation">' + elevation() +
+    '<div class="rack-wrap"><section class="panel rack3d-panel"><h2>Rack A14 · 3D</h2><div class="rack3d-wrap">' + rack3dHtml() +
     '</div></section><section class="panel"><h2>Device</h2><div class="detail">' +
     (d ? deviceDetail(d) : '<p class="empty">Select a device.</p>') +
     '</div></section></div><section class="panel"><h2>ACS FRU</h2>' + fruSummary(false) + "</section>";

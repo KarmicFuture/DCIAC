@@ -177,6 +177,8 @@ export interface AppState {
   buildHall: string;
   /* The one-line shows the build timeline on buildDate instead of live state. */
   onelineBuild: boolean;
+  /* Camera preset for the 3D rack on Operate › Rack. */
+  rackView: string;
   libraryOpen: boolean;
   inspectorOpen: boolean;
   manage: { layer: string; device: string };

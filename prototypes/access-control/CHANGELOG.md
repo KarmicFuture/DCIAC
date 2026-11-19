@@ -2,6 +2,18 @@
 
 ## 2026-11-19
 
+Rack A14 in 3D with its rack PDU (Operate › Rack):
+
+- The flat cabinet is now a 3D rack with Front, Angle, Side, and Rear views. Every device
+  sits at its U as a box with a front bezel and a rear label. Its status light matches the
+  floor, and a device whose outlet is off is drawn dark.
+- The vertical rack PDU is on the rear-right rail. Each of its 11 outlets shows a light for
+  On, Off, Cycling, or Locked (the DI-1 leak lock on outlets 1 and 2). The selected
+  device's outlet is outlined.
+- A Rack PDU A14 table under the rack lists each outlet, its device, and its state.
+- The PDU here is read only. Clicking a socket or an outlet opens Control on that outlet,
+  where the role, leak interlock, and confirmation checks still apply.
+
 Hall build schedule (Plan › Halls, `#/halls`):
 
 - A Gantt-style schedule with one row per hall and one bar per phase, from Field and Pad

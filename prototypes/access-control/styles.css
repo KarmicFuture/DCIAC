@@ -3474,3 +3474,60 @@ button.act.launch.primary small { color: #d9d0c6; }
 .ol-hall.dead circle, .ol-breaker.dead circle { stroke: #9a9387; fill: color-mix(in srgb, #9a9387 18%, var(--panel)); }
 .oneline-build .ol-hall.live circle { fill: color-mix(in srgb, #3f6d4e 30%, var(--panel)); }
 .oneline-build .stage-bar { margin: 0; }
+
+/* Rack A14 in 3D (Operate › Rack) */
+.rack3d-wrap { padding: 12px; }
+.rack3d { display: flex; flex-direction: column; gap: 10px; }
+.r3-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.r3-tools [aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.r3-stage { position: relative; height: 560px; perspective: 1400px; perspective-origin: 50% 40%; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 10px; background: radial-gradient(ellipse at 50% 30%, color-mix(in srgb, var(--panel) 92%, #c9c2b6), color-mix(in srgb, var(--panel) 70%, #b9b1a4)); }
+.r3-world { position: absolute; left: 50%; top: 50%; width: 200px; height: 462px; margin: -231px 0 0 -100px;
+  transform-style: preserve-3d; transform-origin: 50% 50% 0; transition: transform 0.5s ease; }
+@media (prefers-reduced-motion: reduce) { .r3-world { transition: none; } }
+.r3-place { position: absolute; left: 0; top: 0; transform-style: preserve-3d; }
+.r3-box { position: relative; transform-style: preserve-3d; }
+.r3-face { position: absolute; left: 0; top: 0; box-sizing: border-box; backface-visibility: hidden; }
+.r3-cab > .r3-face { background: rgba(40, 36, 32, 0.08); border: 3px solid #2b2724; pointer-events: none; }
+.r3-cab > .r3-front, .r3-cab > .r3-rear { background: none; }
+.r3-cab > .r3-left, .r3-cab > .r3-right { background: rgba(43, 39, 36, 0.18); }
+.r3-cab > .r3-top { background: #3a3530; display: grid; place-items: center; }
+.r3-cab > .r3-bottom { background: #2b2724; }
+.r3-cab-name { color: #e9e4dc; font-size: 12px; font-weight: 650; transform: rotate(180deg); }
+.r3-dev > .r3-face { background: #4a4540; border: 1px solid #2e2a26; }
+.r3-dev > .r3-top, .r3-dev > .r3-bottom { background: #3c3834; }
+.r3-dev.net > .r3-face { background: #3c4a56; }
+.r3-dev.shelf > .r3-face { background: #5b4a3a; }
+.r3-dev.on > .r3-face { border-color: #e08a2e; }
+.r3-dev.on > .r3-front { box-shadow: inset 0 0 0 2px #e08a2e; }
+.r3-dev.dark > .r3-face { filter: brightness(0.55); }
+.r3-bezel { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; padding: 0 6px; border: 0;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 5px); color: #f1ece4; font: inherit; font-size: 9px; cursor: pointer; }
+.r3-bezel i { width: 6px; height: 6px; border-radius: 50%; }
+.r3-rear .r3-rear-label, .r3-rear-label { display: block; padding: 1px 6px; color: #d8d2c8; font-size: 8px; }
+.r3-pdu > .r3-face { background: #1e1c1a; border: 1px solid #000; }
+.r3-pdu-face { display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; padding: 6px 0; }
+.r3-pdu-name { writing-mode: vertical-rl; color: #cfc8bd; font-size: 8px; letter-spacing: 0.05em; }
+.r3-pdu-cord { flex: 1; width: 3px; background: #111; }
+.r3-socket { display: grid; place-items: center; gap: 1px; width: 14px; padding: 2px 0; border: 1px solid #444; border-radius: 2px;
+  background: #0f0e0d; color: #bdb6ab; font: inherit; font-size: 7px; cursor: pointer; }
+.r3-socket b { font-weight: 600; }
+.r3-socket i { width: 6px; height: 6px; border-radius: 50%; background: #3fa66a; }
+.r3-socket.off i { background: #5a2424; }
+.r3-socket.cycling i { background: #d9a227; }
+.r3-socket.locked i { background: #b0563a; border-radius: 1px; }
+.r3-socket.mine { outline: 2px solid #e08a2e; }
+.r3-uscale { position: relative; width: 24px; height: 462px; color: var(--muted); font-size: 8px; text-align: right; }
+.r3-uscale span { position: absolute; right: 0; }
+.r3-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: var(--text-sm); color: var(--muted); }
+.r3-dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: #3fa66a; vertical-align: 0; }
+.r3-dot.off { background: #5a2424; }
+.r3-dot.cycling { background: #d9a227; }
+.r3-dot.locked { background: #b0563a; }
+.r3-pdu-table h3 { margin: 4px 0; }
+.r3-pdu-table tr.mine td { background: color-mix(in srgb, #e08a2e 16%, transparent); }
+.linkish { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+@media (max-width: 600px) {
+  .r3-stage { height: 430px; }
+  .r3-world { scale: 0.78; }
+}

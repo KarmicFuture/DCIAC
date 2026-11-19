@@ -283,6 +283,13 @@ export function onClick(event) {
     }
   }
   else if (act === "build-hall-close") { state.buildHall = ""; render(); }
+  else if (act === "rack-view") { state.rackView = el.dataset.rackView || "angle"; render(); }
+  else if (act === "pdu-outlet") {
+    state.view = "control";
+    state.highlightOutlet = Number(el.dataset.outlet) || 0;
+    state.toast = "";
+    render();
+  }
   else if (act === "gantt-open" && el.dataset.pod) {
     state.view = "plan";
     state.buildHall = el.dataset.pod;
