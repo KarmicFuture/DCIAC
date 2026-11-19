@@ -2,6 +2,21 @@
 
 ## 2026-11-19
 
+Hall build timeline (Plan › Campus):
+
+- Click any hall on the campus build scene, or pick it from the new Hall timeline row
+  under the scene, to open that hall's own timeline on the same date. `#/plan/<hall>`
+  links straight to it.
+- The hall has its own phase bar: Field, Pad, Empty shell, Power and cooling, Racks set,
+  Commissioning, Live. A top-down floor plan fills in as the date moves. Busway, CDUs and
+  containment appear first, then racks are set row by row, and they turn green when the
+  hall goes live. A count shows how many racks are set.
+- The calendar moves both views. "← Campus" goes back, and a live hall has Open live hall.
+- Clicking a hall in the build scene used to do nothing, because the scene took the
+  click for orbiting. It now opens the hall.
+- Halls 6–8 now appear as shells from 1 Jul 2027 instead of jumping straight from pad to
+  live on 16 Aug, so their fit-out has room on the timeline.
+
 New Fleet view (Operate › Fleet, `#/fleet`), the first slice of the fleet summary:
 
 - One row per hall with its open alarms and worst priority, IT power against the hall's

@@ -2,6 +2,7 @@ import { BUILD_END, BUILD_START, STAGES, formatDay, monthCells, monthsOfPlan, sp
 import { PLANT, PODS, YARD } from "../data/pods";
 import { state } from "../state";
 import { esc } from "../ui/format";
+import { renderHallTimeline } from "./planhall";
 import { boxHtml, cameraTransform, feedHtml, itemPoint, siteFeedHtml, sitePipesHtml, yardById } from "./floor";
 
 function hallsOf(indexes) {
@@ -33,7 +34,7 @@ function sceneHtml(stage) {
   const pads = hallsOf(stage.pads).map((hall) => boxHtml(
     { x: hall.site.x, y: hall.site.y, w: hall.site.w, d: hall.site.d, h: 6 },
     "ok",
-    "build-quiet",
+    "build-open",
     { klass: "pad", cap: "Pad", color: "#b7a57a", leds: [], pod: hall.id, label: hall.name + " pad" },
   )).join("");
   const shells = hallsOf(stage.shells).map((hall) => boxHtml(
@@ -94,12 +95,22 @@ function barHtml(current) {
     esc(stage.name) + "</span></button>").join("");
 }
 
+function hallPicks() {
+  return '<div class="hall-picks" role="group" aria-label="Open a hall timeline"><span class="fine">Hall timeline</span>' +
+    PODS.map((pod) => '<button type="button" class="act" data-act="build-open" data-pod="' + esc(pod.id) + '">' + esc(pod.name) + "</button>").join("") +
+    "</div>";
+}
+
 export function renderPlan() {
   const iso = state.buildDate && state.buildDate >= BUILD_START && state.buildDate <= BUILD_END ? state.buildDate : BUILD_START;
   state.buildDate = iso;
   const stage = stageOn(iso);
+  const hall = state.buildHall && PODS.some((pod) => pod.id === state.buildHall) ? renderHallTimeline(state.buildHall, iso) : "";
+  if (hall) {
+    return '<p class="sub plan-day">' + esc(formatDay(iso)) + "</p>" + hall + '<div class="cal-year">' + calendarHtml(iso) + "</div>";
+  }
   return '<p class="sub plan-day">' + esc(formatDay(iso)) + "</p>" +
     '<div class="stage-bar" role="group" aria-label="Build stages">' + barHtml(stage) + "</div>" +
-    sceneHtml(stage) +
+    sceneHtml(stage) + hallPicks() +
     '<div class="cal-year">' + calendarHtml(iso) + "</div>";
 }

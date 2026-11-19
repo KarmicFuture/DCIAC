@@ -3420,3 +3420,35 @@ button.act.launch.primary small { color: #d9d0c6; }
 .fleet-tile b { font-size: var(--text-lg); }
 .fleet-table td { white-space: nowrap; }
 .fleet-clear { color: var(--muted); }
+
+.hall-build { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.hall-build-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.hall-build-head > div { flex: 1 1 240px; min-width: 0; }
+.hall-build-head h2 { margin: 0 0 4px; font-size: var(--text-lg); }
+.hall-build-head .fine { margin: 0; }
+.hall-build-plan { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 8px; overflow: hidden; }
+.hb-svg { display: block; width: 100%; height: auto; max-height: 420px; }
+.hb-field { fill: #8eae62; }
+.hb-pad { fill: #cbb892; stroke: #b7a57a; stroke-width: 3; stroke-dasharray: 12 8; }
+.hb-floor { fill: #e9e4dc; stroke: #8a8378; stroke-width: 6; }
+.hb-aisle.cold { fill: #cfe0ea; }
+.hb-aisle.hot { fill: #f0d6c4; }
+.hb-contain { fill: none; stroke: #b0563a; stroke-width: 2; stroke-dasharray: 6 4; }
+.hb-bus { fill: #e0b15a; }
+.hb-box { fill: #6f8fa6; }
+.hb-rack { stroke-width: 2; }
+.hb-rack.planned { fill: none; stroke: #9a9387; stroke-dasharray: 5 4; }
+.hb-rack.set { fill: #4a4540; stroke: #2e2a26; }
+.hb-rack.live { fill: #3f6d4e; stroke: #24442f; }
+.hb-label { fill: #3a342e; font-size: 14px; }
+.hb-center { text-anchor: middle; font-size: 22px; }
+.hb-small { font-size: 11px; fill: #fff; }
+.hb-rack-id { text-anchor: middle; font-size: 11px; fill: #fff; }
+.hb-rack.planned + .hb-rack-id { fill: #6b655c; }
+.hall-build-count { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+[data-theme="noc"] .hb-floor { fill: #23201d; stroke: #5d574f; }
+[data-theme="noc"] .hb-label { fill: #d8d2c8; }
+[data-theme="noc"] .hb-aisle.cold { fill: #1f3340; }
+[data-theme="noc"] .hb-aisle.hot { fill: #3d2a20; }
+.hall-picks { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 16px; }
+.hall-picks .fine { margin-right: 4px; }
