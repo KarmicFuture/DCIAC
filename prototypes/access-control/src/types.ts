@@ -175,6 +175,8 @@ export interface AppState {
   buildDate: string;
   /* The hall open on the build timeline, or "" for the campus. */
   buildHall: string;
+  /* The one-line shows the build timeline on buildDate instead of live state. */
+  onelineBuild: boolean;
   libraryOpen: boolean;
   inspectorOpen: boolean;
   manage: { layer: string; device: string };

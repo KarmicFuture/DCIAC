@@ -2,6 +2,17 @@
 
 ## 2026-11-19
 
+One-line build timeline (Operate › One-line › Build timeline):
+
+- A Build timeline button switches the one-line to a plan date, with the same stage bar
+  as Plan › Campus. Feeders, transformers, power modules, batteries, the MV bus and each
+  hall's tap are drawn energized, built with no load, or dashed and faint if not yet built.
+- Each hall's tap shows its build phase on that date (Pad, Empty shell, Racks set, and so
+  on). Clicking a hall opens its hall timeline.
+- The header counts feeders and power modules in, halls energized, and MW of IT.
+  `#/oneline?build=2027-07-01` links to a date. Turning the button off shows the live
+  one-line again.
+
 Hall build timeline (Plan › Campus):
 
 - Click any hall on the campus build scene, or pick it from the new Hall timeline row
