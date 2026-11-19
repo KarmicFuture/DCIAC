@@ -119,6 +119,7 @@ export const state: AppState = {
   plan: { maker: "All", selected: "", preview: "", seq: 1, placements: [] },
   horizon: "now",
   buildDate: "2026-11-16",
+  buildHall: "",
   libraryOpen: false,
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },

@@ -184,6 +184,9 @@ export function applyRoute(raw) {
   }
   if (head === "plan") {
     state.view = "plan";
+    const hallId = parts[1] ? decodeURIComponent(parts[1]) : "";
+    state.buildHall = hallId && PODS.some((pod) => pod.id === hallId) ? hallId : "";
+    if (hallId && !state.buildHall) missing("There is no hall called " + hallId + ". Showing the campus timeline.");
     return;
   }
   applyFloor([]);
@@ -226,7 +229,7 @@ export function routeFromState() {
   if (state.view === "simulate") return "#/simulate";
   if (state.view === "models") return "#/models";
   if (state.view === "dcim") return "#/dcim";
-  if (state.view === "plan") return "#/plan";
+  if (state.view === "plan") return state.buildHall ? "#/plan/" + encodeURIComponent(state.buildHall) : "#/plan";
   return "#/floor";
 }
 

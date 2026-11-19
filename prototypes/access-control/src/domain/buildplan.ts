@@ -102,11 +102,11 @@ export const STAGES = [
     name: "First 40 MW",
     start: "2027-07-01",
     end: "2027-08-15",
-    blurb: "Halls 1–4 take live IT load. Their racks, CDUs, and the inventory placed in those halls are in service. Hall 5 is still a shell.",
-    arrives: ["Halls 1–4 commissioned", "Racks and in-hall inventory for those halls", "Cooler 4"],
+    blurb: "Halls 1–4 take live IT load. Their racks, CDUs, and the inventory placed in those halls are in service. Halls 5–8 are shells being fitted out.",
+    arrives: ["Halls 1–4 commissioned", "Racks and in-hall inventory for those halls", "Halls 6–8 shells", "Cooler 4"],
     grass: false,
-    pads: [5, 6, 7, 8, 9],
-    shells: [4],
+    pads: [8, 9],
+    shells: [4, 5, 6, 7],
     live: [0, 1, 2, 3],
     gear: ["grid-1", "grid-2", "xfmr-1", "xfmr-2", "pwr-mod", "pwr-2", "pwr-3", "pwr-4", "batt-1", "batt-2"],
     coolers: 4,
@@ -225,4 +225,66 @@ export function yardShown(item, stage) {
   if (stage.gear.indexOf(id) >= 0) return true;
   if (id.indexOf("stock-") !== 0) return false;
   return stage.groups.indexOf(stockGroup(item)) >= 0;
+}
+
+/* Inside one hall. Between the day its shell is dried in and the day it takes IT
+   load, a hall is fitted out in order: empty shell, power and cooling, racks set
+   row by row, then commissioning. The campus stages above fix the two ends. */
+
+export const HALL_PAD_AT = "2027-01-01";
+
+const HALL_STEPS = [
+  { id: "shell", name: "Empty shell", stage: "shells", at: 0, blurb: "The building is dried in. The floor is empty concrete." },
+  { id: "fitout", name: "Power and cooling", stage: "power", at: 0.25, blurb: "Busway, CDUs, power shelves, aisles, and hot-aisle containment go in. No racks yet." },
+  { id: "racks", name: "Racks set", stage: "first", at: 0.5, blurb: "Racks arrive and are set row by row, then cabled to the busway and CDUs." },
+  { id: "commission", name: "Commissioning", stage: "south", at: 0.85, blurb: "Every rack is set. Power, cooling, and the network are tested before IT load." },
+];
+
+function addDays(iso, days) {
+  const parts = String(iso).split("-").map(Number);
+  return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days)).toISOString().slice(0, 10);
+}
+
+function daysFrom(a, b) {
+  return Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+}
+
+export function hallMilestones(index) {
+  const shell = STAGES.find((stage) => stage.shells.indexOf(index) >= 0 || stage.live.indexOf(index) >= 0);
+  const live = STAGES.find((stage) => stage.live.indexOf(index) >= 0);
+  return { pad: HALL_PAD_AT, shell: shell ? shell.start : BUILD_END, live: live ? live.start : BUILD_END };
+}
+
+/* The hall's own phases with inclusive dates, for its phase bar. */
+export function hallPhases(index) {
+  const m = hallMilestones(index);
+  const span = Math.max(1, daysFrom(m.shell, m.live));
+  const starts = HALL_STEPS.map((step) => addDays(m.shell, Math.round(span * step.at)));
+  const phases = [
+    { id: "field", name: "Field", stage: "grass", start: BUILD_START, end: addDays(m.pad, -1), blurb: "Turf and survey stakes. Nothing is built." },
+    { id: "pad", name: "Pad", stage: "civil", start: m.pad, end: addDays(m.shell, -1), blurb: "The hall pad is graded and poured. Utilities are stubbed up." },
+  ];
+  HALL_STEPS.forEach((step, i) => phases.push({
+    id: step.id,
+    name: step.name,
+    stage: step.stage,
+    start: starts[i],
+    end: i + 1 < starts.length ? addDays(starts[i + 1], -1) : addDays(m.live, -1),
+    blurb: step.blurb,
+  }));
+  phases.push({ id: "live", name: "Live", stage: "full", start: m.live, end: BUILD_END, blurb: "The hall carries IT load. Every rack is in service." });
+  return phases;
+}
+
+export function hallPhaseOn(index, iso, rackCount) {
+  const phases = hallPhases(index);
+  const phase = phases.find((item) => item.start <= iso && iso <= item.end) || phases[iso < BUILD_START ? 0 : phases.length - 1];
+  let racksSet = 0;
+  if (phase.id === "racks") {
+    const days = daysFrom(phase.start, phase.end) + 1;
+    racksSet = Math.min(rackCount, Math.ceil(((daysFrom(phase.start, iso) + 1) / days) * rackCount));
+  } else if (phase.id === "commission" || phase.id === "live") {
+    racksSet = rackCount;
+  }
+  return { phase, phases, racksSet };
 }

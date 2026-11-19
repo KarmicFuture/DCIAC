@@ -220,6 +220,13 @@ export function onClick(event) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }
+  if (!el && state.user && state.view === "plan" && event.target.closest && event.target.closest(".build-scene")) {
+    /* The build scene captures the pointer to orbit, so the click lands on the scene.
+       Find the hall under the pointer instead. */
+    const under = document.elementFromPoint(event.clientX, event.clientY);
+    const hall = under && under.closest ? under.closest('[data-act="build-open"]') : null;
+    if (hall) el = hall;
+  }
   const floorBlank = !el && state.user && state.view === "floor";
   if ((!el || el.disabled) && !floorBlank) return;
   if (el && el.dataset.port) state.selectedPort = Number(el.dataset.port) || 0;
@@ -269,16 +276,14 @@ export function onClick(event) {
   else if (act === "horizon") { state.horizon = el.dataset.horizon === "future" ? "future" : "now"; render(); if (state.horizon === "future") loadFuturePlan(); }
   else if (act === "build-day" || act === "build-stage") { state.buildDate = el.dataset.date || state.buildDate; render(); }
   else if (act === "build-open") {
-    if (el.dataset.live === "1" && el.dataset.pod) {
-      state.view = "floor";
-      state.floor.level = "hall";
-      state.floor.podId = el.dataset.pod;
-      render();
-    } else {
-      state.toast = "That hall is not in service on this date.";
+    if (el.dataset.pod) {
+      state.buildHall = el.dataset.pod;
+      state.toast = "";
       render();
     }
   }
+  else if (act === "build-hall-close") { state.buildHall = ""; render(); }
+  else if (act === "build-live" && el.dataset.pod) { openOnelineHall(el.dataset.pod); render(); }
   else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
   else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); loadFuturePlan(); }
   else if (act === "manage-layer") { state.manage.layer = el.dataset.layer || "bmc"; render(); }

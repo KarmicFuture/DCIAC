@@ -680,6 +680,7 @@ function showPlanDate(iso: string) {
   resetSimulation();
   runtime.sim.barOpen = false;
   state.view = "plan";
+  state.buildHall = "";
   state.buildDate = iso;
   state.menuOpen = false;
   state.labOpen = false;

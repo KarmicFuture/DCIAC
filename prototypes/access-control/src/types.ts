@@ -173,6 +173,8 @@ export interface AppState {
   };
   horizon: string;
   buildDate: string;
+  /* The hall open on the build timeline, or "" for the campus. */
+  buildHall: string;
   libraryOpen: boolean;
   inspectorOpen: boolean;
   manage: { layer: string; device: string };
