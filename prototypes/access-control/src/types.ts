@@ -126,6 +126,8 @@ export interface FloorState {
   chassisZoom: number;
   suppressClick: boolean;
   elevationFace: string;
+  /* The drilled-down rack shows in 3D; off shows the editable 2D elevation. */
+  elevation3d: boolean;
 }
 
 export interface AppState {

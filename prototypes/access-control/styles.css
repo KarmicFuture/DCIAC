@@ -3531,3 +3531,18 @@ button.act.launch.primary small { color: #d9d0c6; }
   .r3-stage { height: 430px; }
   .r3-world { scale: 0.78; }
 }
+.elev-scene.is-3d { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.elev-scene.is-3d .elev-tools { position: static; }
+.elev-3d .r3-stage { height: 560px; }
+.r3-dev.srv > .r3-face { background: #5a5650; }
+.r3-pdu-face.dense { gap: 2px; padding: 4px 0; }
+.r3-pdu-face.dense .r3-socket { padding: 1px 0; font-size: 6px; }
+.r3-pdu-face.dense .r3-socket i { width: 4px; height: 4px; }
+.r3-socket.idle i, .r3-dot.idle { background: #77716a; }
+.r3-socket[disabled] { cursor: default; }
+.r3-dev > .r3-face:not(.r3-front), .r3-pdu > .r3-face:not(.r3-rear), .r3-uscale { pointer-events: none; }
+.elev-tools [aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+@media (max-width: 600px) {
+  .elev-3d .r3-stage { height: 360px; }
+  .elev-3d .r3-world { scale: 0.62; }
+}

@@ -2,6 +2,21 @@
 
 ## 2026-11-19
 
+Floor rack drill-down in 3D with rack PDUs (Floor › hall › rack):
+
+- Opening a rack from the floor now shows it in 3D, using the same rack view as
+  Operate › Rack (Front, Angle, Side, Rear). Every mounted device from the asset
+  repository sits at its U and opens the server when clicked.
+- The rack's 0U rack PDUs from the repository sit on the rear rails with all their
+  ports. On rack A14, rPDU-A shows the live outlet state (On, Off, Cycling, Locked by
+  the DI-1 leak), and a lit socket opens Control on that outlet. Other racks show their
+  PDU ports without live readings.
+- A 2D button brings back the editable elevation for moving devices, front and rear
+  faces, and PNG or PDF export. The rack details panel is unchanged.
+- Vendor names in repository model names are left off the 3D labels.
+- Fixed a flaky floor drag test. It sent a click before the drag had finished
+  swallowing its own click, and failed about one run in twelve.
+
 Rack A14 in 3D with its rack PDU (Operate › Rack):
 
 - The flat cabinet is now a 3D rack with Front, Angle, Side, and Rear views. Every device

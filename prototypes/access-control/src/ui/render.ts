@@ -373,6 +373,7 @@ export function onClick(event) {
   else if (act === "floor-feed") openFeed(el.dataset.pod, el.dataset.feed);
   else if (act === "floor-part") openPart(el.dataset.server, el.dataset.part);
   else if (act === "floor-rack") openRack(el.dataset.pod, el.dataset.rack);
+  else if (act === "elev-3d") { state.floor.elevation3d = el.dataset.mode !== "2d"; render(); }
   else if (act === "elev-face") { state.floor.elevationFace = el.dataset.face === "rear" ? "rear" : "front"; render(); }
   else if (act === "elev-net-save") saveNetworkCable();
   else if (act === "elev-net-drop") dropNetworkCable(el.dataset.id || "");

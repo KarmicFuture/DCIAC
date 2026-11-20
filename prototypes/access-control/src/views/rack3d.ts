@@ -58,43 +58,70 @@ export function outletState(o) {
 
 const STATE_WORD = { on: "On", off: "Off", cycling: "Cycling", locked: "Locked by DI-1 leak" };
 
-function deviceBox(d) {
-  const units = unitsOf(d);
-  const h = units * U_PX - 1;
-  const top = (RACK_U - (d.u + units - 1)) * U_PX;
-  const tone = conditionTone(d);
-  const on = state.selected === d.id;
-  const outlet = outlets.find((o) => o.n === d.outlet);
-  const dark = outlet && outletState(outlet) === "off";
-  const front = '<button type="button" class="r3-bezel" data-act="select" data-device="' + esc(d.id) + '"' + (on ? ' aria-pressed="true"' : "") +
-    ' aria-label="' + esc(d.name + ", U" + d.u + ", outlet " + d.outlet) + '"><span>' + esc(d.short || d.name) + "</span><i style=\"background:" +
-    (dark ? "#3a3632" : tone.color) + '"></i></button>';
-  const rear = '<span class="r3-rear-label">' + esc(d.short || d.name) + " · O" + d.outlet + "</span>";
-  const klass = "r3-dev " + (d.kind === "Switch" ? "net" : (d.kind === "Power shelf" ? "shelf" : "gpu")) + (on ? " on" : "") + (dark ? " dark" : "");
-  return place(20, top, 0, box(DEV_W, h, DEV_D, klass, { front, rear }, ' data-dev="' + esc(d.id) + '"'));
+export type Rack3dUnit = { id: string; label: string; u: number; units: number; klass: string; on?: boolean; dark?: boolean; led?: string; act: string; rear?: string; aria?: string };
+export type Rack3dSocket = { n: number; state: string; title: string; mine?: boolean; act?: string };
+export type Rack3dPdu = { id: string; label: string; side: string; sockets: Rack3dSocket[] };
+
+function unitBox(unit: Rack3dUnit) {
+  const h = unit.units * U_PX - 1;
+  const top = (RACK_U - (unit.u + unit.units - 1)) * U_PX;
+  const front = '<button type="button" class="r3-bezel" ' + unit.act + (unit.on ? ' aria-pressed="true"' : "") +
+    ' aria-label="' + esc(unit.aria || unit.label + ", U" + unit.u) + '"><span>' + esc(unit.label) + "</span><i style=\"background:" +
+    (unit.dark ? "#3a3632" : (unit.led || "#c8c4bc")) + '"></i></button>';
+  const rear = '<span class="r3-rear-label">' + esc(unit.rear || unit.label) + "</span>";
+  const klass = "r3-dev " + unit.klass + (unit.on ? " on" : "") + (unit.dark ? " dark" : "");
+  return place(20, top, 0, box(DEV_W, h, DEV_D, klass, { front, rear }, ' data-dev="' + esc(unit.id) + '"'));
 }
 
-function pduHtml() {
-  const selected = deviceById(state.selected);
-  const sockets = outlets.map((o) => {
+function pduBox(pdu: Rack3dPdu) {
+  const dense = pdu.sockets.length > 14 ? " dense" : "";
+  const sockets = pdu.sockets.map((socket) => '<button type="button" class="r3-socket ' + socket.state + (socket.mine ? " mine" : "") + '" ' +
+    (socket.act || "disabled") + ' data-outlet="' + socket.n + '" title="' + esc(socket.title) + '" aria-label="' + esc(socket.title) +
+    '"><b>' + socket.n + "</b><i></i></button>").join("");
+  const face = '<div class="r3-pdu-face' + dense + '"><span class="r3-pdu-name">' + esc(pdu.label) + "</span>" + sockets + '<span class="r3-pdu-cord"></span></div>';
+  const h = RACK_U * U_PX - 20;
+  /* Vertical, on a rear rail, outlets facing the rear door. */
+  const x = pdu.side === "left" ? 2 : CAB_W - 18;
+  return place(x, 10, -CAB_D / 2 + 20, box(16, h, 16, "r3-pdu", { rear: face, side: "" }, ' data-pdu="' + esc(pdu.id) + '"'));
+}
+
+function deviceUnit(d): Rack3dUnit {
+  const outlet = outlets.find((o) => o.n === d.outlet);
+  return {
+    id: d.id,
+    label: d.short || d.name,
+    u: d.u,
+    units: unitsOf(d),
+    klass: d.kind === "Switch" ? "net" : (d.kind === "Power shelf" ? "shelf" : "gpu"),
+    on: state.selected === d.id,
+    dark: !!(outlet && outletState(outlet) === "off"),
+    led: conditionTone(d).color,
+    act: 'data-act="select" data-device="' + esc(d.id) + '"',
+    rear: (d.short || d.name) + " · O" + d.outlet,
+    aria: d.name + ", U" + d.u + ", outlet " + d.outlet,
+  };
+}
+
+/* The live outlets of rack PDU A14, as sockets. */
+export function a14Sockets(selectedOutlet = 0): Rack3dSocket[] {
+  return outlets.map((o) => {
     const s = outletState(o);
     const mapped = o.deviceId ? deviceById(o.deviceId) : null;
     const who = mapped ? mapped.name : "Unbound";
-    const mine = selected && selected.outlet === o.n ? " mine" : "";
-    return '<button type="button" class="r3-socket ' + s + mine + '" data-act="pdu-outlet" data-outlet="' + o.n + '" title="' +
-      esc("Outlet " + o.n + " · " + who + " · " + STATE_WORD[s]) + '" aria-label="' + esc("Outlet " + o.n + ", " + who + ", " + STATE_WORD[s]) +
-      '"><b>' + o.n + "</b><i></i></button>";
-  }).join("");
-  const face = '<div class="r3-pdu-face"><span class="r3-pdu-name">PDU A14</span>' + sockets + '<span class="r3-pdu-cord"></span></div>';
-  const h = RACK_U * U_PX - 20;
-  /* Mounted vertically on the rear-right rail, outlets facing the rear door. */
-  return place(CAB_W - 18, 10, -CAB_D / 2 + 20, box(16, h, 16, "r3-pdu", { rear: face, side: "" }));
+    return {
+      n: o.n,
+      state: s,
+      title: "Outlet " + o.n + " · " + who + " · " + STATE_WORD[s],
+      mine: selectedOutlet === o.n,
+      act: 'data-act="pdu-outlet"',
+    };
+  });
 }
 
-function cabinet() {
+function cabinet(name) {
   const h = RACK_U * U_PX;
   return place(0, 0, 0, box(CAB_W, h, CAB_D, "r3-cab", {
-    top: '<span class="r3-cab-name">Rack A14</span>',
+    top: '<span class="r3-cab-name">' + esc(name) + "</span>",
   }));
 }
 
@@ -120,15 +147,23 @@ function pduTable() {
     '</tbody></table></div><button type="button" class="act" data-act="nav" data-view="control">Open Control</button></div>';
 }
 
-export function rack3dHtml() {
+export const R3_LEGEND = '<div class="r3-legend"><span><span class="r3-dot on"></span>On</span><span><span class="r3-dot off"></span>Off</span>' +
+  '<span><span class="r3-dot cycling"></span>Cycling</span><span><span class="r3-dot locked"></span>Locked</span>' +
+  '<span><span class="r3-dot idle"></span>No live reading</span></div>';
+
+/* Any rack in 3D: the view buttons and the stage. */
+export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
   const view = viewAngles();
   const views = RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
     (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("");
-  const list = devices.filter((d) => d.u);
-  const scene = '<div class="r3-stage"><div class="r3-world" data-view="' + view.id + '" style="transform:rotateX(' + view.pitch + "deg) rotateY(" + view.yaw + 'deg)">' +
-    cabinet() + uScale() + list.map(deviceBox).join("") + pduHtml() + "</div></div>";
-  return '<div class="rack3d"><div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>" + scene +
-    '<div class="r3-legend"><span><span class="r3-dot on"></span>On</span><span><span class="r3-dot off"></span>Off</span>' +
-    '<span><span class="r3-dot cycling"></span>Cycling</span><span><span class="r3-dot locked"></span>Locked</span></div>' +
-    pduTable() + "</div>";
+  return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>" +
+    '<div class="r3-stage"><div class="r3-world" data-view="' + view.id + '" style="transform:rotateX(' + view.pitch + "deg) rotateY(" + view.yaw + 'deg)">' +
+    cabinet(name) + uScale() + units.map(unitBox).join("") + pdus.map(pduBox).join("") + "</div></div>";
+}
+
+export function rack3dHtml() {
+  const selected = deviceById(state.selected);
+  const units = devices.filter((d) => d.u).map(deviceUnit);
+  const pdu = { id: "pdu-a14", label: "PDU A14", side: "right", sockets: a14Sockets(selected ? selected.outlet : 0) };
+  return '<div class="rack3d">' + rackSceneHtml("Rack A14", units, [pdu]) + R3_LEGEND + pduTable() + "</div>";
 }
