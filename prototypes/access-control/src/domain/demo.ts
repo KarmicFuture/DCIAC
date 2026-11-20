@@ -4,6 +4,7 @@ import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { openRack, stopWalk } from "../views/floor";
+import { setRackPreset } from "../views/rack3d";
 import { audit, userAudit } from "./audit";
 import { fireEvent, resetSimulation, revertEvent } from "./events";
 import { toggleBmc } from "./failover";
@@ -126,6 +127,9 @@ function tidyFullDemo() {
   }
   resetSimulation();
   runtime.sim.barOpen = false;
+  state.onelineBuild = false;
+  state.buildHall = "";
+  setRackPreset("angle");
   calmChrome();
 }
 
@@ -259,25 +263,36 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
+    pop: "Fleet — every hall's alarms, IT power, and headroom on one page.",
+    target: ".fleet-page",
+    enter() {
+      state.view = "fleet";
+    },
+  },
+  {
     pop: "Power one-line — Feeders A/B through transformers onto the MV bus.",
     target: ".oneline-sheet, .ol-svg",
     enter() {
       state.view = "oneline";
+      state.onelineBuild = false;
     },
   },
   {
-    pop: "Operate — consoles, ports, and sessions for A14.",
-    target: ".view, .rack-wrap, .workspace",
+    pop: "Rack A14 in 3D, from the rear: every device at its U, two rack PDUs with live outlet lights. Drag to turn it.",
+    target: ".rack3d-panel .r3-stage, .rack3d-panel",
     enter() {
       state.view = "rack";
       state.selected = "tray-01";
+      setRackPreset("rear");
     },
   },
   {
-    pop: "BMC dark on Tray 06. Failover is ACS serial — not RM1048.",
-    target: ".view, .device-card, .rack-wrap",
+    pop: "BMC dark on Tray 06. The device view marks ACS serial as the best way in — not RM1048.",
+    target: ".device-view, .view",
+    weight: 1.25,
     enter() {
       ensureBmcUp("tray-06");
+      setRackPreset("angle");
       state.view = "rack";
       state.selected = "tray-06";
       fireEvent("bmc-loss", "tray-06", { quiet: true, stay: true });
@@ -365,10 +380,28 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Jul 2027 — first 40 MW live. Halls 1–4 take IT load.",
-    target: ".build-scene, .stage-bar, .plan-day",
+    pop: "Jul 2027 — the one-line on that date: four halls energized, Halls 5–8 built with no load.",
+    target: ".oneline-sheet, .view",
     enter() {
       showPlanDate("2027-07-01");
+      state.view = "oneline";
+      state.onelineBuild = true;
+    },
+  },
+  {
+    pop: "Inside Hall 5 in mid-July: racks are set row by row while Halls 1–4 carry load.",
+    target: ".hall-build, .view",
+    enter() {
+      showPlanDate("2027-07-15");
+      state.buildHall = "hall-5";
+    },
+  },
+  {
+    pop: "Every hall's build on one schedule, from pad to live. Click a bar to open that hall.",
+    target: ".gantt, .view",
+    enter() {
+      showPlanDate("2027-08-01");
+      state.view = "halls";
     },
   },
   {
@@ -394,7 +427,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Done. Floor, one-line, Operate, Control, Plan, DCIM, Audit — day to day.",
+    pop: "Done. Floor, Fleet, one-line, 3D rack, device view, Control, Plan, DCIM, Audit — day to day.",
     target: ".scene",
     enter() {
       tidyFullDemo();
@@ -432,8 +465,9 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "GPU Tray 05 reboots after a BIOS update and never comes back. SSH and RDP go dark.",
-    target: ".view, .rack-wrap",
+    pop: "GPU Tray 05 reboots after a BIOS update and never comes back. The device view shows no OS for SSH or RDP; ACS serial is still the way in.",
+    target: ".device-view, .view",
+    weight: 1.25,
     enter() {
       finishFix();
       breakBoot(FIX_DEVICE);
@@ -681,6 +715,7 @@ function showPlanDate(iso: string) {
   runtime.sim.barOpen = false;
   state.view = "plan";
   state.buildHall = "";
+  state.onelineBuild = false;
   state.buildDate = iso;
   state.menuOpen = false;
   state.labOpen = false;
@@ -716,6 +751,14 @@ function enterTourBeat(index: number) {
   state.labOpen = false;
   calmChrome();
   beat.enter();
+}
+
+/* For tests and the demo audit: what the current tour beat points at. */
+export function tourBeatInfo() {
+  const tour = currentTour();
+  const beat = tourBeat();
+  if (!tour || !beat) return null;
+  return { tour: state.demoId, step: state.demoStep, of: tour.beats.length, caption: textOf(beat.pop), target: beat.target || ".view", view: state.view };
 }
 
 export function advanceTour() {

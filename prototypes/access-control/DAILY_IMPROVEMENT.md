@@ -17,6 +17,10 @@ Edit this file to steer the work. The task reads it from `main` each run.
 - Operate › Rack and the rack you open from the floor are one view. Both draw from
   `rackViewHtml` in `src/views/rack3d.ts`. Change the rack view there so they stay the same.
   Never fork one of them.
+- When a change adds or alters something a user sees, update the demos to match: the
+  Full demo, the AI fix demo, the MP1000 KVM demo, the Lab walks, and the executive
+  briefing. Spotlight targets must point at elements that exist. `AccessDemo.tourBeatInfo()`
+  reports the current beat's target.
 - Build and publish the same way the repo already does: `npm run build`, then copy
   `dist/index.html` and `dist/assets/*` to the repository root, replacing the old
   hashed assets. Merging the pull request then updates the live site.

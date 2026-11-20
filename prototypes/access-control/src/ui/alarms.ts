@@ -31,7 +31,7 @@ export function serialFinding(d) {
     return { login: "ok", pri: 1, text: "Automatic login on " + d.tty + " read: DI-1 leak rope asserted.", go: "control", response: "Open control" };
   }
   if (d.rdp === "down") {
-    return { login: "ok", pri: 2, text: "Automatic login on " + d.tty + " read: in-band RDP is down. Failover is ACS KVM.", act: "rdp-failover", response: "ACS KVM" };
+    return { login: "ok", pri: 2, text: "Automatic login on " + d.tty + " read: in-band RDP is down. Failover is MPU2 KVM.", act: "rdp-failover", response: "MPU2 KVM" };
   }
   if (heatBand(d) === "critical") {
     return { login: "ok", pri: 2, text: "Automatic login on " + d.tty + " read: thermal load critical.", act: "floor-server", response: "Open server" };

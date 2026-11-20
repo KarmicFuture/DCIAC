@@ -99,7 +99,7 @@ export function failoverBanner(d) {
   return '<div class="status hold" role="status"><p>' + esc(lead) + " RM1048 does not take this failover.</p>" +
     '<div class="actions"><button type="button" class="act primary" data-act="fallback" data-device="' + d.id +
     '" data-type="serial">Open serial on ACS</button><button type="button" class="act primary" data-act="fallback" data-device="' +
-    d.id + '" data-type="kvm">Open KVM on ACS</button></div></div>';
+    d.id + '" data-type="kvm">Open MPU2 KVM</button></div></div>';
 }
 
 export function countdownBlock(d, lead) {

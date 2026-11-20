@@ -90,7 +90,7 @@ export const state: AppState = {
     chassisZoom: 1,
     suppressClick: false,
     elevationFace: "front",
-    elevation3d: true,
+    elevation3d: false,
   },
   game: { score: 0, streak: 0, best: 0, catches: 0, awarded: {} },
   acked: {},

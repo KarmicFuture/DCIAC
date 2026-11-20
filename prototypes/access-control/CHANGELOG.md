@@ -2,6 +2,32 @@
 
 ## 2026-11-20
 
+Demos, simulations, and usability brought up to date with the new views. Every demo, Lab
+walk, simulator event, and main view was crawled on desktop and iPhone widths.
+
+- Full demo (now 21 steps) shows the new work:
+  - Fleet.
+  - The 3D rack from the rear with its rack PDUs.
+  - The device view marking ACS serial as the best way in when Tray 06's BMC goes dark.
+  - The one-line on a build date.
+  - Hall 5 being racked.
+  - The all-halls build schedule.
+  Stopping the demo puts the build views back.
+- AI fix demo: when Tray 05 stops at the UEFI shell, the spotlight is on its device view.
+  SSH and RDP show "No OS running", and ACS serial stays the best way in.
+- Executive briefing: "The rack" now describes the 3D rack, its PDUs, and the device view.
+- Fleet follows the simulator. A hall on a failed or at-risk feed is flagged "Power lost"
+  or "At risk", and the page shows the simulation summary.
+- The device panel puts the name, the fault, and the ways in first, ahead of the faces and
+  thermals. The floor inspector no longer repeats the RDP buttons the device view already has,
+  and its table fits the narrow panel.
+- Rack links match clicks. `#/floor/<hall>/<rack>` opens the 3D rack view with the
+  details open, and so does a device link. The U positions editor moved to
+  `#/floor/<hall>/<rack>/u`, opens in 2D, and has a "Back to the rack view" button.
+- One name for the KVM: "MPU2 KVM" and "MPU2 port" everywhere, replacing "ACS KVM" and
+  "MPU port".
+- `DAILY_IMPROVEMENT.md` now asks every change to update the demos to match.
+
 Device view by device type (Operate › Rack device panel, and the floor device panel):
 
 - Every device opens a view built for its type: a GPU tray, a switch, a power shelf, or

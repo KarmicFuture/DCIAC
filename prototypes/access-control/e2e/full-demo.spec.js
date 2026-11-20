@@ -26,14 +26,27 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
     .toContain("Hall 1");
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "floor");
 
+  // Fleet, then the one-line.
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator(".shell")).toHaveAttribute("data-view", "fleet");
+  await expect(page.locator("#demo-caption")).toContainText("Fleet");
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect.poll(async () => page.locator(".shell").getAttribute("data-view"), { timeout: 5000 })
     .toBe("oneline");
   await expect(page.locator(".oneline-sheet")).toBeVisible();
   await expect(page.locator("#demo-caption")).toContainText("one-line");
 
+  // The 3D rack from the rear, then the device view on a dark BMC.
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("Rack A14 in 3D");
+  await expect(page.locator(".rack3d-panel .r3-world")).toHaveAttribute("data-view", "rear");
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator("#demo-caption")).toContainText("device view");
+  await expect(page.locator('.device-view tr.best[data-band="oob"]')).toHaveAttribute("data-path", "acs-serial");
+  await expect(page.locator('.device-view tr[data-path="bmc"]')).toContainText("BMC dark");
+
   // Skip ahead to the Plan date progression.
-  for (let i = 0; i < 8; i += 1) {
+  for (let i = 0; i < 6; i += 1) {
     await page.evaluate(() => window.AccessDemo.advanceDemo());
   }
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "plan");
@@ -48,8 +61,14 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator("#demo-caption")).toContainText("Apr 2027");
 
+  // Jul 2027 on the one-line, inside Hall 5, and the all-halls schedule.
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator("#demo-caption")).toContainText("Jul 2027");
+  await expect(page.locator(".oneline-build .ol-summary")).toContainText("4 of 10 halls energized");
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator('.hall-build[data-hall="hall-5"]')).toHaveAttribute("data-phase", "racks");
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator(".shell")).toHaveAttribute("data-view", "halls");
 
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator("#demo-caption")).toContainText("Oct 2027");
@@ -79,7 +98,11 @@ test("Full demo reads on an iPhone viewport", async ({ page }) => {
   await expect(page.locator(".scene")).toBeVisible();
 
   await page.evaluate(() => window.AccessDemo.advanceDemo());
+  await expect(page.locator(".shell")).toHaveAttribute("data-view", "fleet");
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "oneline");
   await expect(page.locator(".oneline-sheet")).toBeVisible();
   await page.evaluate(() => window.AccessDemo.stopDemo());
+  // Stopping puts the build views back.
+  expect(await page.evaluate(() => [window.AccessDemo.state.onelineBuild, window.AccessDemo.state.buildHall])).toEqual([false, ""]);
 });

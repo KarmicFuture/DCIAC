@@ -9,7 +9,8 @@ import { deviceById, devices } from "./data/devices";
 import { outlets } from "./data/outlets";
 import { entityById } from "./data/pods";
 import { setAnalyzer } from "./domain/analyzer";
-import { advanceDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo } from "./domain/demo";
+import { advanceDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo, tourBeatInfo } from "./domain/demo";
+import { EVENTS, targetsForEvent } from "./domain/events";
 import { breakBoot, setFixLineMs } from "./domain/autofix";
 import {
   encodeSimPayload,
@@ -54,6 +55,8 @@ window.AccessDemo = {
   startFullDemo,
   startFixDemo,
   startMp1000Demo,
+  tourBeatInfo,
+  simEvents: () => EVENTS.map((e) => ({ id: e.id, title: e.title, targets: targetsForEvent(e.id).map((t) => t.id) })),
   setFixLineMs,
   breakBoot,
   advanceDemo,

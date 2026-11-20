@@ -69,7 +69,7 @@ test("MP1000 list keeps the console gates: dark BMC goes to ACS, no window means
   await page.evaluate(() => window.AccessDemo.fireEvent("bmc-loss", "tray-06", { quiet: true, stay: true }));
   await page.evaluate(() => { location.hash = "#/sessions"; });
   const dark = page.locator('.mp1000-panel tr[data-device="tray-06"]');
-  await expect(dark).toContainText("BMC dark. Use ACS KVM.");
+  await expect(dark).toContainText("BMC dark. Use MPU2 KVM.");
   await expect(dark.locator('[data-act="mp1000-kvm"]')).toBeDisabled();
 
   // With no window or work order, the console check refuses the launch.

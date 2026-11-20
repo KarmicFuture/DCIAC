@@ -1627,14 +1627,9 @@ export function serverInspector(entity) {
     action = "<p>" + esc(where) + " This is the out-of-band path. RM1048 does not take the failover.</p>" +
       '<button type="button" class="act primary" data-act="floor-serial" data-device="' + entity.id + '">Open ACS serial</button>';
   } else if (managed && entity.kind === "GPU tray" && entity.rdp === "down") {
-    action = "<p>In-band RDP is down. The graphical failover is ACS KVM on MPU port " + entity.mpu + ".</p>" +
-      '<button type="button" class="act primary" data-act="rdp-failover" data-device="' + entity.id + '">Open KVM failover</button>';
-  } else if (managed && entity.kind === "GPU tray") {
-    action = "<p class=\"fine\">RDP is the in-band desktop. ACS KVM takes the session if that path drops.</p>" +
-      '<button type="button" class="act" data-act="rdp-open" data-device="' + entity.id + '">Open RDP</button>';
+    action = "<p>In-band RDP is down. The device view below offers the MPU2 KVM failover.</p>";
   } else if (managed) {
-    action = "<p class=\"fine\">BMC is still up. ACS serial is the out-of-band wire if this BMC drops.</p>" +
-      '<button type="button" class="act" data-act="floor-serial" data-device="' + entity.id + '">Open ACS serial</button>';
+    action = "";
   } else if (entity.kind === "Grid") {
     action = yardArt(entity) + "<p>The utility grid lands on a gantry outside the shell. One feeder is closed through the transformer and the power module, and it stops at the hall wall.</p>" +
       '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr">Open the feeder</button>';
@@ -1684,7 +1679,7 @@ export function serverInspector(entity) {
   const breaks = breakThisHtml(entity.id, breakEventsForEntity(entity));
   const ports = !isFacility(entity) && entity.load ? deviceViewHtml(entity) : "";
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + ports + breaks + powerHtml(entity.id) + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + action + ports + faces + heatNote + parts + inside + breaks + powerHtml(entity.id) + "</div>";
 }
 
 export function deviceParts(entity) {
@@ -1837,7 +1832,7 @@ export function renderInspector() {
       ". The same 3D rack as Operate › Rack. Pick a device in the rack for its details here.</p>" +
       powerHtml(rack.id) +
       breakThisHtml(rack.id, breakEventsForRack(rack.id)) +
-      '<p class="elev-actions"><button type="button" class="act" data-act="rack-positions">U positions</button></p>';
+      '<p class="elev-actions"><button type="button" class="act" data-act="rack-positions">Edit U positions</button></p>';
   } else if (level === "rack" && planOpen && !rack) {
     const gear = state.plan.placements.filter((item) => item.host === planOpen.id);
     body = "<h2>" + esc(planOpen.name) + "</h2><p class=\"fine\">" + freeU(planOpen.id) + "U free. Drop servers, switches, and PDUs into the enclosure.</p>" +
