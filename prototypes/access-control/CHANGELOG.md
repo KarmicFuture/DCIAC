@@ -2,6 +2,17 @@
 
 ## 2026-11-20
 
+Fleet rack drill-down (Operate › Fleet, `#/fleet`):
+
+- Each hall row has a "Show racks" button. It lists the hall's racks with open alarms
+  (count and worst priority), IT power against the rack's budget, and heat (Normal, Near
+  limit, Critical, BMC dark).
+- Sort the racks by Power (highest first, the default) or Alarms (alarmed racks first,
+  worst priority first). Per-rack alarm counts add up to the hall's count.
+- Each rack name opens that rack on the floor in the 3D rack view.
+- The Full demo's Fleet step opens Hall 1's racks sorted by alarms, so A14 is on top.
+- This finishes priority 2 in `DAILY_IMPROVEMENT.md`.
+
 Demos, simulations, and usability brought up to date with the new views. Every demo, Lab
 walk, simulator event, and main view was crawled on desktop and iPhone widths.
 

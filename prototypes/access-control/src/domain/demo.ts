@@ -5,6 +5,7 @@ import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { openRack, stopWalk } from "../views/floor";
 import { setRackPreset } from "../views/rack3d";
+import { setFleetDrill } from "../views/fleet";
 import { audit, userAudit } from "./audit";
 import { fireEvent, resetSimulation, revertEvent } from "./events";
 import { toggleBmc } from "./failover";
@@ -263,10 +264,11 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Fleet — every hall's alarms, IT power, and headroom on one page.",
+    pop: "Fleet — every hall's alarms, IT power, and headroom on one page. Hall 1's racks are listed with the alarmed ones first.",
     target: ".fleet-page",
     enter() {
       state.view = "fleet";
+      setFleetDrill("pod-a", "alarms");
     },
   },
   {
