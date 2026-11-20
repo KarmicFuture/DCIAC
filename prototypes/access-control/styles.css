@@ -3566,3 +3566,34 @@ button.act.launch.primary small { color: #d9d0c6; }
 .r3-stage.spinning .r3-world { transition: none; }
 .r3-stage:focus-visible { outline: 2px solid #e08a2e; outline-offset: 2px; }
 .r3-hint { align-self: center; margin-right: 4px; }
+
+/* Device view: ports by type and the ways in */
+.device-view { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.device-view h3 { margin: 0; }
+.device-view h4 { margin: 6px 0 4px; font-size: var(--text-sm); color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.dv-face { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; background: #2a2724; color: #eee8de; }
+.dv-face h4 { color: #b9b1a4; margin: 0 0 4px; }
+.dv-ports { display: flex; flex-wrap: wrap; gap: 6px; }
+.dv-port { display: flex; flex-direction: column; gap: 2px; min-width: 84px; padding: 6px 8px; border-radius: 6px; background: #3a3632; border-left: 4px solid var(--dv-c, #888); }
+.dv-port b { font-size: 12px; }
+.dv-port small { font-size: 10px; color: #c9c1b4; }
+.dv-to { font-size: 10px; color: #f2c58b; }
+.dv-jacks { display: flex; flex-wrap: wrap; gap: 2px; max-width: 200px; }
+.dv-jacks i { width: 9px; height: 7px; border-radius: 1px; background: var(--dv-c, #888); opacity: 0.85; }
+.dv-jacks.dense i { width: 6px; height: 5px; }
+.role-serial { --dv-c: #3fa66a; }
+.role-video, .role-usb { --dv-c: #8b6fd6; }
+.role-mgmt { --dv-c: #e08a2e; }
+.role-inband { --dv-c: #4f9bd9; }
+.role-data { --dv-c: #6f8fa6; }
+.role-power { --dv-c: #c9a227; }
+.dv-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: var(--text-sm); color: var(--muted); }
+.dv-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; background: var(--dv-c); vertical-align: -1px; }
+.dv-paths td { vertical-align: top; }
+.dv-paths td small { display: block; color: var(--muted); font-size: var(--text-sm); }
+.dv-paths td .act { margin: 0 4px 4px 0; }
+.dv-paths tr.best td { background: color-mix(in srgb, #3fa66a 12%, transparent); }
+.dv-paths tr.dv-why td { padding-top: 0; color: var(--muted); font-size: var(--text-sm); border-top: 0; }
+.dv-best { display: inline-block; padding: 1px 6px; border-radius: 10px; background: #1f6b45; color: #fff; font-size: 10px; vertical-align: 1px; }
+.dv-state.ok { color: #1f6b45; }
+.dv-state.held { color: #8a3030; }

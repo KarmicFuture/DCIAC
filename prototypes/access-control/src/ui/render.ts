@@ -445,6 +445,12 @@ export function onClick(event) {
   else if (act === "floor-go") goFloor(el.dataset.level);
   else if (act === "floor-serial") floorSerial(el.dataset.device);
   else if (act === "rdp-open") openSession(el.dataset.device, "rdp", "desktop", "");
+  else if (act === "copy-ssh") {
+    const text = el.dataset.text || "";
+    try { navigator.clipboard.writeText(text); } catch (err) { /* the toast still shows the command */ }
+    state.toast = "Copied: " + text;
+    render();
+  }
   else if (act === "rdp-drop" || act === "rdp-failover") failRdpToKvm(el.dataset.device);
   else if (act === "mp1000-kvm") launchMp1000Kvm(el.dataset.device);
   else if (act === "rdp-toggle") {

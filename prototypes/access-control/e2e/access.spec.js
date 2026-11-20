@@ -53,7 +53,7 @@ test("ReadOnly cannot cycle outlets or mount virtual media", async ({ page }) =>
   await expect(page.locator('[data-act="all-outlets"]')).toBeDisabled();
 
   await page.locator('nav [data-view="rack"]').click();
-  await page.getByRole("button", { name: /ACS KVM/ }).first().click();
+  await page.locator('.device-view tr[data-path="mpu-kvm"] [data-act="launch"]').first().click();
   await expect(page.locator("h1")).toHaveText("Operate");
   await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-selected", "true");
   const mount = page.locator('[data-act="mount"]');

@@ -2,6 +2,24 @@
 
 ## 2026-11-20
 
+Device view by device type (Operate › Rack device panel, and the floor device panel):
+
+- Every device opens a view built for its type: a GPU tray, a switch, a power shelf, or
+  a server. Its ports are drawn by role: serial, KVM, management, host LAN, data, and
+  power. Port lists follow the vendor documentation: GB200 NVL72 compute tray, SN2201,
+  ORv3 power shelf, and a 2U server like the PowerEdge R760.
+- Ports that are cabled show where they go: the serial console to its ACS-A14 port and
+  ttyS line, and video plus USB to its MPU2 port.
+- A "Ways in" table lists every path, out of band (ACS serial, MPU2 KVM, BMC) and in
+  band (SSH, RDP, or the shelf controller). Each path has its state and a button, and
+  the best out-of-band and best in-band paths are marked. The best path updates live.
+  A dark BMC is held. With no operating system, SSH and RDP show "No OS running" and
+  nothing in band is marked best. A dropped RDP offers the MPU2 KVM failover.
+- A switch shows its 48 RJ45 and 4 QSFP28 ports and says plainly that it has no KVM,
+  BMC, or RDP. A power shelf shows its six PSUs and its shelf controller.
+- The same view appears in Operate › Rack and on the floor. Buttons go through the
+  same session and console checks as before.
+
 One rack view (Floor › hall › click a rack, and Operate › Rack):
 
 - Clicking a rack on the floor now opens the same 3D rack as Operate › Rack, instead of

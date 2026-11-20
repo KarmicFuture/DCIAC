@@ -1,4 +1,5 @@
 import { deviceById, devices } from "../data/devices";
+import { deviceViewHtml } from "./deviceview";
 import { rackPointerDown, rackPointerMove, rackPointerUp, rackViewHtml } from "./rack3d";
 import { LIBRARY, MODELS, applyModels, catalogById, findRack, freeU, placementById } from "../data/library";
 import { elevationParts, elevationPointerDown, elevationPointerMove, elevationPointerUp, loadElevation } from "./elevation";
@@ -1681,8 +1682,9 @@ export function serverInspector(entity) {
   const faces = !isFacility(entity) && entity.load ? deviceFaces(entity) : "";
   const inside = faces ? "" : (!isFacility(entity) && entity.load ? deviceParts(entity) : "");
   const breaks = breakThisHtml(entity.id, breakEventsForEntity(entity));
+  const ports = !isFacility(entity) && entity.load ? deviceViewHtml(entity) : "";
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + breaks + powerHtml(entity.id) + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + ports + breaks + powerHtml(entity.id) + "</div>";
 }
 
 export function deviceParts(entity) {

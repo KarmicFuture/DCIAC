@@ -31,7 +31,7 @@ test("rack A14 is 3D with its devices and the rack PDU", async ({ page }) => {
   await page.locator('.r3-pdu-table [data-act="select"][data-device="tray-04"]').click();
   await expect(page.locator(".r3-pdu").first().locator('.r3-socket[data-outlet="7"]')).toHaveClass(/mine/);
   await expect(page.locator('.r3-pdu-table tr[data-outlet="7"]')).toHaveClass(/mine/);
-  await expect(page.locator(".detail h3")).toHaveText("GPU Tray 04");
+  await expect(page.locator(".detail > h3")).toHaveText("GPU Tray 04");
   expect(errors).toEqual([]);
 });
 
