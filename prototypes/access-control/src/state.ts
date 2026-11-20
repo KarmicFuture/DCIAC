@@ -123,6 +123,8 @@ export const state: AppState = {
   buildHall: "",
   onelineBuild: false,
   rackView: "angle",
+  rackYaw: -42,
+  rackPitch: -14,
   libraryOpen: false,
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },

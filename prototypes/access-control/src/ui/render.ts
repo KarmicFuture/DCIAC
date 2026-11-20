@@ -1,4 +1,5 @@
 import { html, render as litRender } from "lit-html";
+import { rackKey, rackSwallowsClick, setRackPreset } from "../views/rack3d";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import { assertWorld, deviceById } from "../data/devices";
 import {
@@ -215,6 +216,7 @@ export function syncFields() {
 }
 
 export function onClick(event) {
+  if (rackSwallowsClick()) return;
   let el = event.target.closest("[data-act]");
   if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour")) {
     const picked = pickDrill(event.clientX, event.clientY);
@@ -283,7 +285,7 @@ export function onClick(event) {
     }
   }
   else if (act === "build-hall-close") { state.buildHall = ""; render(); }
-  else if (act === "rack-view") { state.rackView = el.dataset.rackView || "angle"; render(); }
+  else if (act === "rack-view") { setRackPreset(el.dataset.rackView || "angle"); render(); }
   else if (act === "pdu-outlet") {
     state.view = "control";
     state.highlightOutlet = Number(el.dataset.outlet) || 0;
@@ -443,6 +445,12 @@ export function onClick(event) {
   else if (act === "floor-go") goFloor(el.dataset.level);
   else if (act === "floor-serial") floorSerial(el.dataset.device);
   else if (act === "rdp-open") openSession(el.dataset.device, "rdp", "desktop", "");
+  else if (act === "copy-ssh") {
+    const text = el.dataset.text || "";
+    try { navigator.clipboard.writeText(text); } catch (err) { /* the toast still shows the command */ }
+    state.toast = "Copied: " + text;
+    render();
+  }
   else if (act === "rdp-drop" || act === "rdp-failover") failRdpToKvm(el.dataset.device);
   else if (act === "mp1000-kvm") launchMp1000Kvm(el.dataset.device);
   else if (act === "rdp-toggle") {
@@ -632,6 +640,7 @@ export function onChange(event) {
 }
 
 export function onKeyDown(event) {
+  if (rackKey(event)) return;
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");
     if (typing) return;

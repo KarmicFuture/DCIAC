@@ -1,4 +1,6 @@
 import { deviceById, devices } from "../data/devices";
+import { deviceViewHtml } from "./deviceview";
+import { rackPointerDown, rackPointerMove, rackPointerUp, rackViewHtml } from "./rack3d";
 import { LIBRARY, MODELS, applyModels, catalogById, findRack, freeU, placementById } from "../data/library";
 import { elevationParts, elevationPointerDown, elevationPointerMove, elevationPointerUp, loadElevation } from "./elevation";
 import { powerHtml } from "./power";
@@ -344,6 +346,7 @@ function floorBoxAt(event) {
 }
 
 export function onPointerDown(event) {
+  if (rackPointerDown(event)) return;
   if (elevationPointerDown(event)) return;
   if (!state.user || event.button !== 0) return;
   if (state.view === "plan") {
@@ -390,6 +393,7 @@ export function onPointerDown(event) {
 }
 
 export function onPointerMove(event) {
+  if (rackPointerMove(event)) return;
   if (elevationPointerMove(event)) return;
   if (runtime.carry && event.pointerId === runtime.carry.id) {
     placeCarry(event);
@@ -412,6 +416,7 @@ export function onPointerMove(event) {
 }
 
 export function onPointerUp(event) {
+  if (rackPointerUp(event)) return;
   if (elevationPointerUp(event)) return;
   if (runtime.carry && event.pointerId === runtime.carry.id) {
     const moved = runtime.carry.moved;
@@ -1573,6 +1578,13 @@ function cabinetBay(rack) {
   return '<div class="rack-post"></div><div class="rack-bay stack">' + stackUnits(rack) + "</div>";
 }
 
+/* The floor drill-down uses the same 3D rack as Operate › Rack. Details for the rack
+   or the server picked in it open in the inspector on the right. */
+export function renderRackScene(rack, pod) {
+  return '<div class="scene rack-scene elevation" data-rack-host="' + esc(rack.id) + '" aria-label="' + esc(pod.name + " " + rack.name) + '">' +
+    rackViewHtml(rack.id, "floor") + "</div>";
+}
+
 export function renderChassis(rack, pod) {
   return '<div class="scene chassis-scene thermal elevation" data-rack-host="' + esc(rack.id) + '">' + hudHtml() +
     '<div class="rack-view" aria-label="' + esc(pod.name) + " " + esc(rack.name) + '"><div class="rack-cab">' +
@@ -1670,8 +1682,9 @@ export function serverInspector(entity) {
   const faces = !isFacility(entity) && entity.load ? deviceFaces(entity) : "";
   const inside = faces ? "" : (!isFacility(entity) && entity.load ? deviceParts(entity) : "");
   const breaks = breakThisHtml(entity.id, breakEventsForEntity(entity));
+  const ports = !isFacility(entity) && entity.load ? deviceViewHtml(entity) : "";
   return '<div data-load-for="' + entity.id + '"><p class="band-label ' + band + '">' + esc(bandLabel(band)) + " · " + score +
-    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + breaks + powerHtml(entity.id) + "</div>";
+    '%</p><h2>' + esc(entity.name) + "</h2><p class=\"fine\">" + esc(entity.kind) + (managed ? " · simulated BMC" : " · simulated load") + "</p>" + faces + heatNote + parts + inside + action + ports + breaks + powerHtml(entity.id) + "</div>";
 }
 
 export function deviceParts(entity) {
@@ -1821,7 +1834,7 @@ export function renderInspector() {
     body = entity ? serverInspector(entity) : '<p class="fine">Select a server.</p>';
   } else if (level === "rack" && rack) {
     body = "<h2>" + esc(rack.name) + "</h2><p class=\"fine\">" + esc(pod.name) +
-      ". The cabinet is the equipment. The bus bar is the rail on the right.</p>" +
+      ". The same 3D rack as Operate › Rack. Pick a device in the rack for its details here.</p>" +
       powerHtml(rack.id) +
       breakThisHtml(rack.id, breakEventsForRack(rack.id)) +
       '<p class="elev-actions"><button type="button" class="act" data-act="rack-positions">U positions</button></p>';
@@ -1915,7 +1928,7 @@ export function renderFloor() {
   const pod = podById(state.floor.podId);
   const rack = rackById(pod, state.floor.rackId);
   const onSite = state.floor.level === "site" || (state.floor.level === "feed" && !pod);
-  const scene = onSite ? renderSite() : (openedPlan ? renderPlanChassis(planOpen) : (chassis && rack ? renderChassis(rack, pod) : renderHall()));
+  const scene = onSite ? renderSite() : (openedPlan ? renderPlanChassis(planOpen) : (chassis && rack ? renderRackScene(rack, pod) : renderHall()));
   return '<div class="floor-page"><div class="plan-layout"><div class="floor-layout floor-fill" data-floor-level="' + esc(state.floor.level) + '">' + mountScene(scene) + "</div></div></div>";
 }
 

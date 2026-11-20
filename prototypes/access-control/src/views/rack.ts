@@ -7,8 +7,8 @@ import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { fruSummary } from "../ui/shell";
 import { conditionTone } from "./floor";
-import { rdpLauncher } from "./sessions";
 import { rack3dHtml } from "./rack3d";
+import { deviceViewHtml } from "./deviceview";
 
 export function uLabel(n) {
   return "U" + String(n).padStart(2, "0");
@@ -115,10 +115,7 @@ export function deviceDetail(d) {
   const outlet = outletByN(d.outlet);
   const leak = onLeak(d.id) ? "On the DI-1 rope" : "Not on the DI-1 rope";
   const failover = d.bmc === "down";
-  const rmSerialCap = failover ? "BMC dark · use ACS" : (state.rm1048 === "healthy" ? "SerialInterfaces/" + d.redfishId : "Plane dark");
-  const rmKvmCap = failover ? "BMC dark · use ACS" : (state.rm1048 === "healthy" ? "Graphical console" : "Plane dark");
   const acsClass = failover ? "primary" : "";
-  const rmClass = failover || state.rm1048 !== "healthy" ? "held" : "";
   const usb = d.usb
     ? launcher(d, "acs", "serial", "USB console", d.usb + " · OOB", "usb", acsClass)
     : "";
@@ -132,12 +129,7 @@ export function deviceDetail(d) {
     '<dt>KVM</dt><dd class="mono">MPU port ' + d.mpu + "</dd><dt>Outlet</dt><dd>Outlet " + d.outlet +
     " · " + esc(outlet.power) + "</dd><dt>Leak</dt><dd>" + esc(leak) + "</dd></dl>";
   return deviceFaces(d) + thermalCard(d) + "<h3>" + esc(d.name) + "</h3><p class=\"fine\">" + esc(d.kind) + " · " + uLabel(d.u) +
-    "</p>" + failoverBanner(d) + '<div class="launch-grid">' +
-    launcher(d, "acs", "serial", "ACS serial", d.tty + " · port " + d.port + " · out of band", "rs232", acsClass) +
-    launcher(d, "acs", "kvm", "ACS KVM", "MPU port " + d.mpu + " · HTML5", "", acsClass) +
-    launcher(d, "rm1048", "serial", "RM1048 serial", rmSerialCap, "", rmClass) +
-    launcher(d, "rm1048", "kvm", "RM1048 KVM", rmKvmCap, "", rmClass) +
-    "</div>" + usb + rdpLauncher(d) + failBox(d.id, "serial") + failBox(d.id, "kvm") + facts + wait +
+    "</p>" + failoverBanner(d) + deviceViewHtml(d) + usb + failBox(d.id, "serial") + failBox(d.id, "kvm") + facts + wait +
     '<p class="fine">Unbound and cross-rack launches are refused on the port map.</p>' +
     '<button type="button" class="act" data-act="nav" data-view="map">Open the port map</button>';
 }

@@ -14,6 +14,9 @@ Edit this file to steer the work. The task reads it from `main` each run.
 - Never weaken power-control confirmations, role permissions, leak or power interlocks,
   or the audit log unless a priority below explicitly asks for it.
 - Do not add Vertiv or Avocent branding.
+- Operate › Rack and the rack you open from the floor are one view. Both draw from
+  `rackViewHtml` in `src/views/rack3d.ts`. Change the rack view there so they stay the same.
+  Never fork one of them.
 - Build and publish the same way the repo already does: `npm run build`, then copy
   `dist/index.html` and `dist/assets/*` to the repository root, replacing the old
   hashed assets. Merging the pull request then updates the live site.

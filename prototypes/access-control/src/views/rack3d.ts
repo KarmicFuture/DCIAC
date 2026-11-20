@@ -1,7 +1,9 @@
 import { deviceById, devices } from "../data/devices";
 import { LEAK, outlets } from "../data/outlets";
-import { state } from "../state";
+import { runtime, state } from "../state";
 import { esc } from "../ui/format";
+import { PODS, entityById, rackById, rackEntities } from "../data/pods";
+import { render } from "../ui/schedule";
 import { conditionTone } from "./floor";
 
 /* Rack A14 in 3D: the cabinet, each device at its U, and the vertical rack PDU on
@@ -23,8 +25,101 @@ export const RACK_VIEWS = [
 ];
 
 function viewAngles() {
+  if (state.rackView === "custom") return { id: "custom", yaw: state.rackYaw, pitch: state.rackPitch };
   const view = RACK_VIEWS.find((row) => row[0] === state.rackView) || RACK_VIEWS[1];
   return { id: view[0] as string, yaw: view[2] as number, pitch: view[3] as number };
+}
+
+/* Free rotation. Drag the rack with a mouse or finger, or focus the stage and use the
+   arrow keys. The angle is shared, so both rack views turn the same way. */
+const PITCH_MIN = -60;
+const PITCH_MAX = 15;
+let spin: { id: number; x: number; y: number; yaw: number; pitch: number; moved: boolean } | null = null;
+let swallowClick = false;
+
+function clampPitch(p) {
+  return Math.max(PITCH_MIN, Math.min(PITCH_MAX, p));
+}
+
+function worldTransform(yaw, pitch) {
+  return "rotateX(" + pitch.toFixed(1) + "deg) rotateY(" + yaw.toFixed(1) + "deg)";
+}
+
+export function setRackPreset(id) {
+  const view = RACK_VIEWS.find((row) => row[0] === id) || RACK_VIEWS[1];
+  state.rackView = view[0] as string;
+  state.rackYaw = view[2] as number;
+  state.rackPitch = view[3] as number;
+}
+
+export function turnRack(dYaw, dPitch) {
+  const now = viewAngles();
+  state.rackView = "custom";
+  state.rackYaw = Math.round(now.yaw + dYaw);
+  state.rackPitch = clampPitch(Math.round(now.pitch + dPitch));
+}
+
+/* Turn the rack on screen without redrawing the page, so focus and the drag stay put. */
+function showAngles(stage) {
+  const world = stage.querySelector(".r3-world");
+  if (world) world.style.transform = worldTransform(state.rackYaw, state.rackPitch);
+  const tools = stage.parentElement ? stage.parentElement.querySelectorAll('[data-act="rack-view"][aria-pressed="true"]') : [];
+  tools.forEach((button) => button.removeAttribute("aria-pressed"));
+}
+
+export function rackPointerDown(event) {
+  const stage = event.target.closest && event.target.closest(".r3-stage");
+  if (!stage || event.button !== 0) return false;
+  if (event.target.closest("button")) return false;
+  const now = viewAngles();
+  spin = { id: event.pointerId, x: event.clientX, y: event.clientY, yaw: now.yaw, pitch: now.pitch, moved: false };
+  stage.setPointerCapture(event.pointerId);
+  stage.classList.add("spinning");
+  return true;
+}
+
+export function rackPointerMove(event) {
+  if (!spin || event.pointerId !== spin.id) return false;
+  const dx = event.clientX - spin.x;
+  const dy = event.clientY - spin.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) spin.moved = true;
+  const yaw = spin.yaw + dx * 0.5;
+  const pitch = clampPitch(spin.pitch - dy * 0.35);
+  state.rackView = "custom";
+  state.rackYaw = Math.round(yaw);
+  state.rackPitch = Math.round(pitch);
+  const stage = document.querySelector(".r3-stage");
+  if (stage) showAngles(stage);
+  return true;
+}
+
+export function rackPointerUp(event) {
+  if (!spin || event.pointerId !== spin.id) return false;
+  const moved = spin.moved;
+  spin = null;
+  document.querySelectorAll(".r3-stage.spinning").forEach((el) => el.classList.remove("spinning"));
+  if (moved) {
+    swallowClick = true;
+    setTimeout(() => { swallowClick = false; }, 0);
+  }
+  return true;
+}
+
+/* A drag that ends over a device must not also open it. */
+export function rackSwallowsClick() {
+  return swallowClick;
+}
+
+export function rackKey(event) {
+  const stage = event.target.closest && event.target.closest(".r3-stage");
+  if (!stage) return false;
+  const steps = { ArrowLeft: [-15, 0], ArrowRight: [15, 0], ArrowUp: [0, 8], ArrowDown: [0, -8] };
+  const step = steps[event.key];
+  if (!step) return false;
+  event.preventDefault();
+  turnRack(step[0], step[1]);
+  showAngles(stage);
+  return true;
 }
 
 function unitsOf(d) {
@@ -133,13 +228,14 @@ function uScale() {
   return place(-30, 0, CAB_D / 2, '<div class="r3-uscale">' + marks.join("") + "</div>");
 }
 
-function pduTable() {
+function pduTable(ctx = "operate") {
   const rows = outlets.map((o) => {
     const s = outletState(o);
     const mapped = o.deviceId ? deviceById(o.deviceId) : null;
-    const mine = state.selected && mapped && mapped.id === state.selected;
+    const picked = ctx === "operate" ? state.selected : state.floor.serverId;
+    const mine = picked && mapped && mapped.id === picked;
     return '<tr data-outlet="' + o.n + '"' + (mine ? ' class="mine"' : "") + '><td><button type="button" class="linkish" data-act="pdu-outlet" data-outlet="' + o.n + '">Outlet ' + o.n + "</button></td><td>" +
-      (mapped ? '<button type="button" class="linkish" data-act="select" data-device="' + esc(mapped.id) + '">' + esc(mapped.name) + "</button>" : '<span class="fine">Unbound</span>') +
+      (mapped ? '<button type="button" class="linkish" ' + (ctx === "operate" ? 'data-act="select" data-device="' : 'data-act="floor-server" data-server="') + esc(mapped.id) + '">' + esc(mapped.name) + "</button>" : '<span class="fine">Unbound</span>') +
       '</td><td><span class="r3-dot ' + s + '"></span>' + esc(STATE_WORD[s]) + "</td></tr>";
   }).join("");
   return '<div class="r3-pdu-table"><h3>Rack PDU A14</h3><p class="fine">Read only here. Switch outlets on Control, where role, leak interlock, and confirmation checks apply.</p>' +
@@ -154,16 +250,161 @@ export const R3_LEGEND = '<div class="r3-legend"><span><span class="r3-dot on"><
 /* Any rack in 3D: the view buttons and the stage. */
 export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
   const view = viewAngles();
-  const views = RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
+  const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
     (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("");
   return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>" +
-    '<div class="r3-stage"><div class="r3-world" data-view="' + view.id + '" style="transform:rotateX(' + view.pitch + "deg) rotateY(" + view.yaw + 'deg)">' +
+    '<div class="r3-stage" tabindex="0" id="r3-stage" data-focus-key="r3-stage" role="img" aria-label="' + esc(name) +
+    ' in 3D. Drag to rotate, or use the arrow keys."><div class="r3-world" data-view="' + view.id + '" style="transform:' + worldTransform(view.yaw, view.pitch) + '">' +
     cabinet(name) + uScale() + units.map(unitBox).join("") + pdus.map(pduBox).join("") + "</div></div>";
 }
 
+/* One rack view everywhere: Operate › Rack and the floor drill-down both build the
+   rack from the same model and draw it with the same scene. Only what a click does
+   differs: Operate selects the device, the floor opens it on the floor. */
+
+const mountCache: Record<string, any[]> = {};
+const loading: Record<string, boolean> = {};
+
+function fetchMounts(rackId) {
+  if (loading[rackId] || mountCache[rackId]) return;
+  loading[rackId] = true;
+  fetch("/api/v1/racks/" + encodeURIComponent(rackId) + "/elevation", { cache: "no-store" })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((body) => {
+      mountCache[rackId] = body && Array.isArray(body.mounts) ? body.mounts : [];
+      render();
+    })
+    .catch(() => { mountCache[rackId] = []; })
+    .finally(() => { loading[rackId] = false; });
+}
+
+function mountsFor(rackId) {
+  const live = runtime.elevation;
+  if (live && live.rackId === rackId && Array.isArray(live.mounts)) return live.mounts;
+  if (!mountCache[rackId]) fetchMounts(rackId);
+  return mountCache[rackId] || null;
+}
+
+/* Model names from the repository can carry vendor branding. The rack shows the
+   product line only. */
+export function unbranded(text) {
+  return String(text || "").replace(/\b(vertiv|avocent|geist|liebert)\b/gi, "").replace(/\s+/g, " ").trim();
+}
+
+function unitKlass(category) {
+  const c = String(category || "").toLowerCase();
+  if (c.indexOf("switch") >= 0) return "net";
+  if (c.indexOf("shelf") >= 0 || c.indexOf("power") >= 0) return "shelf";
+  if (c.indexOf("gpu") >= 0) return "gpu";
+  return "srv";
+}
+
+function unitAct(id, ctx) {
+  if (ctx === "operate") return deviceById(id) ? 'data-act="select" data-device="' + esc(id) + '"' : "disabled";
+  return entityById(id) ? 'data-act="floor-server" data-server="' + esc(id) + '"' : "disabled";
+}
+
+function isOn(id, ctx) {
+  return ctx === "operate" ? state.selected === id : state.floor.serverId === id;
+}
+
+function darkFor(id) {
+  const d = deviceById(id);
+  const o = d ? outlets.find((item) => item.n === d.outlet) : null;
+  return !!(o && outletState(o) === "off");
+}
+
+function selectedOutlet(ctx) {
+  const d = deviceById(ctx === "operate" ? state.selected : state.floor.serverId);
+  return d && d.rack === "A14" ? d.outlet : 0;
+}
+
+function fromMounts(rackId, mounts, ctx) {
+  const units: Rack3dUnit[] = mounts.filter((item) => item.uHeight && item.uPosition).map((item) => {
+    const d = deviceById(item.assetTag);
+    const id = d ? d.id : item.assetTag;
+    const entity = entityById(id);
+    const model = unbranded(item.model);
+    return {
+      id,
+      label: item.assetTag,
+      u: Number(item.uPosition),
+      units: Math.max(1, Number(item.uHeight) || 1),
+      klass: unitKlass(item.category),
+      on: isOn(id, ctx),
+      dark: darkFor(id),
+      led: entity ? conditionTone(entity).color : undefined,
+      act: unitAct(id, ctx),
+      rear: item.assetTag + (model ? " · " + model : "") + (d && d.outlet ? " · O" + d.outlet : ""),
+      aria: (d ? d.name : item.assetTag) + (model ? ", " + model : "") + ", U" + item.uPosition + (d && d.outlet ? ", outlet " + d.outlet : ""),
+    };
+  });
+  let live = rackId === "A14";
+  const pdus: Rack3dPdu[] = mounts.filter((item) => !item.uHeight && String(item.category || "").toUpperCase() === "PDU").map((item, index) => {
+    const count = Math.max(1, Math.min(48, Number(item.powerPorts) || 24));
+    const side = item.side || (index % 2 === 0 ? "right" : "left");
+    let sockets: Rack3dSocket[];
+    if (live) {
+      /* Rack A14's first rack PDU carries the live outlets shown on Control. */
+      const known = a14Sockets(selectedOutlet(ctx));
+      sockets = Array.from({ length: count }, (_, i) => known[i] || { n: i + 1, state: "idle", title: item.assetTag + " port " + (i + 1) + " · Unbound" });
+      live = false;
+    } else {
+      sockets = Array.from({ length: count }, (_, i) => ({ n: i + 1, state: "idle", title: item.assetTag + " port " + (i + 1) + " · No live reading" }));
+    }
+    return { id: item.id, label: item.assetTag, side, sockets };
+  });
+  return { units, pdus };
+}
+
+/* Before the repository answers, or for a rack it has nothing in: rack A14 from its
+   live devices, any other rack from its simulated servers. */
+function fallback(rackId, ctx) {
+  if (rackId === "A14") {
+    const units = devices.filter((d) => d.u).map((d) => Object.assign(deviceUnit(d), { on: isOn(d.id, ctx), act: unitAct(d.id, ctx) }));
+    return { units, pdus: [{ id: "pdu-a14", label: "PDU A14", side: "right", sockets: a14Sockets(selectedOutlet(ctx)) }] };
+  }
+  const pod = PODS.find((item) => (item.racks || []).some((rack) => rack.id === rackId));
+  const rack = pod ? rackById(pod, rackId) : null;
+  const entities = rack ? rackEntities(rack) : [];
+  let top = 40;
+  const units: Rack3dUnit[] = entities.map((entity) => {
+    const size = entity.kind === "Switch" ? 1 : 2;
+    const u = entity.kind === "Switch" ? 22 : (/shelf/i.test(entity.kind) ? 6 : top);
+    if (entity.kind === "GPU tray") top -= 2;
+    return {
+      id: entity.id,
+      label: entity.name,
+      u,
+      units: size,
+      klass: entity.kind === "Switch" ? "net" : (/shelf/i.test(entity.kind) ? "shelf" : "gpu"),
+      on: isOn(entity.id, ctx),
+      led: conditionTone(entity).color,
+      act: unitAct(entity.id, ctx),
+      rear: entity.name,
+    };
+  });
+  return { units, pdus: [] };
+}
+
+export function rackModel(rackId, ctx = "floor") {
+  const mounts = mountsFor(rackId);
+  if (mounts && mounts.some((item) => item.uHeight && item.uPosition)) return fromMounts(rackId, mounts, ctx);
+  const base = fallback(rackId, ctx);
+  if (mounts && rackId !== "A14") base.pdus = fromMounts(rackId, mounts, ctx).pdus;
+  return base;
+}
+
+export function rackViewHtml(rackId, ctx = "floor") {
+  const model = rackModel(rackId, ctx);
+  const live = rackId === "A14";
+  const note = model.pdus.length
+    ? (live ? "Rack PDU sockets show live outlet state. From the Rear view, click a lit socket to open it on Control." : "Rack PDUs show their ports. This rack has no live outlet readings.")
+    : "No rack PDU is recorded on this rack.";
+  return '<div class="rack3d" data-rack3d="' + esc(rackId) + '">' + rackSceneHtml("Rack " + rackId, model.units, model.pdus) + R3_LEGEND +
+    '<p class="fine r3-note">' + esc(note) + "</p>" + (live ? pduTable(ctx) : "") + "</div>";
+}
+
 export function rack3dHtml() {
-  const selected = deviceById(state.selected);
-  const units = devices.filter((d) => d.u).map(deviceUnit);
-  const pdu = { id: "pdu-a14", label: "PDU A14", side: "right", sockets: a14Sockets(selected ? selected.outlet : 0) };
-  return '<div class="rack3d">' + rackSceneHtml("Rack A14", units, [pdu]) + R3_LEGEND + pduTable() + "</div>";
+  return rackViewHtml("A14", "operate");
 }

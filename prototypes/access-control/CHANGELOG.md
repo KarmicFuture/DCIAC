@@ -1,5 +1,42 @@
 # Changelog
 
+## 2026-11-20
+
+Device view by device type (Operate › Rack device panel, and the floor device panel):
+
+- Every device opens a view built for its type: a GPU tray, a switch, a power shelf, or
+  a server. Its ports are drawn by role: serial, KVM, management, host LAN, data, and
+  power. Port lists follow the vendor documentation: GB200 NVL72 compute tray, SN2201,
+  ORv3 power shelf, and a 2U server like the PowerEdge R760.
+- Ports that are cabled show where they go: the serial console to its ACS-A14 port and
+  ttyS line, and video plus USB to its MPU2 port.
+- A "Ways in" table lists every path, out of band (ACS serial, MPU2 KVM, BMC) and in
+  band (SSH, RDP, or the shelf controller). Each path has its state and a button, and
+  the best out-of-band and best in-band paths are marked. The best path updates live.
+  A dark BMC is held. With no operating system, SSH and RDP show "No OS running" and
+  nothing in band is marked best. A dropped RDP offers the MPU2 KVM failover.
+- A switch shows its 48 RJ45 and 4 QSFP28 ports and says plainly that it has no KVM,
+  BMC, or RDP. A power shelf shows its six PSUs and its shelf controller.
+- The same view appears in Operate › Rack and on the floor. Buttons go through the
+  same session and console checks as before.
+
+One rack view (Floor › hall › click a rack, and Operate › Rack):
+
+- Clicking a rack on the floor now opens the same 3D rack as Operate › Rack, instead of
+  the flat cabinet. That includes the Front, Angle, Side and Rear views, the rack PDUs on
+  the rear rails, the legend, and the Rack PDU A14 table. Rack details, power path and
+  "Break this" stay in the panel on the right. Picking a device in the rack shows its
+  details there, and the rack stays in 3D.
+- Both places, and the U positions 3D view, now draw from one shared rack view, so
+  they stay the same. Operate › Rack now also shows both of rack A14's rPDUs from the
+  asset repository. rPDU-A carries the live outlets.
+- Racks with nothing in the asset repository show their simulated servers.
+- `DAILY_IMPROVEMENT.md` now has a rule that the two rack views stay one view.
+- Both rack views rotate freely. Drag the rack with a mouse or finger to turn it, tilting
+  from about 60° above to 15° below. You can also focus the rack and use the arrow keys.
+  Front, Angle, Side and Rear still snap to set views. The angle carries between the two
+  views, and dragging across a device turns the rack without opening the device.
+
 ## 2026-11-19
 
 Floor rack drill-down in 3D with rack PDUs (Floor › hall › rack):
