@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-20
+
+One rack view (Floor › hall › click a rack, and Operate › Rack):
+
+- Clicking a rack on the floor now opens the same 3D rack as Operate › Rack, instead of
+  the flat cabinet. That includes the Front, Angle, Side and Rear views, the rack PDUs on
+  the rear rails, the legend, and the Rack PDU A14 table. Rack details, power path and
+  "Break this" stay in the panel on the right. Picking a device in the rack shows its
+  details there, and the rack stays in 3D.
+- Both places, and the U positions 3D view, now draw from one shared rack view, so
+  they stay the same. Operate › Rack now also shows both of rack A14's rPDUs from the
+  asset repository. rPDU-A carries the live outlets.
+- Racks with nothing in the asset repository show their simulated servers.
+- `DAILY_IMPROVEMENT.md` now has a rule that the two rack views stay one view.
+
 ## 2026-11-19
 
 Floor rack drill-down in 3D with rack PDUs (Floor › hall › rack):

@@ -44,7 +44,7 @@ test("a device box opens the server, and 2D brings back the editable elevation",
   await expect(scene).toBeVisible();
   await scene.locator('[data-act="rack-view"][data-rack-view="front"]').click();
   await page.waitForTimeout(600);
-  await scene.locator('.r3-dev[data-dev] [data-act="elev-device"][data-tag="tray-03"]').click();
+  await scene.locator('.r3-dev [data-act="floor-server"][data-server="tray-03"]').click();
   await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/floor/pod-a/A14/tray-03");
 
   await page.evaluate(() => { location.hash = "#/floor/pod-a/A14"; });
@@ -54,11 +54,11 @@ test("a device box opens the server, and 2D brings back the editable elevation",
   await expect(page.locator(".elev-scene .r3-stage")).toHaveCount(0);
 });
 
-test("an empty rack in another hall shows an empty 3D cabinet", async ({ page }) => {
+test("a rack with nothing in the repository shows its simulated servers in 3D", async ({ page }) => {
   await signIn(page);
   await page.evaluate(() => { location.hash = "#/floor/hall-10/H10-01"; });
   const scene = page.locator(".elev-scene.is-3d");
   await expect(scene).toBeVisible();
-  await expect(scene.locator(".r3-dev")).toHaveCount(0);
+  expect(await scene.locator(".r3-dev").count()).toBeGreaterThan(0);
   await expect(scene).toContainText("No rack PDU is recorded on this rack.");
 });
