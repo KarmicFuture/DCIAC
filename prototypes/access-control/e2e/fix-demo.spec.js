@@ -22,8 +22,10 @@ test("AI fix demo: alarm, serial session, AI diagnosis, automatic fix, verified"
   await expect(page.locator(".demo-kicker")).toContainText("AI fix demo · 1 of 11");
   await expect(caption(page)).toContainText("acs.watch logs in");
 
-  // 2-3: the tray reboots and acs.watch raises a P1.
+  // 2-3: the tray reboots; its device view shows no OS in band, and acs.watch raises a P1.
   await next(page);
+  await expect(page.locator('.device-view tr[data-path="ssh"]')).toContainText("No OS running");
+  await expect(page.locator('.device-view tr.best[data-band="oob"]')).toHaveAttribute("data-path", "acs-serial");
   await next(page);
   await expect(caption(page)).toContainText("raises a P1");
   const alarmRow = page.locator('summary[data-alarm="watch-tray-05"]');

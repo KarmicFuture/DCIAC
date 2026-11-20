@@ -81,14 +81,22 @@ function applyFloor(rest) {
   }
   state.floor.rackId = rackId;
   state.floor.rowId = rowFor(state.floor.podId, state.floor.rackId);
+  /* A rack link opens the same 3D rack view as clicking the rack; /u opens the
+     U positions editor. */
+  state.inspectorOpen = true;
   if (!rest[2]) {
+    state.floor.level = "rack";
+    loadElevation(state.floor.rackId);
+    return;
+  }
+  if (rest[2] === "u") {
     state.floor.level = "elevation";
     loadElevation(state.floor.rackId);
     return;
   }
   const serverId = decodeURIComponent(rest[2]);
   if (!entityById(serverId)) {
-    state.floor.level = "elevation";
+    state.floor.level = "rack";
     loadElevation(state.floor.rackId);
     missing("There is no device " + serverId + " in rack " + rackId + ". Showing the rack.");
     return;
@@ -212,7 +220,8 @@ export function routeFromState() {
         : "#/floor/feed/" + encodeURIComponent(floor.feedId || "");
     } else if (floor.level === "pod") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a");
     else if (floor.level === "row") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/row/" + encodeURIComponent(floor.rowId || "");
-    else if (floor.level === "rack" || floor.level === "elevation") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14");
+    else if (floor.level === "rack") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14");
+    else if (floor.level === "elevation") path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14") + "/u";
     else if (floor.level === "server" || floor.level === "part") {
       path = "#/floor/" + encodeURIComponent(floor.podId || "pod-a") + "/" + encodeURIComponent(floor.rackId || "A14") + "/" + encodeURIComponent(floor.serverId || "");
       if (floor.level === "part" && floor.partId) path += "/" + encodeURIComponent(floor.partId);

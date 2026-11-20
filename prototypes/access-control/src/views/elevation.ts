@@ -218,7 +218,7 @@ function detail(data) {
     stat("Power ports", numbers.powerPortsUsed + " used · " + powerFree) +
     stat("Network ports", numbers.netPortsUsed + " used · " + netFree) +
     "</div><p class=\"fine\">Showing the " + face + ".</p>" + networkHtml(data) + powerHtml(data.rackId) + "<h3>Racks in this hall</h3><div class=\"elev-racks\">" + racks + "</div>" +
-    '<p class="elev-actions"><button type="button" class="act" data-act="elev-chassis">3D chassis</button></p>';
+    '<p class="elev-actions"><button type="button" class="act" data-act="elev-chassis">Back to the rack view</button></p>';
 }
 
 export function elevationParts() {

@@ -46,3 +46,18 @@ test("fleet view fits an iPhone width", async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("fleet shows simulated power loss per hall", async ({ page }) => {
+  await signIn(page);
+  await page.evaluate(() => { location.hash = "#/fleet"; });
+  await expect(page.locator(".fleet-feed")).toHaveCount(0);
+  await page.evaluate(() => window.AccessDemo.fireEvent("feeders-both-loss", "", { quiet: true, stay: true }));
+  await page.evaluate(() => { location.hash = "#/floor"; });
+  await page.evaluate(() => { location.hash = "#/fleet"; });
+  await expect(page.locator(".fleet-feed.lost")).toHaveCount(10);
+  await expect(page.locator(".fleet-sim")).toContainText("Simulation:");
+  await page.evaluate(() => window.AccessDemo.resetSimulation());
+  await page.evaluate(() => { location.hash = "#/floor"; });
+  await page.evaluate(() => { location.hash = "#/fleet"; });
+  await expect(page.locator(".fleet-feed")).toHaveCount(0);
+});

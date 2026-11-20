@@ -3597,3 +3597,13 @@ button.act.launch.primary small { color: #d9d0c6; }
 .dv-best { display: inline-block; padding: 1px 6px; border-radius: 10px; background: #1f6b45; color: #fff; font-size: 10px; vertical-align: 1px; }
 .dv-state.ok { color: #1f6b45; }
 .dv-state.held { color: #8a3030; }
+.fleet-feed { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 10px; font-size: 11px; color: #fff; }
+.fleet-feed.risk { background: #a85a24; }
+.fleet-feed.lost { background: #8a3030; }
+.fleet-sim { margin: 4px 0 0; font-size: var(--text-sm); color: #a85a24; }
+.dv-paths th:last-child, .dv-paths td:last-child { width: 1%; white-space: nowrap; }
+.dv-paths tr.dv-why td:last-child { width: auto; white-space: normal; }
+.dv-go { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dv-go .act { margin: 0; }
+.inspector .device-view h3 { font-size: var(--text-sm); }
+.inspector .dv-port { min-width: 72px; }

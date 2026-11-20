@@ -245,7 +245,7 @@ export function mockExplain(input: ExplainInput): ExplainResult {
       "In-band remote desktop on " + name + " is down. The automatic login on " + tty + " read that loss.",
       input.lines,
       ["rdp", "kvm"],
-      "The desktop failover is ACS KVM. RM1048 does not take it.",
+      "The desktop failover is MPU2 KVM. RM1048 does not take it.",
       90,
       "open-acs-kvm"
     );
@@ -381,11 +381,11 @@ export function gateAction(input: ExplainInput, result: ExplainResult): GatedAct
       return { suggestion, label: "Open ACS serial", enabled: false, reason: "ACS-A14 opens consoles only inside rack A14." };
     }
     if (suggestion === "open-acs-kvm" && !mapped.mpu) {
-      return { suggestion, label: "Open ACS KVM", enabled: false, reason: "This device has no MPU KVM port." };
+      return { suggestion, label: "Open MPU2 KVM", enabled: false, reason: "This device has no MPU2 KVM port." };
     }
     return {
       suggestion,
-      label: suggestion === "open-acs-kvm" ? "Open ACS KVM" : "Open ACS serial",
+      label: suggestion === "open-acs-kvm" ? "Open MPU2 KVM" : "Open ACS serial",
       enabled: true,
       reason: "",
     };

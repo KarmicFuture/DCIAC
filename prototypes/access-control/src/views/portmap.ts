@@ -51,7 +51,7 @@ export function mapRows() {
       target: d.name,
       rack: "A14",
       bind: "Bound",
-      button: { type: "launch", device: d.id, path: "acs", sessionType: "kvm", medium: "", label: "ACS KVM" },
+      button: { type: "launch", device: d.id, path: "acs", sessionType: "kvm", medium: "", label: "MPU2 KVM" },
     });
   });
   rows.push({

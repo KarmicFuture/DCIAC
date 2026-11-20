@@ -30,7 +30,7 @@ export function sessionTitle(s) {
   if (s.path === "rm1048" && s.type === "serial") return "RM1048 · Redfish serial";
   if (s.path === "rm1048" && s.type === "kvm") return "RM1048 · KVM";
   if (s.type === "kvm" && s.rdpFailover) return "Path ACS · KVM failover";
-  if (s.type === "kvm") return "Path ACS · MPU KVM";
+  if (s.type === "kvm") return "MPU2 KVM";
   if (s.medium === "usb") return "Path ACS · USB console";
   return "Path ACS · serial";
 }
@@ -39,7 +39,7 @@ export function sessionLocator(d, s) {
   if (s.type === "desktop") return d.host + " · RDP 3389";
   if (s.path === "rm1048" && s.type === "serial") return rmSerialUri(d);
   if (s.path === "rm1048" && s.type === "kvm") return rmKvmUri(d);
-  if (s.type === "kvm") return "MPU port " + d.mpu;
+  if (s.type === "kvm") return "MPU2 port " + d.mpu;
   if (s.medium === "usb") return "USB-1";
   return d.tty + " · port " + d.port;
 }
@@ -48,7 +48,7 @@ export function sessionDetail(d, path, type, medium) {
   if (type === "desktop") return d.host + " · RDP 3389 · in-band";
   if (path === "rm1048" && type === "serial") return rmSerialUri(d);
   if (path === "rm1048" && type === "kvm") return rmKvmUri(d) + (mp1000Launches.has(deviceId(d) + ":rm1048:kvm") ? " · launched from MP1000" : "");
-  if (type === "kvm") return "MPU port " + d.mpu + " · HTML5 · path ACS";
+  if (type === "kvm") return "MPU2 port " + d.mpu + " · HTML5 · path ACS";
   if (medium === "usb") return "USB-1 · path ACS";
   return d.tty + " · port " + d.port + " · path ACS";
 }
@@ -63,20 +63,20 @@ export function sessionNote(d, s) {
   }
   if (s.type === "desktop") {
     return d.rdp === "down"
-      ? "In-band remote desktop is down. The failover is ACS KVM, not RM1048."
-      : "In-band remote desktop. ACS KVM is the out-of-band graphical path if this drops.";
+      ? "In-band remote desktop is down. The failover is MPU2 KVM, not RM1048."
+      : "In-band remote desktop. MPU2 KVM is the out-of-band graphical path if this drops.";
   }
   if (s.path === "acs" && s.type === "kvm") {
-    if (s.rdpFailover || d.rdp === "down") return "RDP failed over to this MPU KVM. RM1048 does not take the desktop failover.";
+    if (s.rdpFailover || d.rdp === "down") return "RDP failed over to this MPU2 KVM. RM1048 does not take the desktop failover.";
     if (d.bmc === "down") return "Out-of-band video on MPU. The BMC failed over to ACS, not to RM1048.";
-    return "Device chosen on the ACS port map. Video is MPU port " + d.mpu + ". Serial is a separate path.";
+    return "Device chosen on the ACS port map. Video is MPU2 port " + d.mpu + ". Serial is a separate path.";
   }
   if (s.path === "acs" && s.type === "serial") {
     const kind = consoleKind(d);
     const face = kind === "ios" ? "Cisco IOS prompt" : (kind === "uefi" ? "BMC and UEFI shell" : "Linux login");
     if (d.serialOnly) return face + " on " + d.name + ". This port is that server's console.";
     if (d.bmc === "down") return face + " on ACS. The BMC failed over to this port, not to RM1048.";
-    return face + " on " + d.name + ". Video stays on the MPU KVM path.";
+    return face + " on " + d.name + ". Video stays on the MPU2 KVM path.";
   }
   if (d.bmc === "down") return "RM1048 is the in-band plane. It does not take the BMC failover.";
   return "This path is the RM1048 in-band plane.";
@@ -224,7 +224,7 @@ export function openSession(deviceId, path, type, medium) {
     const session = ensureSession(mapped, "rdp", "desktop");
     state.view = "sessions";
     state.focusSession = session.id;
-    state.toast = mapped.rdp === "down" ? mapped.name + " RDP is down. Fail over to ACS KVM." : "";
+    state.toast = mapped.rdp === "down" ? mapped.name + " RDP is down. Fail over to MPU2 KVM." : "";
     render();
     return;
   }
@@ -487,7 +487,7 @@ export function failRdpToKvm(id) {
       role: "appliance",
       action: "RDP path lost",
       asset: mapped.name,
-      detail: "in-band RDP failed over to MPU KVM port " + mapped.mpu,
+      detail: "in-band RDP failed over to MPU2 KVM port " + mapped.mpu,
     });
   }
   if (!runtime.sim.stay) {
@@ -495,7 +495,7 @@ export function failRdpToKvm(id) {
     state.focusSession = kvm.id;
     state.labOpen = false;
   }
-  state.toast = mapped.name + " RDP lost. Failover is ACS KVM, not RM1048.";
+  state.toast = mapped.name + " RDP lost. Failover is MPU2 KVM, not RM1048.";
   render();
 }
 

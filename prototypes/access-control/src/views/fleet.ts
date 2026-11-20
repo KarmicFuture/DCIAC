@@ -1,5 +1,7 @@
 import { PLANT, PODS, entityById, heatBand, rackEntities } from "../data/pods";
 import { activeAlarms } from "../ui/alarms";
+import { impact } from "../domain/events";
+import { runtime } from "../state";
 import { esc } from "../ui/format";
 
 export type HallSummary = {
@@ -12,6 +14,7 @@ export type HallSummary = {
   worst: number;
   itKw: number;
   capKw: number;
+  feed: string;
 };
 
 /* The hall an alarm belongs to. Devices on ACS-A14 carry no pod, so they sit in
@@ -30,8 +33,16 @@ function rackKw(rack) {
   return (PLANT.kwPerRack * avg) / 100;
 }
 
+/* The hall's power feed under the simulator: normal, at risk (redundancy gone or
+   on the affected path), or lost. */
+function feedState(report, hallId) {
+  if (!report || !report.active || !report.affected || !report.affected[hallId]) return "normal";
+  return report.loadLost ? "lost" : "risk";
+}
+
 export function fleetSummary(): HallSummary[] {
   const alarms = activeAlarms();
+  const report = impact(runtime.sim);
   return PODS.map((pod) => {
     const racks = pod.racks || [];
     let hot = 0;
@@ -54,6 +65,7 @@ export function fleetSummary(): HallSummary[] {
       worst: mine.length ? Math.min(...mine.map((alarm) => alarm.pri)) : 0,
       itKw,
       capKw: racks.length * PLANT.kwPerRack,
+      feed: feedState(report, pod.id),
     };
   });
 }
@@ -72,6 +84,12 @@ function alarmCell(hall: HallSummary) {
     hall.alarms + " · worst P" + hall.worst;
 }
 
+function simNote() {
+  const report = impact(runtime.sim);
+  if (!report || !report.active || !report.summary) return "";
+  return '<p class="fleet-sim" role="status">Simulation: ' + esc(report.summary) + "</p>";
+}
+
 export function renderFleet() {
   const halls = fleetSummary();
   const total = halls.reduce((acc, hall) => ({
@@ -86,7 +104,8 @@ export function renderFleet() {
     return '<tr data-hall="' + esc(hall.id) + '"' + (hall.worst === 1 ? ' class="fleet-p1"' : "") + ">" +
       '<td><button type="button" class="act" data-act="oneline-hall" data-pod="' + esc(hall.id) + '">' + esc(hall.name) + "</button></td>" +
       '<td data-col="alarms">' + alarmCell(hall) + "</td>" +
-      '<td data-col="power">' + mw(hall.itKw) + " of " + mw(hall.capKw) + " · " + load + "%</td>" +
+      '<td data-col="power">' + mw(hall.itKw) + " of " + mw(hall.capKw) + " · " + load + "%" +
+      (hall.feed === "normal" ? "" : ' <span class="fleet-feed ' + hall.feed + '">' + (hall.feed === "lost" ? "Power lost" : "At risk") + "</span>") + "</td>" +
       '<td data-col="headroom">' + mw(Math.max(0, hall.capKw - hall.itKw)) + "</td>" +
       '<td data-col="racks">' + hall.racks + (hall.critical ? " · " + hall.critical + " critical" : "") +
       (hall.hot ? " · " + hall.hot + " near" : "") + "</td></tr>";
@@ -97,7 +116,8 @@ export function renderFleet() {
     '<div class="fleet-tile"><span>IT load</span><b>' + mw(total.itKw) + "</b><small>" + pct(total.itKw, total.capKw) + "% of " + mw(total.capKw) + "</small></div>" +
     '<div class="fleet-tile"><span>Critical racks</span><b>' + total.critical + "</b><small>of " + total.racks + "</small></div></div>";
   return '<div class="fleet-page"><div class="oneline-head"><div><h2>Fleet</h2>' +
-    '<p class="ol-summary">Every hall at a glance. Alarm, power and capacity readings update with the live simulation. Open a hall to see its racks.</p></div></div>' +
+    '<p class="ol-summary">Every hall at a glance. Alarm, power and capacity readings update with the live simulation. Open a hall to see its racks.</p>' +
+    simNote() + "</div></div>" +
     tiles + '<section class="panel"><h2>Halls</h2><div class="table-wrap"><table class="fleet-table"><thead><tr><th>Hall</th><th>Alarms</th><th>IT power</th><th>Headroom</th><th>Racks</th></tr></thead><tbody>' +
     rows + "</tbody></table></div></section></div>";
 }

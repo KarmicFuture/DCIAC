@@ -14,8 +14,8 @@ export function mp1000Targets() {
 }
 
 export function mp1000Status(d) {
-  if (d.bmc === "down") return { ok: false, text: "BMC dark. Use ACS KVM." };
-  if (state.rm1048 !== "healthy") return { ok: false, text: "RM1048 plane dark. Use ACS KVM." };
+  if (d.bmc === "down") return { ok: false, text: "BMC dark. Use MPU2 KVM." };
+  if (state.rm1048 !== "healthy") return { ok: false, text: "RM1048 plane dark. Use MPU2 KVM." };
   return { ok: true, text: "Ready" };
 }
 
@@ -40,7 +40,7 @@ export function mp1000Panel() {
       "</td><td>RM1048 · A14</td><td" + (status.ok ? "" : ' class="reason"') + ">" + esc(status.text) + "</td><td>" + button + "</td></tr>";
   }).join("");
   return '<section class="panel mp1000-panel"><h2>MP1000 devices</h2>' +
-    '<p class="fine">The MP1000 management platform lists every server behind every RM1048 rack manager. Launch KVM opens an HTML5 session through the rack\'s RM1048 to the server\'s BMC. If the BMC is dark, the out-of-band path is ACS KVM.</p>' +
+    '<p class="fine">The MP1000 management platform lists every server behind every RM1048 rack manager. Launch KVM opens an HTML5 session through the rack\'s RM1048 to the server\'s BMC. If the BMC is dark, the out-of-band path is MPU2 KVM.</p>' +
     '<div class="table-wrap"><table><thead><tr><th>Device</th><th>Host</th><th>Rack manager</th><th>KVM</th><th></th></tr></thead><tbody>' +
     rows + "</tbody></table></div></section>";
 }

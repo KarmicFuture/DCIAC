@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: "The rack",
-    copy: "The elevation is the rack. Devices are drawn to their U height. Network cables an operator chooses to track appear here, on the rack, and nowhere else.",
+    copy: "The rack is drawn in 3D, every device at its U, with its rack PDUs on the rear rails. Drag to turn it. Pick a device to see its ports and the best way in, out of band and in band.",
     show() {
       openRack("pod-a", "A14");
     },

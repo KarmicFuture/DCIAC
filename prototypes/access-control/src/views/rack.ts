@@ -126,10 +126,12 @@ export function deviceDetail(d) {
     " · rack A14</dd><dt>BMC</dt><dd>" + esc(bmcText(d)) + "</dd><dt>Serial</dt><dd class=\"mono\">" +
     esc(d.tty) + " · port " + d.port + "</dd>" +
     (d.usb ? '<dt>USB console</dt><dd class="mono">' + esc(d.usb) + "</dd>" : "") +
-    '<dt>KVM</dt><dd class="mono">MPU port ' + d.mpu + "</dd><dt>Outlet</dt><dd>Outlet " + d.outlet +
+    '<dt>KVM</dt><dd class="mono">MPU2 port ' + d.mpu + "</dd><dt>Outlet</dt><dd>Outlet " + d.outlet +
     " · " + esc(outlet.power) + "</dd><dt>Leak</dt><dd>" + esc(leak) + "</dd></dl>";
-  return deviceFaces(d) + thermalCard(d) + "<h3>" + esc(d.name) + "</h3><p class=\"fine\">" + esc(d.kind) + " · " + uLabel(d.u) +
-    "</p>" + failoverBanner(d) + deviceViewHtml(d) + usb + failBox(d.id, "serial") + failBox(d.id, "kvm") + facts + wait +
+  /* Name, then what is wrong, then how to reach it. Faces and thermals follow. */
+  return "<h3>" + esc(d.name) + "</h3><p class=\"fine\">" + esc(d.kind) + " · " + uLabel(d.u) +
+    "</p>" + failoverBanner(d) + deviceViewHtml(d) + usb + failBox(d.id, "serial") + failBox(d.id, "kvm") + wait +
+    deviceFaces(d) + thermalCard(d) + facts +
     '<p class="fine">Unbound and cross-rack launches are refused on the port map.</p>' +
     '<button type="button" class="act" data-act="nav" data-view="map">Open the port map</button>';
 }

@@ -206,8 +206,9 @@ export function bestPaths(entity) {
 function pathRow(p: Path, best: boolean) {
   return '<tr data-path="' + p.id + '" data-band="' + p.band + '"' + (best ? ' class="best"' : "") + "><td><b>" + esc(p.name) + "</b>" +
     (best ? ' <span class="dv-best">Best ' + (p.band === "oob" ? "out of band" : "in band") + "</span>" : "") +
-    '<small>' + esc(p.via) + "</small></td><td><span class=\"dv-state " + (p.ok ? "ok" : "held") + '">' + esc(p.status) + "</span></td>" +
-    "<td>" + p.button + "</td></tr>" + '<tr class="dv-why"><td colspan="3">' + esc(p.why) + "</td></tr>";
+    '<small>' + esc(p.via) + "</small>" + (p.button ? '<div class="dv-go">' + p.button + "</div>" : "") +
+    '</td><td><span class="dv-state ' + (p.ok ? "ok" : "held") + '">' + esc(p.status) + "</span></td></tr>" +
+    '<tr class="dv-why"><td colspan="2">' + esc(p.why) + "</td></tr>";
 }
 
 function na(kind) {
@@ -228,7 +229,7 @@ export function deviceViewHtml(entity) {
     '<div class="dv-face">' + groups + "</div>" +
     '<div class="dv-legend"><span class="role-serial">Serial</span><span class="role-video">KVM</span><span class="role-mgmt">Management</span><span class="role-inband">Host LAN</span><span class="role-data">Data</span><span class="role-power">Power</span></div>' +
     "<h4>Ways in</h4>" +
-    '<div class="table-wrap"><table class="dv-paths"><thead><tr><th>Out of band</th><th>State</th><th></th></tr></thead><tbody>' + oob + "</tbody>" +
-    (inband ? "<thead><tr><th>In band</th><th>State</th><th></th></tr></thead><tbody>" + inband + "</tbody>" : "") + "</table></div>" +
+    '<div class="table-wrap"><table class="dv-paths"><thead><tr><th>Out of band</th><th>State</th></tr></thead><tbody>' + oob + "</tbody>" +
+    (inband ? "<thead><tr><th>In band</th><th>State</th></tr></thead><tbody>" + inband + "</tbody>" : "") + "</table></div>" +
     (missing ? '<p class="fine">' + esc(missing) + "</p>" : "") + "</section>";
 }
