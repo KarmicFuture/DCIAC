@@ -3561,3 +3561,8 @@ button.act.launch.primary small { color: #d9d0c6; }
   .scene.rack-scene .inspector.drawer { position: static; width: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 12px; }
 }
 .scene.rack-scene { padding-top: 56px; }
+.r3-stage { cursor: grab; touch-action: none; user-select: none; }
+.r3-stage.spinning { cursor: grabbing; }
+.r3-stage.spinning .r3-world { transition: none; }
+.r3-stage:focus-visible { outline: 2px solid #e08a2e; outline-offset: 2px; }
+.r3-hint { align-self: center; margin-right: 4px; }

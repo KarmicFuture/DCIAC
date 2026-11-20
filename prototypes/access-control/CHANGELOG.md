@@ -14,6 +14,10 @@ One rack view (Floor › hall › click a rack, and Operate › Rack):
   asset repository. rPDU-A carries the live outlets.
 - Racks with nothing in the asset repository show their simulated servers.
 - `DAILY_IMPROVEMENT.md` now has a rule that the two rack views stay one view.
+- Both rack views rotate freely. Drag the rack with a mouse or finger to turn it, tilting
+  from about 60° above to 15° below. You can also focus the rack and use the arrow keys.
+  Front, Angle, Side and Rear still snap to set views. The angle carries between the two
+  views, and dragging across a device turns the rack without opening the device.
 
 ## 2026-11-19
 

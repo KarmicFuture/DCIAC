@@ -181,6 +181,8 @@ export interface AppState {
   onelineBuild: boolean;
   /* Camera preset for the 3D rack on Operate › Rack. */
   rackView: string;
+  rackYaw: number;
+  rackPitch: number;
   libraryOpen: boolean;
   inspectorOpen: boolean;
   manage: { layer: string; device: string };

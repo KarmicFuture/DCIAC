@@ -25,8 +25,101 @@ export const RACK_VIEWS = [
 ];
 
 function viewAngles() {
+  if (state.rackView === "custom") return { id: "custom", yaw: state.rackYaw, pitch: state.rackPitch };
   const view = RACK_VIEWS.find((row) => row[0] === state.rackView) || RACK_VIEWS[1];
   return { id: view[0] as string, yaw: view[2] as number, pitch: view[3] as number };
+}
+
+/* Free rotation. Drag the rack with a mouse or finger, or focus the stage and use the
+   arrow keys. The angle is shared, so both rack views turn the same way. */
+const PITCH_MIN = -60;
+const PITCH_MAX = 15;
+let spin: { id: number; x: number; y: number; yaw: number; pitch: number; moved: boolean } | null = null;
+let swallowClick = false;
+
+function clampPitch(p) {
+  return Math.max(PITCH_MIN, Math.min(PITCH_MAX, p));
+}
+
+function worldTransform(yaw, pitch) {
+  return "rotateX(" + pitch.toFixed(1) + "deg) rotateY(" + yaw.toFixed(1) + "deg)";
+}
+
+export function setRackPreset(id) {
+  const view = RACK_VIEWS.find((row) => row[0] === id) || RACK_VIEWS[1];
+  state.rackView = view[0] as string;
+  state.rackYaw = view[2] as number;
+  state.rackPitch = view[3] as number;
+}
+
+export function turnRack(dYaw, dPitch) {
+  const now = viewAngles();
+  state.rackView = "custom";
+  state.rackYaw = Math.round(now.yaw + dYaw);
+  state.rackPitch = clampPitch(Math.round(now.pitch + dPitch));
+}
+
+/* Turn the rack on screen without redrawing the page, so focus and the drag stay put. */
+function showAngles(stage) {
+  const world = stage.querySelector(".r3-world");
+  if (world) world.style.transform = worldTransform(state.rackYaw, state.rackPitch);
+  const tools = stage.parentElement ? stage.parentElement.querySelectorAll('[data-act="rack-view"][aria-pressed="true"]') : [];
+  tools.forEach((button) => button.removeAttribute("aria-pressed"));
+}
+
+export function rackPointerDown(event) {
+  const stage = event.target.closest && event.target.closest(".r3-stage");
+  if (!stage || event.button !== 0) return false;
+  if (event.target.closest("button")) return false;
+  const now = viewAngles();
+  spin = { id: event.pointerId, x: event.clientX, y: event.clientY, yaw: now.yaw, pitch: now.pitch, moved: false };
+  stage.setPointerCapture(event.pointerId);
+  stage.classList.add("spinning");
+  return true;
+}
+
+export function rackPointerMove(event) {
+  if (!spin || event.pointerId !== spin.id) return false;
+  const dx = event.clientX - spin.x;
+  const dy = event.clientY - spin.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) spin.moved = true;
+  const yaw = spin.yaw + dx * 0.5;
+  const pitch = clampPitch(spin.pitch - dy * 0.35);
+  state.rackView = "custom";
+  state.rackYaw = Math.round(yaw);
+  state.rackPitch = Math.round(pitch);
+  const stage = document.querySelector(".r3-stage");
+  if (stage) showAngles(stage);
+  return true;
+}
+
+export function rackPointerUp(event) {
+  if (!spin || event.pointerId !== spin.id) return false;
+  const moved = spin.moved;
+  spin = null;
+  document.querySelectorAll(".r3-stage.spinning").forEach((el) => el.classList.remove("spinning"));
+  if (moved) {
+    swallowClick = true;
+    setTimeout(() => { swallowClick = false; }, 0);
+  }
+  return true;
+}
+
+/* A drag that ends over a device must not also open it. */
+export function rackSwallowsClick() {
+  return swallowClick;
+}
+
+export function rackKey(event) {
+  const stage = event.target.closest && event.target.closest(".r3-stage");
+  if (!stage) return false;
+  const steps = { ArrowLeft: [-15, 0], ArrowRight: [15, 0], ArrowUp: [0, 8], ArrowDown: [0, -8] };
+  const step = steps[event.key];
+  if (!step) return false;
+  event.preventDefault();
+  turnRack(step[0], step[1]);
+  showAngles(stage);
+  return true;
 }
 
 function unitsOf(d) {
@@ -157,10 +250,11 @@ export const R3_LEGEND = '<div class="r3-legend"><span><span class="r3-dot on"><
 /* Any rack in 3D: the view buttons and the stage. */
 export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
   const view = viewAngles();
-  const views = RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
+  const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
     (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("");
   return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>" +
-    '<div class="r3-stage"><div class="r3-world" data-view="' + view.id + '" style="transform:rotateX(' + view.pitch + "deg) rotateY(" + view.yaw + 'deg)">' +
+    '<div class="r3-stage" tabindex="0" id="r3-stage" data-focus-key="r3-stage" role="img" aria-label="' + esc(name) +
+    ' in 3D. Drag to rotate, or use the arrow keys."><div class="r3-world" data-view="' + view.id + '" style="transform:' + worldTransform(view.yaw, view.pitch) + '">' +
     cabinet(name) + uScale() + units.map(unitBox).join("") + pdus.map(pduBox).join("") + "</div></div>";
 }
 

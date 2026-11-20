@@ -1,5 +1,5 @@
 import { deviceById, devices } from "../data/devices";
-import { rackViewHtml } from "./rack3d";
+import { rackPointerDown, rackPointerMove, rackPointerUp, rackViewHtml } from "./rack3d";
 import { LIBRARY, MODELS, applyModels, catalogById, findRack, freeU, placementById } from "../data/library";
 import { elevationParts, elevationPointerDown, elevationPointerMove, elevationPointerUp, loadElevation } from "./elevation";
 import { powerHtml } from "./power";
@@ -345,6 +345,7 @@ function floorBoxAt(event) {
 }
 
 export function onPointerDown(event) {
+  if (rackPointerDown(event)) return;
   if (elevationPointerDown(event)) return;
   if (!state.user || event.button !== 0) return;
   if (state.view === "plan") {
@@ -391,6 +392,7 @@ export function onPointerDown(event) {
 }
 
 export function onPointerMove(event) {
+  if (rackPointerMove(event)) return;
   if (elevationPointerMove(event)) return;
   if (runtime.carry && event.pointerId === runtime.carry.id) {
     placeCarry(event);
@@ -413,6 +415,7 @@ export function onPointerMove(event) {
 }
 
 export function onPointerUp(event) {
+  if (rackPointerUp(event)) return;
   if (elevationPointerUp(event)) return;
   if (runtime.carry && event.pointerId === runtime.carry.id) {
     const moved = runtime.carry.moved;

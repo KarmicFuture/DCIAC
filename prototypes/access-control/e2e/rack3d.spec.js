@@ -20,12 +20,12 @@ test("rack A14 is 3D with its devices and the rack PDU", async ({ page }) => {
   await expect(page.locator(".r3-pdu")).toHaveCount(2);
   await expect(page.locator(".r3-pdu").first().locator(".r3-socket.on")).toHaveCount(11);
   await expect(page.locator(".r3-pdu-table tbody tr")).toHaveCount(11);
-  await expect(page.locator(".r3-world")).toHaveAttribute("style", /rotateY\(-42deg\)/);
+  await expect(page.locator(".r3-world")).toHaveAttribute("style", /rotateY\(-42(\.0)?deg\)/);
 
   // Camera presets turn the rack.
   await page.locator('[data-act="rack-view"][data-rack-view="rear"]').click();
   await expect(page.locator('[data-act="rack-view"][data-rack-view="rear"]')).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".r3-world")).toHaveAttribute("style", /rotateY\(-200deg\)/);
+  await expect(page.locator(".r3-world")).toHaveAttribute("style", /rotateY\(-200(\.0)?deg\)/);
 
   // Selecting a device marks its outlet on the PDU.
   await page.locator('.r3-pdu-table [data-act="select"][data-device="tray-04"]').click();
