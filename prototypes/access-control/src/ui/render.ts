@@ -35,6 +35,7 @@ import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
 import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
+import { drillOpenHall, setFleetDrill, toggleFleetRacks } from "../views/fleet";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
 import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo, toggleTheme } from "../domain/demo";
 import { diagnoseBoot, runBootFix } from "../domain/autofix";
@@ -355,6 +356,8 @@ export function onClick(event) {
   }
   else if (act === "oneline-open") openOnelineNode(el.dataset.server || "");
   else if (act === "oneline-hall") openOnelineHall(el.dataset.pod || "");
+  else if (act === "fleet-racks") { toggleFleetRacks(el.dataset.pod || ""); render(); }
+  else if (act === "fleet-sort") { setFleetDrill(drillOpenHall(), el.dataset.sort || ""); render(); }
   else if (act === "oneline-site") { openOnelineSite(); render(); }
   else if (act === "lab-close") { state.labOpen = false; render(); }
   else if (act === "bmc-toggle") toggleBmc(el.dataset.device);

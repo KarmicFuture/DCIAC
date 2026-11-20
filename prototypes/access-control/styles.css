@@ -3420,6 +3420,14 @@ button.act.launch.primary small { color: #d9d0c6; }
 .fleet-tile b { font-size: var(--text-lg); }
 .fleet-table td { white-space: nowrap; }
 .fleet-clear { color: var(--muted); }
+.fleet-racks { margin-left: 8px; }
+.fleet-racks-row > td { padding: 4px 0 10px 16px; white-space: normal; }
+.fleet-sort { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; font-size: var(--text-sm); color: var(--muted); }
+.fleet-sort [aria-pressed="true"] { border-color: var(--accent, #2f6fb0); font-weight: 600; }
+.fleet-rack-table { width: 100%; }
+.fleet-band { font-size: var(--text-sm); }
+.fleet-band.near { color: #a85a24; }
+.fleet-band.critical, .fleet-band.failover { color: #b03030; font-weight: 600; }
 
 .hall-build { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .hall-build-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
