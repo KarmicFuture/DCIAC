@@ -101,7 +101,9 @@ Mark items done here in the same pull request that finishes them.
    *Done.* Shipped 2026-11-19: Operate › Fleet (`#/fleet`) lists every hall with open
    alarms, IT power, headroom, and hot-rack counts. Shipped 2026-11-20: "Show racks" on each
    hall row lists its racks, sortable by power or alarms, each opening on the floor.
-3. SLA and escalation timers on alarms, so it's clear how long each has been open and when it escalates.
+3. ~~SLA and escalation timers on alarms, so it's clear how long each has been open and when it escalates.~~
+   *Done.* Shipped 2026-11-21: every row in the alarm list shows how long it has been open and
+   when it escalates (P1 15 min, P2 60 min, P3 4 h to acknowledge). Ack stops the clock.
 4. Shift handover summary: what happened, what's still open, and what the next shift should watch.
 5. Liquid-cooling telemetry: CDU supply and return temperatures, flow, and kW-per-rack budget.
 6. Remote-hands dispatch: turn an alarm into a work order with steps and sign-off.

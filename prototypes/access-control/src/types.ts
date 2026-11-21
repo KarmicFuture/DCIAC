@@ -106,6 +106,7 @@ export interface Alarm {
   device?: string;
   part?: string;
   response?: string;
+  since?: number;
 }
 
 export interface FloorState {
@@ -143,6 +144,7 @@ export interface AppState {
     awarded: Record<string, boolean>;
   };
   acked: Record<string, boolean>;
+  alarmSince: Record<string, { pri: number; at: number }>;
   rm1048: string;
   leak: boolean;
   maintenance: { name: string; wo: string } | null;

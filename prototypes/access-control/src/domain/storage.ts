@@ -27,6 +27,7 @@ export function saveWorld() {
       sessions: state.sessions,
       audit: state.audit,
       acked: state.acked,
+      alarmSince: state.alarmSince,
       leak: state.leak,
       maintenance: state.maintenance,
       maintName: state.maintName,
@@ -63,6 +64,7 @@ export function restoreWorld() {
     if (Array.isArray(data.sessions)) state.sessions = data.sessions;
     if (Array.isArray(data.audit)) state.audit = data.audit;
     if (data.acked && typeof data.acked === "object") state.acked = data.acked;
+    if (data.alarmSince && typeof data.alarmSince === "object") state.alarmSince = data.alarmSince;
     if (typeof data.leak === "boolean") state.leak = data.leak;
     if (data.maintenance && typeof data.maintenance.name === "string") state.maintenance = { name: data.maintenance.name, wo: data.maintenance.wo || "" };
     else if (data.maintenance === null) state.maintenance = null;

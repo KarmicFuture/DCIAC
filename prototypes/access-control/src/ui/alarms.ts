@@ -13,6 +13,7 @@ import { go } from "./shell";
 import { floorSerial, openFloorServer, openPart } from "../views/floor";
 import { launchAlarmSerial } from "../domain/autofix";
 import { thermalReading } from "../views/rack";
+import { slaHtml, trackSince } from "../domain/sla";
 
 export function serialFinding(d) {
   if (d.watchDeny) {
@@ -150,6 +151,8 @@ export function activeAlarms(): Alarm[] {
     });
   });
   plantAlarms().forEach((alarm) => list.push(alarm));
+  const since = trackSince(list);
+  list.forEach((alarm) => { alarm.since = since[alarm.id]; });
   return list.sort((a, b) => a.pri - b.pri || a.asset.localeCompare(b.asset));
 }
 
@@ -164,7 +167,7 @@ export function alarmBanner() {
       : "";
     return '<details class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><summary data-act="alarm-focus" data-alarm="' +
       alarm.id + '"><span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + "</span><b>" +
-      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + "</span>" + action +
+      esc(alarm.asset) + '</b><span class="alarm-text"><span class="alarm-line">' + esc(alarm.text) + "</span>" + slaHtml(alarm) + "</span>" + action +
       '</summary><div class="alarm-extra"><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
       alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
       explainHtml(alarmInput(alarm)) + "</details></div></details>";
