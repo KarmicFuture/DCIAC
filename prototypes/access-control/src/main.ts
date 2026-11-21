@@ -23,6 +23,7 @@ import {
   secondsUntilCritical,
 } from "./domain/events";
 import { finishOutletHold } from "./domain/outlet-policy";
+import { ageAlarm, slaStatus } from "./domain/sla";
 import { stepCapacity } from "./domain/failover";
 import { runtime, state } from "./state";
 import { boot } from "./ui/render";
@@ -63,6 +64,8 @@ window.AccessDemo = {
   stopDemo,
   setAnalyzer,
   finishOutletHold,
+  slaStatus,
+  ageAlarm,
 };
 
 try {

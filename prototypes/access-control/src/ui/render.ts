@@ -43,11 +43,12 @@ import { launchMp1000Kvm } from "../domain/mp1000";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
 import { loadWorld } from "../data/repository";
-import { ackAlarm, addScenarioChange, advanceWork, applyInventoryFilter, cancelCable, chooseCablePort, collectSample, compareScenario, createWorkOrder, decideDiscovery, dropCable, exportCables, findHome, importCables, loadAlarms, loadFuturePlan, loadTrend, openHall, openRackCapacity, openReport, planHome, promoteScenario, reportMissing, reservePort, sampleSweep, saveCable, scanAsset, scheduleReport, sendServiceNow, showCableRack, traceCable } from "../views/dcim";
+import { ackAlarm as ackDcimAlarm, addScenarioChange, advanceWork, applyInventoryFilter, cancelCable, chooseCablePort, collectSample, compareScenario, createWorkOrder, decideDiscovery, dropCable, exportCables, findHome, importCables, loadAlarms, loadFuturePlan, loadTrend, openHall, openRackCapacity, openReport, planHome, promoteScenario, reportMissing, reservePort, sampleSweep, saveCable, scanAsset, scheduleReport, sendServiceNow, showCableRack, traceCable } from "../views/dcim";
 import { dropNetworkCable, exportElevation, saveNetworkCable } from "../views/elevation";
 import { failPower, setPowerMode } from "../views/power";
 import { cloneModel, importModels, saveModel } from "../views/models";
 import { selectDevice } from "../views/rack";
+import { updateAlarmTimers } from "../domain/sla";
 
 function hydrateFields() {
   const fields = {
@@ -409,7 +410,7 @@ export function onClick(event) {
   else if (act === "dcim-report") openReport(el.dataset.kind || "capacity", "");
   else if (act === "dcim-csv") openReport(runtime.dcim.reportKind || "capacity", "csv");
   else if (act === "dcim-pdf") openReport(runtime.dcim.reportKind || "capacity", "pdf");
-  else if (act === "dcim-ack") ackAlarm(el.dataset.id || "");
+  else if (act === "dcim-ack") ackDcimAlarm(el.dataset.id || "");
   else if (act === "dcim-decide") decideDiscovery(el.dataset.id || "", el.dataset.accept !== "0");
   else if (act === "dcim-scan") scanAsset();
   else if (act === "dcim-hall") openHall(el.dataset.id || "");
@@ -714,7 +715,7 @@ export async function boot() {
   document.body.addEventListener("dragover", onDragOver);
   document.body.addEventListener("drop", onDrop);
   document.body.addEventListener("dragend", onDragEnd);
-  setInterval(() => { tick(); settleOutletHold(); }, 250);
+  setInterval(() => { tick(); settleOutletHold(); updateAlarmTimers(); }, 250);
   setInterval(() => stepSimCapacity(stepCapacity, 1000), 100);
   render();
 }

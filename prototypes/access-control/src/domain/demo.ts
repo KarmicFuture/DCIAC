@@ -478,7 +478,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: () => "acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1.",
+    pop: () => "acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1, and its 15-minute escalation timer starts.",
     target: 'details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"]), .alarm-banner',
     open: '.alarm-banner, details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"])',
     enter() {

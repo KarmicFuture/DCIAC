@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-21
+
+Alarm SLA and escalation timers (the alarm chip on every page, e.g. Floor › Hall):
+
+- Every alarm row shows how long it has been open and when it escalates if nobody
+  acknowledges it: "Open 3m · escalates in 12m". Acknowledge windows are P1 15 minutes,
+  P2 60 minutes, P3 4 hours (`SLA_MINUTES` in `src/domain/sla.ts`).
+- Past its window, an unacknowledged alarm turns red: "Escalated 5m ago · open 20m".
+- Ack stops the escalation clock and the row reads "Acked · open 20m". The timers tick in
+  place every quarter second without redrawing the page.
+- The clock starts when the alarm is first seen at its priority, restarts if the priority
+  changes, and survives a page reload.
+- Fixed: the Ack button in the alarm list did nothing. It was wired to the DCIM monitor's
+  server-side ack by a clashing import, so banner alarms never showed as acknowledged.
+- The AI fix demo's P1 caption mentions the 15-minute escalation timer.
+- This finishes priority 3 in `DAILY_IMPROVEMENT.md`.
+
 ## 2026-11-20
 
 Fleet rack drill-down (Operate › Fleet, `#/fleet`):
