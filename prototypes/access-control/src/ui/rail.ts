@@ -33,20 +33,26 @@ const TAB_VIEWS = [
 
 const VIEW_TITLE = {
   floor: "Floor",
-  plan: "Plan",
   manage: "Manage",
-  rack: "Operate",
-  map: "Operate",
-  control: "Operate",
-  sessions: "Operate",
-  oneline: "Operate",
-  fleet: "Operate",
   audit: "Audit",
-  models: "Plan",
-  halls: "Plan",
-  dcim: "Plan",
   simulate: "Simulate",
 };
+
+function tabLabel(tabs, view) {
+  const pair = tabs.find(([id]) => id === view);
+  return pair ? pair[1] : "";
+}
+
+function groupHeading(group, tabs) {
+  const label = tabLabel(tabs, state.view);
+  return label ? group + " · " + label : group;
+}
+
+function topbarTitle() {
+  if (OPERATE_VIEWS.indexOf(state.view) >= 0) return groupHeading("Operate", OPERATE_TABS);
+  if (PLAN_VIEWS.indexOf(state.view) >= 0) return groupHeading("Plan", PLAN_TABS);
+  return VIEW_TITLE[state.view] || "Access";
+}
 
 function groupCurrent(views) {
   return views.indexOf(state.view) >= 0 ? ' aria-current="page"' : "";
@@ -58,27 +64,30 @@ export function navButton(id, label, views) {
     esc(label) + "</button>";
 }
 
-function viewTabs(tabs) {
-  return '<div class="view-tabs" role="tablist">' + tabs.map((pair) => {
-    const on = state.view === pair[0] ? ' aria-selected="true"' : ' aria-selected="false"';
+function viewTabs(tabs, group) {
+  const navLabel = group + " views";
+  return '<div class="view-tabs" role="navigation" aria-label="' + esc(navLabel) + '">' + tabs.map((pair) => {
+    const current = state.view === pair[0] ? ' aria-current="page"' : "";
     const count = pair[0] === "sessions" && state.sessions.length ? " · " + state.sessions.length : "";
-    return '<button type="button" role="tab" data-act="nav" data-view="' + pair[0] + '"' + on + ">" +
+    return '<button type="button" data-act="nav" data-view="' + pair[0] + '"' + current + ">" +
       esc(pair[1]) + count + "</button>";
   }).join("") + "</div>";
 }
 
 export function operateHead() {
-  return '<div class="page-head"><div class="top"><div><h1>Operate</h1>' + viewTabs(OPERATE_TABS) +
+  const heading = esc(groupHeading("Operate", OPERATE_TABS));
+  return '<div class="page-head"><div class="top"><div><h1>' + heading + "</h1>" + viewTabs(OPERATE_TABS, "Operate") +
     "</div>" + themeButton() + "</div></div>";
 }
 
 export function planHead() {
-  return '<div class="page-head"><div class="top"><div><h1>Plan</h1>' + viewTabs(PLAN_TABS) +
+  const heading = esc(groupHeading("Plan", PLAN_TABS));
+  return '<div class="page-head"><div class="top"><div><h1>' + heading + "</h1>" + viewTabs(PLAN_TABS, "Plan") +
     "</div>" + themeButton() + "</div></div>";
 }
 
 export function topbar() {
-  const title = VIEW_TITLE[state.view] || "Access";
+  const title = topbarTitle();
   const open = state.menuOpen ? "true" : "false";
   return '<div class="topbar">' + briefingButton() + '<button type="button" class="menu-btn" data-act="menu" aria-expanded="' + open +
     '" aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></button><strong>Access</strong><span class="topbar-view">' +

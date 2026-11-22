@@ -264,7 +264,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Fleet — every hall's alarms, IT power, and headroom on one page. Hall 1's racks are listed with the alarmed ones first.",
+    pop: "Operate · Fleet — every hall's alarms, IT power, and headroom on one page. Hall 1's racks are listed with the alarmed ones first.",
     target: ".fleet-page",
     enter() {
       state.view = "fleet";
@@ -272,7 +272,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Power one-line — Feeders A/B through transformers onto the MV bus.",
+    pop: "Operate · One-line — Feeders A/B through transformers onto the MV bus.",
     target: ".oneline-sheet, .ol-svg",
     enter() {
       state.view = "oneline";
@@ -280,7 +280,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Rack A14 in 3D, from the rear: every device at its U, two rack PDUs with live outlet lights. Drag to turn it.",
+    pop: "Operate · Rack — Rack A14 in 3D, from the rear: every device at its U, two rack PDUs with live outlet lights. Drag to turn it.",
     target: ".rack3d-panel .r3-stage, .rack3d-panel",
     enter() {
       state.view = "rack";
@@ -289,7 +289,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "BMC dark on Tray 06. The device view marks ACS serial as the best way in — not RM1048.",
+    pop: "Operate · Rack — BMC dark on Tray 06. The device view marks ACS serial as the best way in — not RM1048.",
     target: ".device-view, .view",
     weight: 1.25,
     enter() {
@@ -305,7 +305,7 @@ const FULL_TOUR: TourBeat[] = [
   {
     pop: () => {
       const mapped = deviceById("tray-06");
-      return "ACS serial on " + ((mapped && mapped.tty) || "ttyS8") + " — out-of-band while BMC is dark.";
+      return "Operate · Sessions — ACS serial on " + ((mapped && mapped.tty) || "ttyS8") + " — out-of-band while BMC is dark.";
     },
     target: ".view, .session, .term-path, .workspace",
     enter() {
@@ -315,7 +315,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Control gates outlet power by role, BMC plane, and maintenance.",
+    pop: "Operate · Control — outlet power is gated by role, BMC plane, and maintenance.",
     target: ".view, .control, table",
     enter() {
       const mapped = deviceById("tray-06");
@@ -331,7 +331,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "DI-1 leak — outlets 1–2 lock. No plant-wide trip.",
+    pop: "Operate · Control — DI-1 leak. Outlets 1–2 lock. No plant-wide trip.",
     target: ".view, .alarm-banner, table",
     enter() {
       fireEvent("leak-trip", "", { quiet: true, stay: true });
@@ -340,7 +340,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Maintenance lifts the hold. Bound outlets cycle; every act is audited.",
+    pop: "Operate · Control — maintenance lifts the hold. Bound outlets cycle; every act is audited.",
     target: ".view, table",
     enter() {
       openMaintenance();
@@ -361,28 +361,28 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Plan · Nov 2026 — grass field. Survey stakes only; nothing energized.",
+    pop: "Plan · Campus — Nov 2026. Grass field. Survey stakes only; nothing energized.",
     target: ".build-scene, .stage-bar, .plan-day",
     enter() {
       showPlanDate("2026-11-16");
     },
   },
   {
-    pop: "Feb 2027 — both utility feeders and transformers on the west yard.",
+    pop: "Plan · Campus — Feb 2027. Both utility feeders and transformers on the west yard.",
     target: ".build-scene, .stage-bar, .plan-day",
     enter() {
       showPlanDate("2027-02-15");
     },
   },
   {
-    pop: "Apr 2027 — halls 1–5 dried in. Coolers start the heat yard.",
+    pop: "Plan · Campus — Apr 2027. Halls 1–5 dried in. Coolers start the heat yard.",
     target: ".build-scene, .stage-bar, .plan-day",
     enter() {
       showPlanDate("2027-04-01");
     },
   },
   {
-    pop: "Jul 2027 — the one-line on that date: four halls energized, Halls 5–8 built with no load.",
+    pop: "Operate · One-line — Jul 2027. The one-line on that date: four halls energized, Halls 5–8 built with no load.",
     target: ".oneline-sheet, .view",
     enter() {
       showPlanDate("2027-07-01");
@@ -391,7 +391,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Inside Hall 5 in mid-July: racks are set row by row while Halls 1–4 carry load.",
+    pop: "Plan · Campus — inside Hall 5 in mid-July. Racks are set row by row while Halls 1–4 carry load.",
     target: ".hall-build, .view",
     enter() {
       showPlanDate("2027-07-15");
@@ -399,7 +399,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Every hall's build on one schedule, from pad to live. Click a bar to open that hall.",
+    pop: "Plan · Halls — every hall's build on one schedule, from pad to live. Click a bar to open that hall.",
     target: ".gantt, .view",
     enter() {
       showPlanDate("2027-08-01");
@@ -407,14 +407,14 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Oct 2027 — 100 MW. All ten halls match the live campus.",
+    pop: "Plan · Campus — Oct 2027. 100 MW. All ten halls match the live campus.",
     target: ".build-scene, .stage-bar, .plan-day",
     enter() {
       showPlanDate("2027-10-01");
     },
   },
   {
-    pop: "DCIM — capacity, cables, work orders, monitoring, reports.",
+    pop: "Plan · DCIM — capacity, cables, work orders, monitoring, reports.",
     target: ".view, .dcim",
     enter() {
       state.view = "dcim";
@@ -429,7 +429,7 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Done. Floor, Fleet, one-line, 3D rack, device view, Control, Plan, DCIM, Audit — day to day.",
+    pop: "Done. Floor, Operate · Fleet, Operate · One-line, Operate · Rack, Operate · Control, Plan · Campus, Plan · DCIM, Audit — day to day.",
     target: ".scene",
     enter() {
       tidyFullDemo();
@@ -459,7 +459,7 @@ function fixTty() {
 
 const FIX_TOUR: TourBeat[] = [
   {
-    pop: "Serial watch: acs.watch logs in to every ACS serial port in rack A14, around the clock.",
+    pop: "Operate · Sessions — Serial watch: acs.watch logs in to every ACS serial port in rack A14, around the clock.",
     target: ".watch-panel, .view",
     enter() {
       tidyFixDemo();
@@ -467,7 +467,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "GPU Tray 05 reboots after a BIOS update and never comes back. The device view shows no OS for SSH or RDP; ACS serial is still the way in.",
+    pop: "Operate · Rack — GPU Tray 05 reboots after a BIOS update and never comes back. The device view shows no OS for SSH or RDP; ACS serial is still the way in.",
     target: ".device-view, .view",
     weight: 1.25,
     enter() {
@@ -478,7 +478,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: () => "acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1.",
+    pop: () => "Operate · Rack — acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1.",
     target: 'details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"]), .alarm-banner',
     open: '.alarm-banner, details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"])',
     enter() {
@@ -487,7 +487,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: () => "The alarm launches an ACS serial session on " + fixTty() + ". Out-of-band, so it works with no OS.",
+    pop: () => "Operate · Sessions — the alarm launches an ACS serial session on " + fixTty() + ". Out-of-band, so it works with no OS.",
     target: ".session, .xterm-host",
     enter() {
       finishFix();
@@ -496,7 +496,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "The console shows why: network boot got no DHCP answer, HTTP boot failed, and the tray fell to the UEFI shell.",
+    pop: "Operate · Sessions — the console shows why: network boot got no DHCP answer, HTTP boot failed, and the tray fell to the UEFI shell.",
     target: ".xterm-host, .session",
     enter() {
       finishFix();
@@ -504,7 +504,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "AI reads the session, then runs one read-only check: bcfg boot dump.",
+    pop: "Operate · Sessions — AI reads the session, then runs one read-only check: bcfg boot dump.",
     target: ".xterm-host, .session",
     weight: 1.5,
     enter() {
@@ -514,7 +514,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Diagnosis, 93%: the BIOS update reset the boot order. Ubuntu (Boot0003) is last.",
+    pop: "Operate · Sessions — diagnosis, 93%: the BIOS update reset the boot order. Ubuntu (Boot0003) is last.",
     target: ".session .explain, .session",
     enter() {
       finishFix();
@@ -522,7 +522,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Automatic response: runbook RB-UEFI-01 moves Ubuntu first and resets the tray. Boot order only, no power change.",
+    pop: "Operate · Sessions — automatic response: runbook RB-UEFI-01 moves Ubuntu first and resets the tray. Boot order only, no power change.",
     target: ".xterm-host, .session",
     weight: 2,
     enter() {
@@ -532,7 +532,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Verified: Ubuntu is up, acs.watch logs in, and the P1 clears.",
+    pop: "Operate · Sessions — verified: Ubuntu is up, acs.watch logs in, and the P1 clears.",
     target: ".session .explain, .session",
     enter() {
       finishFix();
@@ -541,7 +541,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Audit: alarm, session, AI check, diagnosis, runbook, and verification, each with who ran it.",
+    pop: "Audit — alarm, session, AI check, diagnosis, runbook, and verification, each with who ran it.",
     target: ".view",
     enter() {
       finishFix();
@@ -549,7 +549,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Done. Alarm, serial session, AI diagnosis, automatic fix, verified.",
+    pop: "Operate · Rack — done. Alarm, serial session, AI diagnosis, automatic fix, verified.",
     target: ".view",
     enter() {
       tidyFixDemo();
@@ -584,14 +584,14 @@ const MP1000_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "The MP1000 device list: every server behind every RM1048, with its KVM status. No hunting for IPs.",
+    pop: "Operate · Sessions — the MP1000 device list: every server behind every RM1048, with its KVM status. No hunting for IPs.",
     target: ".mp1000-panel",
     enter() {
       state.view = "sessions";
     },
   },
   {
-    pop: "Consoles open only inside a maintenance window or an in-progress work order. The operator opens a window for rack A14.",
+    pop: "Operate · Sessions — consoles open only inside a maintenance window or an in-progress work order. The operator opens a window for rack A14.",
     target: ".mp1000-panel, .view",
     enter() {
       const name = state.maintName;
@@ -603,14 +603,14 @@ const MP1000_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "The operator picks GPU Tray 02 and clicks Launch KVM.",
+    pop: "Operate · Sessions — the operator picks GPU Tray 02 and clicks Launch KVM.",
     target: '.mp1000-panel tr[data-device="' + KVM_DEVICE + '"], .mp1000-panel',
     enter() {
       state.view = "sessions";
     },
   },
   {
-    pop: "MP1000 checks the operator's role and window, then brokers the session through rack A14's RM1048 to the tray's BMC.",
+    pop: "Operate · Sessions — MP1000 checks the operator's role and window, then brokers the session through rack A14's RM1048 to the tray's BMC.",
     target: ".session.kvm, .mp1000-panel",
     weight: 1.5,
     enter() {
@@ -619,7 +619,7 @@ const MP1000_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "The HTML5 viewer shows the tray's screen, with keyboard and mouse. No Java, no VPN into the rack.",
+    pop: "Operate · Sessions — the HTML5 viewer shows the tray's screen, with keyboard and mouse. No Java, no VPN into the rack.",
     target: ".session.kvm .bios, .session.kvm",
     enter() {
       state.view = "sessions";
@@ -628,7 +628,7 @@ const MP1000_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "The same session reaches BIOS setup, before any OS loads. SSH and RDP can't do that.",
+    pop: "Operate · Sessions — the same session reaches BIOS setup, before any OS loads. SSH and RDP can't do that.",
     target: ".session.kvm .bios, .session.kvm",
     enter() {
       state.view = "sessions";
@@ -637,14 +637,14 @@ const MP1000_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Audit: the MP1000 launch and the KVM session, each with who opened it and the path it took.",
+    pop: "Audit — the MP1000 launch and the KVM session, each with who opened it and the path it took.",
     target: ".view",
     enter() {
       state.view = "audit";
     },
   },
   {
-    pop: "Done. Device list, launch KVM, brokered through RM1048, HTML5 viewer, audited.",
+    pop: "Operate · Sessions — done. Device list, launch KVM, brokered through RM1048, HTML5 viewer, audited.",
     target: ".mp1000-panel, .view",
     enter() {
       tidyMp1000Demo();

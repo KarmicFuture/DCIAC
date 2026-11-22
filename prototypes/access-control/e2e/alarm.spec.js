@@ -24,6 +24,6 @@ test("alarm chip focuses the rack and the action leaves the floor", async ({ pag
   await expect.poll(async () => page.locator(".world").evaluate((el) => el.style.transform)).not.toBe(before);
 
   await page.locator(".alarm-row[open] [data-act='alarm-go']").click();
-  await expect(page.locator("h1")).toHaveText("Operate");
-  await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("h1")).toHaveText("Operate · Sessions");
+  await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-current", "page");
 });

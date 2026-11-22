@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-22
+
+Demo paths use the screen names from the headings. The sign-in tours and their captions say `Operate · Fleet`, `Operate · Rack`, `Operate · Sessions`, `Operate · Control`, `Operate · One-line`, `Plan · Campus`, `Plan · Halls`, and `Plan · DCIM` for the screens they open.
+
 ## 2026-11-20
 
 Fleet rack drill-down (Operate › Fleet, `#/fleet`):

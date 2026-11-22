@@ -8,8 +8,8 @@ const ROLES = [
 
 const VIEWS = [
   ["floor", "Outside"],
-  ["rack", "Operate"],
-  ["plan", "Plan"],
+  ["rack", "Operate · Rack"],
+  ["plan", "Plan · Campus"],
   ["audit", "Audit"],
 ];
 
@@ -54,8 +54,8 @@ test("ReadOnly cannot cycle outlets or mount virtual media", async ({ page }) =>
 
   await page.locator('nav [data-view="rack"]').click();
   await page.locator('.device-view tr[data-path="mpu-kvm"] [data-act="launch"]').first().click();
-  await expect(page.locator("h1")).toHaveText("Operate");
-  await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("h1")).toHaveText("Operate · Sessions");
+  await expect(page.locator('.view-tabs [data-view="sessions"]')).toHaveAttribute("aria-current", "page");
   const mount = page.locator('[data-act="mount"]');
   await expect(mount).toBeDisabled();
   await expect(page.locator(".media .reason")).toHaveText("ReadOnly cannot open write-capable KVM virtual media.");
@@ -124,8 +124,8 @@ test("tripping DI-1 raises the alarm and blocks outlets 1 and 2", async ({ page 
   await page.locator("#sim-event").selectOption("leak-trip");
   await page.locator('[data-act="sim-run"]').click();
 
-  await expect(page.locator("h1")).toHaveText("Operate");
-  await expect(page.locator('.view-tabs [data-view="control"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("h1")).toHaveText("Operate · Control");
+  await expect(page.locator('.view-tabs [data-view="control"]')).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("heading", { name: "DI-1 leak alarm" })).toBeVisible();
   await expect(page.locator(".alarm")).toContainText("Outlet 1 (GPU Tray 01) and Outlet 2 (GPU Tray 02)");
   await expect(page.locator(".toast")).toContainText("DI-1 alarm. Suggested control is Outlet 1 and Outlet 2.");

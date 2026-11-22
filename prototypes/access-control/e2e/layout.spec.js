@@ -32,7 +32,8 @@ test("phone puts content first and keeps primary tabs", async ({ page }) => {
 
   await tabs.getByRole("button", { name: "Operate" }).click();
   await page.locator('.view-tabs [data-view="map"]').click();
-  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator("h1")).toHaveText("Operate · Port map");
+  await expect(page.locator(".topbar-view")).toHaveText("Operate · Port map");
   await expect(page.locator(".port-legend")).toContainText("In the rack");
   await expect(page.locator(".port-legend")).toContainText("Serial-only");
   await expect(page.locator(".port-legend")).toContainText("Refused");
@@ -61,7 +62,7 @@ test("desktop keeps the side rail and the port map tools", async ({ page }) => {
   await expect(page.locator(".tabbar")).toBeHidden();
   await page.locator('nav [data-view="rack"]').click();
   await page.locator('.view-tabs [data-view="map"]').click();
-  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator("h1")).toHaveText("Operate · Port map");
   await expect(page.locator(".port-legend")).toBeVisible();
   await page.locator("#port-search").fill("SN2201");
   await expect(page.locator(".port-cell")).toHaveCount(1);

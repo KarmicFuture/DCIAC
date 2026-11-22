@@ -369,7 +369,7 @@ nav button small { display: block; color: var(--rail-muted); font-size: var(--te
   padding: 6px 12px;
   min-height: 32px;
 }
-.view-tabs button[aria-selected="true"] {
+.view-tabs button[aria-current="page"] {
   background: var(--action);
   color: var(--on-action);
   border-color: var(--action);
