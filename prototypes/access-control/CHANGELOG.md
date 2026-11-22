@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The floor has Orbit left, right, up, and down between Pan and Zoom. Each press turns or tilts the view, focus stays on the button, and Reset view restores the starting angle.
+
 The floor has Pan left, right, up, and down beside Zoom. Each press moves the view 48 pixels, focus stays on the button, and Reset view returns to the center.
 
 Each grid's drawer opens its own feeder. Feeder A returns to grid 1, and Feeder B returns to grid 2.
