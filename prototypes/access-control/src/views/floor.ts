@@ -1885,7 +1885,8 @@ export function renderInspector() {
     const hall = podById(state.floor.podId) || PODS[0];
     const managed = devices.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical" || heatBand(entity) === "failover");
     body = "<h2>" + esc(hall.name) + "</h2><p class=\"fine\">" + PLANT.racksPerHall + " AI racks in two rows of ten. " + PLANT.hallItMw + " MW of IT against a " + PLANT.cduMw + " MW CDU. " +
-      (hall.managed ? "Rack A14 fails over to ACS serial." : "This hall is simulated. ACS-A14 stays in Hall 1.") + "</p><h3>Racks</h3>" +
+      (hall.managed ? "Rack A14 fails over to ACS serial." : "This hall is simulated. ACS-A14 stays in Hall 1.") + "</p>" +
+      '<button type="button" class="act" data-act="floor-overview" data-pod="' + esc(hall.id) + '">Open ' + esc(hall.name) + ' overview</button><h3>Racks</h3>' +
       hall.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' + hall.id + '" data-rack="' + item.id + '">' +
         ledDot(rackEntities(item)) + '<span>' + esc(item.name) + '</span><b>' + rackEntities(item).length + '<span class="sr-only"> devices</span></b></button>').join("") +
       "<h3>Power and cooling</h3>" + infra.filter((item) => item.pod === hall.id && item.kind !== "Aisle").map(rowButton).join("") +

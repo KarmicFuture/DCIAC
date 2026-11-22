@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The hall List has an Open Hall overview button. It opens that hall's rows, racks, infrastructure, and nearing-capacity list, and focus stays in the panel.
+
 Each expanded floor alarm has a Show on floor button. It opens the List on that rack's hall and puts focus on the rack's row.
 
 The floor view has a List button. Outside, it opens the halls. In a hall, it opens the racks, power and cooling, and the watch list. Focus stays in that panel while you drill in.

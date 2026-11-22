@@ -554,6 +554,7 @@ export function onClick(event) {
     state.floor.zoom = Math.max(state.floor.zoom, 0.9);
     render();
   }
+  else if (act === "floor-overview") openPod(el.dataset.pod);
   else if (act === "floor-go") goFloor(el.dataset.level);
   else if (act === "floor-serial") floorSerial(el.dataset.device);
   else if (act === "rdp-open") openSession(el.dataset.device, "rdp", "desktop", "");
