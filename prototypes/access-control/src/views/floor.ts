@@ -1845,7 +1845,7 @@ export function renderInspector() {
     body = "<h2>Ten halls</h2><p class=\"fine\">" + PLANT.halls + " halls × " + PLANT.racksPerHall + " AI racks × " + PLANT.kwPerRack + " kW = " + PLANT.itMw + " MW of IT. Two " + PLANT.feederMw + " MW feeders (either one can carry the site) and " + PLANT.coolMw + " MW of heat rejection sit outside. Each hall has a " + PLANT.cduMw + " MW CDU for " + PLANT.hallItMw + " MW of racks.</p><h3>Halls</h3>" +
       PODS.map((hall) => '<button type="button" class="floor-row" data-act="floor-hall" data-pod="' + hall.id + '"><span>' + esc(hall.name) + "</span><b>" + PLANT.racksPerHall + " racks</b></button>").join("") +
       '<h3>Yard</h3>' +
-      infra.filter((item) => item.yard && item.kind !== "Pipe").map(rowButton).join("");
+      infra.filter((item) => item.yard).map(rowButton).join("");
   } else if (level === "part") {
     const entity = entityById(state.floor.serverId);
     body = entity ? partPanel(entity) : '<p class="fine">Select a device.</p>';

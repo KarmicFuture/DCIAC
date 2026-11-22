@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The Yard list includes Supply piping and Return piping. Enter opens that pipe's details, and focus stays in the panel.
+
 The hall List has an Open Hall overview button. It opens that hall's rows, racks, infrastructure, and nearing-capacity list, and focus stays in the panel.
 
 Each expanded floor alarm has a Show on floor button. It opens the List on that rack's hall and puts focus on the rack's row.
