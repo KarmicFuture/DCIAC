@@ -745,6 +745,11 @@ button.act.launch.primary small { color: #d9d0c6; }
   color: var(--ink);
 }
 .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.confirm-card :focus-visible,
+.toast button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 .toast button {
   background: transparent;
   color: #fff;

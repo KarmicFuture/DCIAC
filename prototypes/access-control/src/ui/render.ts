@@ -20,7 +20,7 @@ import { applyCapacitySeed, stepCapacity, tick, toggleBmc } from "../domain/fail
 import { onHashChange, syncHash } from "../domain/route";
 import { restoreWorld, saveWorld } from "../domain/storage";
 import { toggleLeak } from "../domain/leak";
-import { actAll, actOutlet, cancelOutlet, settleOutletHold, showOutlet, submitOutletConfirm, undoOutlet } from "../domain/outlet-policy";
+import { actAll, actOutlet, cancelOutlet, outletConfirmHtml, settleOutletHold, showOutlet, submitOutletConfirm, undoOutlet } from "../domain/outlet-policy";
 import { closeSession, failRdpToKvm, fallback, openSession, refuseEndpoint, restoreRdp, sendSerial, sessionById, setScreen, toggleMedia } from "../domain/sessions";
 import { copyTerm, downloadLog, focusTerm, mountTerminals, searchTerm, sendBreak } from "./terminal";
 import { sessionBlocked, toggleRm } from "../domain/single-master";
@@ -175,6 +175,67 @@ function clearBootNote(root) {
   });
 }
 
+function syncOutletInert() {
+  const open = !!(state.outletGate && state.outletGate.phase === "confirm");
+  const app = document.getElementById("app");
+  if (!app) return;
+  const targets = [];
+  Array.from(app.children).forEach((child) => {
+    if (child instanceof HTMLElement && !child.classList.contains("shell")) targets.push(child);
+  });
+  const shell = app.querySelector(".shell");
+  if (shell) {
+    Array.from(shell.children).forEach((child) => {
+      if (child instanceof HTMLElement && child.dataset.slot !== "confirm") targets.push(child);
+    });
+  }
+  const railNav = document.querySelector("header.rail nav");
+  if (railNav instanceof HTMLElement) targets.push(railNav);
+  targets.forEach((node) => {
+    if (open) node.setAttribute("inert", "");
+    else node.removeAttribute("inert");
+  });
+}
+
+function confirmFocusables() {
+  const card = document.querySelector(".confirm-card");
+  if (!card) return [];
+  return Array.from(card.querySelectorAll('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el.getAttribute("aria-disabled") === "true") return false;
+      if (el.hasAttribute("disabled")) return false;
+      return el.tabIndex !== -1;
+    });
+}
+
+function outletConfirmKeys(event) {
+  const gate = state.outletGate;
+  if (!gate || gate.phase !== "confirm") return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    cancelOutlet();
+    return true;
+  }
+  if (event.key !== "Tab") return false;
+  const items = confirmFocusables();
+  if (!items.length) return false;
+  const active = document.activeElement;
+  const idx = items.indexOf(active);
+  const last = items.length - 1;
+  if (!event.shiftKey && idx === last) {
+    event.preventDefault();
+    items[0].focus({ preventScroll: true });
+    return true;
+  }
+  if (event.shiftKey && idx === 0) {
+    event.preventDefault();
+    items[last].focus({ preventScroll: true });
+    return true;
+  }
+  return false;
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
@@ -190,13 +251,14 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}</div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
   dressChrome();
   mountTerminals();
   markScrollers();
+  syncOutletInert();
   settle();
   applyCamera();
   paintHeat();
@@ -643,6 +705,7 @@ export function onChange(event) {
 }
 
 export function onKeyDown(event) {
+  if (outletConfirmKeys(event)) return;
   if (rackKey(event)) return;
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");

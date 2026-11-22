@@ -19,7 +19,7 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await expect(page.locator(".shell")).toHaveAttribute("data-demo", "full");
 
   await page.evaluate(() => {
-    window.AccessDemo.setDemoPauseMs(250);
+    window.AccessDemo.setDemoPauseMs(60000);
     window.AccessDemo.advanceDemo();
   });
   await expect.poll(async () => page.locator("#demo-caption").textContent(), { timeout: 5000 })

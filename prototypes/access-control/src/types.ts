@@ -207,6 +207,8 @@ export interface AppState {
     error: string;
     wo: string;
     typed: string;
+    opener: string;
+    busy: boolean;
   } | null;
 }
 
