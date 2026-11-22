@@ -1,0 +1,13 @@
+---
+description: Usability-first standards for all DCIAC agents
+alwaysApply: true
+---
+
+Usability standards
+	One improvement per cycle; keep diffs under ~300 lines.
+	Never push to main. Work on branch ux/<yyyy-mm-dd>-<slug>.
+	Every UI change needs: clear labels, visible focus states, keyboard access,
+helpful empty/error states, and loading feedback for actions over 300 ms.
+	Run the test suite before declaring work done.
+	Write handoffs to files: docs/ux-backlog.md, docs/plans/.
+	This repo is DCIAC (Access). Do not edit dcim-hall-board.
