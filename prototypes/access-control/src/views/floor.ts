@@ -1666,8 +1666,9 @@ export function serverInspector(entity) {
   } else if (managed) {
     action = "";
   } else if (entity.kind === "Grid") {
+    const side = entity.id === "grid-2" ? "b" : "a";
     action = yardArt(entity) + "<p>The utility grid lands on a gantry outside the shell. One feeder is closed through the transformer and the power module, and it stops at the hall wall.</p>" +
-      '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr">Open the feeder</button>';
+      '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr-' + side + '">Open Feeder ' + side.toUpperCase() + "</button>";
   } else if (entity.kind === "Pipe") {
     const supply = entity.id === "pipe-sup";
     action = yardArt(entity) + "<p>" + (supply
