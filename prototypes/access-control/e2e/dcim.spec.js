@@ -8,8 +8,8 @@ test("install a PowerEdge R760 from Find a home and alarm on Feeder A", async ({
 
   await page.locator('nav [data-view="plan"]').click();
   await page.locator('.view-tabs [data-view="dcim"]').click();
-  await expect(page.locator("h1")).toHaveText("Plan");
-  await expect(page.locator('.view-tabs [data-view="dcim"]')).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("h1")).toHaveText("Plan · DCIM");
+  await expect(page.locator('.view-tabs [data-view="dcim"]')).toHaveAttribute("aria-current", "page");
   await page.locator('[data-act="dcim-home"]').click();
   const home = page.locator('[data-act="dcim-plan"][data-rack="H3-07"]');
   await expect(home).toBeVisible();

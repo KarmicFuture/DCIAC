@@ -7,7 +7,7 @@ test("the build plan starts as grass and ends as the 100 MW campus", async ({ pa
   await expect(page.locator(".hud-mission")).toContainText("Outside");
 
   await page.locator('nav [data-view="plan"]').click();
-  await expect(page.locator("h1")).toHaveText("Plan");
+  await expect(page.locator("h1")).toHaveText("Plan · Campus");
   await expect(page.locator(".plan-day")).toBeVisible();
   await expect(page.locator(".build-scene .grass-slab")).toBeVisible();
   await expect(page.locator(".build-scene .legend")).toContainText("Grass field");

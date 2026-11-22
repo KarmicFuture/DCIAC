@@ -25,7 +25,7 @@ test("guided demo walks BMC failover, the leak, and a read-only refusal", async 
   await expect(page.locator("#demo-caption")).toContainText("is dark");
   await expect(page.locator("#demo-caption")).toContainText("ttyS8");
   await page.locator("#demo-advance").click();
-  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator("h1")).toHaveText("Operate · Sessions");
   await expect(page.locator("#demo-caption")).toContainText("out-of-band console");
   await expect(page.locator(".term-path")).toContainText("ACS ttyS8");
   await page.locator("#demo-advance").click();
@@ -36,7 +36,7 @@ test("guided demo walks BMC failover, the leak, and a read-only refusal", async 
   await page.getByRole("button", { name: "DI-1 leak" }).click();
   await expect(page.locator("#demo-caption")).toContainText("DI-1 is quiet");
   await page.locator("#demo-advance").click();
-  await expect(page.locator("h1")).toHaveText("Operate");
+  await expect(page.locator("h1")).toHaveText("Operate · Control");
   await expect(page.locator("#demo-caption")).toContainText("Outlets 1 and 2 are locked");
   await expect(outletRow(page, 1).locator('[data-op="cycle"]')).toBeDisabled();
   await expect(outletRow(page, 2).locator('[data-op="cycle"]')).toBeDisabled();

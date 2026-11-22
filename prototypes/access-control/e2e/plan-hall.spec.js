@@ -5,7 +5,7 @@ async function openPlan(page) {
   await page.locator('[data-user="dsvs.operator"]').click();
   await expect(page.locator(".hud-mission")).toContainText("Outside");
   await page.locator('nav [data-view="plan"]').click();
-  await expect(page.locator("h1")).toHaveText("Plan");
+  await expect(page.locator("h1")).toHaveText("Plan · Campus");
 }
 
 const day = (page, iso) => page.locator('.cal-year [data-act="build-day"][data-date="' + iso + '"]').click();
