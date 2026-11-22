@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The floor view has a List button. Outside, it opens the halls. In a hall, it opens the racks, power and cooling, and the watch list. Focus stays in that panel while you drill in.
+
 The KVM console is named for the device and screen it drives. The instructions say to Tab in and type, and the echo reads "Typed: nothing yet" until a key is sent.
 
 Alarm responses are their own buttons, beside the row that expands the details. Each one is named with the asset, and the banner chip reads its priority and count.

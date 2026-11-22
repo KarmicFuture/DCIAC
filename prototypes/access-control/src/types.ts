@@ -184,6 +184,7 @@ export interface AppState {
   rackYaw: number;
   rackPitch: number;
   libraryOpen: boolean;
+  floorListOpen: boolean;
   inspectorOpen: boolean;
   manage: { layer: string; device: string };
   containment: string;

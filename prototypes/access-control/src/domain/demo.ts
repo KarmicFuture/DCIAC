@@ -108,6 +108,7 @@ function calmChrome() {
   state.menuOpen = false;
   state.toast = "";
   state.libraryOpen = false;
+  state.floorListOpen = false;
 }
 
 function closeDemoSessions() {

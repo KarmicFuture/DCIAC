@@ -126,6 +126,7 @@ export const state: AppState = {
   rackYaw: -42,
   rackPitch: -14,
   libraryOpen: false,
+  floorListOpen: false,
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },
   containment: "hac",

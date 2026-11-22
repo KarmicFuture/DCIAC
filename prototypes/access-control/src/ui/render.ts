@@ -33,7 +33,7 @@ import { bindRender, render } from "./schedule";
 import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
-import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { applyCamera, closeFloorDetail, floorDetailOpen, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { drillOpenHall, setFleetDrill, toggleFleetRacks } from "../views/fleet";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
@@ -72,7 +72,7 @@ export function settle() {
     state.focusField = "";
     if (field) {
       field.focus({ preventScroll: true });
-      const end = field.value.length;
+      const end = (field.value || "").length;
       if (field.setSelectionRange) field.setSelectionRange(end, end);
     }
   }
@@ -236,6 +236,51 @@ function outletConfirmKeys(event) {
   return false;
 }
 
+let floorDrawerFocusRestore = "";
+
+const floorDrawerAttrKeys = ["pod", "rack", "row", "server", "level", "feed", "part", "plan"];
+
+function recordFloorDrawerFocus() {
+  floorDrawerFocusRestore = "";
+  if (state.view !== "floor") return;
+  const drawer = document.getElementById("floor-detail");
+  if (!drawer) return;
+  const active = document.activeElement;
+  if (!active || active === document.body || (active !== drawer && !drawer.contains(active))) return;
+  if (active === drawer) {
+    floorDrawerFocusRestore = "#floor-detail";
+    return;
+  }
+  const el = active.closest("[data-act]");
+  if (!el || !drawer.contains(el)) {
+    floorDrawerFocusRestore = "#floor-detail";
+    return;
+  }
+  let sel = '[data-act="' + el.getAttribute("data-act") + '"]';
+  floorDrawerAttrKeys.forEach((key) => {
+    const val = el.getAttribute("data-" + key);
+    if (val) sel += '[data-' + key + '="' + val + '"]';
+  });
+  floorDrawerFocusRestore = sel;
+}
+
+function restoreFloorDrawerFocus() {
+  const sel = floorDrawerFocusRestore;
+  floorDrawerFocusRestore = "";
+  if (!sel) return;
+  const active = document.activeElement;
+  if (active && active !== document.body) return;
+  const drawer = document.getElementById("floor-detail");
+  if (!drawer) return;
+  if (sel === "#floor-detail") {
+    drawer.focus({ preventScroll: true });
+    return;
+  }
+  const target = drawer.querySelector(sel);
+  if (target && target.focus) target.focus({ preventScroll: true });
+  else drawer.focus({ preventScroll: true });
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
@@ -251,6 +296,7 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
+  recordFloorDrawerFocus();
   litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
@@ -260,6 +306,7 @@ function paint() {
   markScrollers();
   syncOutletInert();
   settle();
+  restoreFloorDrawerFocus();
   applyCamera();
   paintHeat();
   placeDemoHighlights();
@@ -544,6 +591,11 @@ export function onClick(event) {
   else if (act === "explain-run") runExplain(el.dataset.explainKind, el.dataset.explainId);
   else if (act === "plan-maker") { state.plan.maker = el.dataset.maker; render(); }
   else if (act === "library-open") { state.libraryOpen = !state.libraryOpen; render(); }
+  else if (act === "floor-list") {
+    if (floorDetailOpen()) { closeFloorDetail(); state.focusField = "floor-list-toggle"; }
+    else { state.floorListOpen = true; state.focusField = "floor-detail"; }
+    render();
+  }
   else if (act === "plan-preview") {
     state.plan.preview = el.dataset.catalog;
     state.plan.selected = "";
@@ -710,9 +762,10 @@ export function onKeyDown(event) {
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");
     if (typing) return;
-    if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.plan.selected || state.plan.preview)) {
+    if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.floorListOpen || state.plan.selected || state.plan.preview)) {
       state.libraryOpen = false;
       closeFloorDetail();
+      state.focusField = document.getElementById("floor-list-toggle") ? "floor-list-toggle" : "content";
       render();
     }
     return;
