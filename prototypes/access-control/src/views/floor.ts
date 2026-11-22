@@ -1776,6 +1776,10 @@ export function feedPanel() {
   } else if (id === "grid-xfmr") {
     copy = "Utility feeder from the grid gantry to the MV transformer. Energized. The conductor stays in the yard.";
     next = '<button type="button" class="act" data-act="floor-server" data-server="grid-1">Open the grid</button>';
+  } else if (id === "grid-xfmr-a" || id === "grid-xfmr-b") {
+    const side = id === "grid-xfmr-a" ? "A" : "B";
+    copy = "Feeder " + side + ". Utility feeder from the grid gantry to MV transformer " + side + ". " + copy + " The conductor stays in the yard.";
+    next = '<button type="button" class="act" data-act="floor-server" data-server="' + (side === "A" ? "grid-1" : "grid-2") + '">Open the grid</button>';
   } else if (id === "grid-future") {
     copy = "Second feeder to the planned power module. It is drawn with the future state, beside the feeder that is closed today.";
   } else if (id === "xfmr-mod") {
@@ -1851,7 +1855,10 @@ export function renderInspector() {
     body = "<h2>Ten halls</h2><p class=\"fine\">" + PLANT.halls + " halls × " + PLANT.racksPerHall + " AI racks × " + PLANT.kwPerRack + " kW = " + PLANT.itMw + " MW of IT. Two " + PLANT.feederMw + " MW feeders (either one can carry the site) and " + PLANT.coolMw + " MW of heat rejection sit outside. Each hall has a " + PLANT.cduMw + " MW CDU for " + PLANT.hallItMw + " MW of racks.</p><h3>Halls</h3>" +
       PODS.map((hall) => '<button type="button" class="floor-row" data-act="floor-hall" data-pod="' + hall.id + '"><span>' + esc(hall.name) + "</span><b>" + PLANT.racksPerHall + " racks</b></button>").join("") +
       '<h3>Yard</h3>' +
-      infra.filter((item) => item.yard).map(rowButton).join("");
+      infra.filter((item) => item.yard).map(rowButton).join("") +
+      '<h3>Feeders</h3>' +
+      '<button type="button" class="floor-row" data-act="floor-feed" data-feed="grid-xfmr-a">Feeder A</button>' +
+      '<button type="button" class="floor-row" data-act="floor-feed" data-feed="grid-xfmr-b">Feeder B</button>';
   } else if (level === "part") {
     const entity = entityById(state.floor.serverId);
     body = entity ? partPanel(entity) : '<p class="fine">Select a device.</p>';

@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The floor List has Feeder A and Feeder B. Enter opens that utility feeder and an Open the grid button, and focus stays in the panel.
+
 Show on floor is in the alarm banner on every screen. Enter opens the floor List on that rack's hall, and Back returns to the screen you left.
 
 The Yard list includes Supply piping and Return piping. Enter opens that pipe's details, and focus stays in the panel.
