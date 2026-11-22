@@ -919,6 +919,11 @@ button.act.launch.primary small { color: #d9d0c6; }
   font-size: var(--text-sm);
   line-height: 1.5;
 }
+.bios:focus-visible,
+.rdp.kvm-take:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
 .session.rm .bios { background: #0e2218; color: #d5efe4; }
 .keys { margin-top: 12px; color: #8fb9a4; }
 .toggle { margin-bottom: 8px; }

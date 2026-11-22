@@ -2,6 +2,8 @@
 
 ## 2026-11-22
 
+The KVM console is named for the device and screen it drives. The instructions say to Tab in and type, and the echo reads "Typed: nothing yet" until a key is sent.
+
 Alarm responses are their own buttons, beside the row that expands the details. Each one is named with the asset, and the banner chip reads its priority and count.
 
 Outlet confirmation keeps the keyboard inside the dialog. Focus starts on the first field (or Cancel), Tab stays in the card, Escape cancels, and the page behind the dialog is inert until the operator confirms or cancels. Focus returns to the button that opened it.
