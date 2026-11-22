@@ -10,7 +10,7 @@ import { alarmInput, explainHtml } from "./explain";
 import { esc } from "./format";
 import { render } from "./schedule";
 import { go } from "./shell";
-import { floorSerial, openFloorServer, openPart } from "../views/floor";
+import { floorAlarmRackId, floorSerial, openFloorServer, openPart } from "../views/floor";
 import { launchAlarmSerial } from "../domain/autofix";
 import { thermalReading } from "../views/rack";
 
@@ -169,7 +169,12 @@ export function alarmBanner() {
       '<span class="sr-only">Priority ' + alarm.pri + ". </span><b>" + esc(alarm.asset) + '</b>' +
       '<span class="alarm-line">' + esc(alarm.text) + '</span></summary><div class="alarm-extra">' +
       '<button type="button" class="act" data-act="alarm-ack" data-alarm="' + alarm.id + '"' +
-      (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
+      (unacked ? "" : " disabled") + ">Ack</button>" +
+      (state.view === "floor" && floorAlarmRackId(alarm)
+        ? '<button type="button" class="act" data-act="alarm-floor" data-alarm="' + alarm.id +
+          '" aria-label="Show on floor · ' + esc(alarm.asset) + '">Show on floor</button>'
+        : "") +
+      '<details class="explain-fold"><summary>Explain</summary>' +
       explainHtml(alarmInput(alarm)) + "</details></div></details>" + go + "</div>";
   }).join("");
   return '<details class="alarm-banner"><summary class="alarm-chip"><span class="sr-only">Abnormal conditions: </span><span class="pri-mark pri-' +

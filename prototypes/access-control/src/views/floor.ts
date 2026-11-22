@@ -563,10 +563,16 @@ function locateAlarm(alarm) {
   return null;
 }
 
-export function focusFloorAlarm(alarm) {
+export function floorAlarmRackId(alarm) {
+  const place = locateAlarm(alarm);
+  return place && place.kind === "rack" ? place.rack.id : "";
+}
+
+export function focusFloorAlarm(alarm, opts: { list?: boolean } = {}) {
   if (state.view !== "floor" || !alarm) return;
   const place = locateAlarm(alarm);
   if (!place) return;
+  if (opts.list && place.kind !== "rack") return;
   if (runtime.walk) stopWalk(false, false);
   const from = {
     panX: state.floor.panX,
@@ -579,6 +585,7 @@ export function focusFloorAlarm(alarm) {
     ? state.floor.level === "hall" && state.floor.podId === place.pod.id
     : state.floor.level === "site";
   state.inspectorOpen = false;
+  if (opts.list) state.floorListOpen = true;
   state.floor.serverId = "";
   state.floor.feedId = "";
   state.floor.partId = "";
@@ -595,13 +602,31 @@ export function focusFloorAlarm(alarm) {
     Object.assign(state.floor, aimPoint(place.item.x + (place.item.w || 0) / 2, place.item.y + (place.item.d || 0) / 2));
     armPulse(place.item.id);
   }
-  if (!same) render();
+  if (!same || opts.list) render();
   glideCamera(from);
   const selector = place.kind === "rack"
     ? '.rackbox[data-rack="' + place.rack.id + '"]'
     : '.rackbox[data-server="' + place.item.id + '"]';
   const box = document.querySelector(selector);
   if (box) box.classList.add("is-pulse");
+  if (opts.list && place.kind === "rack") {
+    const drawer = document.getElementById("floor-detail");
+    const row = drawer && drawer.querySelector('[data-act="floor-rack"][data-rack="' + place.rack.id + '"]');
+    if (row && (row as HTMLElement).focus) {
+      (row as HTMLElement).focus({ preventScroll: true });
+      if (drawer) {
+        const rowEl = row as HTMLElement;
+        const top = rowEl.offsetTop;
+        const visibleTop = drawer.scrollTop;
+        const visibleBottom = visibleTop + drawer.clientHeight;
+        if (top < visibleTop || top + rowEl.offsetHeight > visibleBottom) {
+          drawer.scrollTop = top - drawer.clientHeight / 2;
+        }
+      }
+    } else if (drawer && drawer.focus) {
+      drawer.focus({ preventScroll: true });
+    }
+  }
 }
 
 function walkElapsed(now) {

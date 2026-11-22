@@ -583,6 +583,10 @@ export function onClick(event) {
       if (alarm) focusFloorAlarm(alarm);
     }
   }
+  else if (act === "alarm-floor") {
+    const alarm = activeAlarms().find((item) => item.id === el.dataset.alarm);
+    if (alarm) focusFloorAlarm(alarm, { list: true });
+  }
   else if (act === "alarm-go") {
     event.preventDefault();
     event.stopPropagation();
