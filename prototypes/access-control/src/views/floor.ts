@@ -569,10 +569,16 @@ export function floorAlarmRackId(alarm) {
 }
 
 export function focusFloorAlarm(alarm, opts: { list?: boolean } = {}) {
-  if (state.view !== "floor" || !alarm) return;
+  if (!alarm) return;
+  if (state.view !== "floor" && !opts.list) return;
   const place = locateAlarm(alarm);
   if (!place) return;
   if (opts.list && place.kind !== "rack") return;
+  if (state.view !== "floor") {
+    state.view = "floor";
+    state.toast = "";
+    state.menuOpen = false;
+  }
   if (runtime.walk) stopWalk(false, false);
   const from = {
     panX: state.floor.panX,

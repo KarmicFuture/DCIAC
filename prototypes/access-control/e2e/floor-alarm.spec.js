@@ -87,7 +87,8 @@ test("Show on floor button presence and naming", async ({ page }) => {
 
   await page.goto("/#/sessions", { waitUntil: "domcontentloaded" });
   await page.locator(".alarm-chip").click();
-  await expect(page.locator('[data-act="alarm-floor"]')).toHaveCount(0);
+  await expect(page.locator('[data-act="alarm-floor"]')).not.toHaveCount(0);
+  await expect(page.locator('.alarm-list summary [data-act="alarm-floor"]')).toHaveCount(0);
 });
 
 test("Show on floor: keyboard to List rack row and escape", async ({ page }) => {

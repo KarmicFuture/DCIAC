@@ -170,7 +170,7 @@ export function alarmBanner() {
       '<span class="alarm-line">' + esc(alarm.text) + '</span></summary><div class="alarm-extra">' +
       '<button type="button" class="act" data-act="alarm-ack" data-alarm="' + alarm.id + '"' +
       (unacked ? "" : " disabled") + ">Ack</button>" +
-      (state.view === "floor" && floorAlarmRackId(alarm)
+      (floorAlarmRackId(alarm)
         ? '<button type="button" class="act" data-act="alarm-floor" data-alarm="' + alarm.id +
           '" aria-label="Show on floor · ' + esc(alarm.asset) + '">Show on floor</button>'
         : "") +
