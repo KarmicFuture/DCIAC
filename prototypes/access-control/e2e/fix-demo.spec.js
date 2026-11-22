@@ -84,7 +84,7 @@ test("an operator can run the same fix from the Explain panel; read only cannot"
 
   // Open serial from the alarm. No work order is needed: the P1 is the reason.
   await page.locator(".alarm-banner > summary").click();
-  await page.locator('details.alarm-row:has(summary[data-alarm="watch-tray-05"]) [data-act="alarm-go"]').click();
+  await page.locator('.alarm-row:has(summary[data-alarm="watch-tray-05"]) [data-act="alarm-go"]').click();
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "sessions");
 
   const run = page.locator('.session .explain [data-act="explain-run"]');
@@ -106,7 +106,7 @@ test("an operator can run the same fix from the Explain panel; read only cannot"
   await page.evaluate(() => { window.AccessDemo.breakBoot("tray-05"); window.AccessDemo.state.sessions = []; });
   await page.evaluate(() => { location.hash = "#/rack/A14/tray-05"; });
   await page.locator(".alarm-banner > summary").click();
-  await page.locator('details.alarm-row:has(summary[data-alarm="watch-tray-05"]) [data-act="alarm-go"]').click();
+  await page.locator('.alarm-row:has(summary[data-alarm="watch-tray-05"]) [data-act="alarm-go"]').click();
   await expect(page.locator(".session .explain [data-act=explain-run]")).toBeDisabled();
   await expect(page.locator(".session .explain [data-act=explain-run]")).toContainText("requires Operator");
 });

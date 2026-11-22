@@ -159,17 +159,20 @@ export function alarmBanner() {
   const top = alarms[0];
   const rows = alarms.map((alarm) => {
     const unacked = !state.acked[alarm.id];
-    const action = alarm.response
-      ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id + '">' + esc(alarm.response) + "</button>"
+    const go = alarm.response
+      ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id +
+        '" aria-label="' + esc(alarm.response) + " · " + esc(alarm.asset) + '">' + esc(alarm.response) + "</button>"
       : "";
-    return '<details class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><summary data-act="alarm-focus" data-alarm="' +
-      alarm.id + '"><span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + "</span><b>" +
-      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + "</span>" + action +
-      '</summary><div class="alarm-extra"><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
-      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
-      explainHtml(alarmInput(alarm)) + "</details></div></details>";
+    return '<div class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '" role="listitem">' +
+      '<details class="alarm-fold"><summary data-act="alarm-focus" data-alarm="' + alarm.id + '">' +
+      '<span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + '</span>' +
+      '<span class="sr-only">Priority ' + alarm.pri + ". </span><b>" + esc(alarm.asset) + '</b>' +
+      '<span class="alarm-line">' + esc(alarm.text) + '</span></summary><div class="alarm-extra">' +
+      '<button type="button" class="act" data-act="alarm-ack" data-alarm="' + alarm.id + '"' +
+      (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
+      explainHtml(alarmInput(alarm)) + "</details></div></details>" + go + "</div>";
   }).join("");
-  return '<details class="alarm-banner"><summary class="alarm-chip" aria-label="Abnormal conditions"><span class="pri-mark pri-' +
+  return '<details class="alarm-banner"><summary class="alarm-chip"><span class="sr-only">Abnormal conditions: </span><span class="pri-mark pri-' +
     top.pri + '" aria-hidden="true">' + top.pri + "</span><span>P" + top.pri + " · " + alarms.length +
     "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
 }
