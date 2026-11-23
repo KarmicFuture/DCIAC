@@ -19,9 +19,35 @@ Alarm SLA and escalation clocks (the alarm chip at the top of every Operate and 
 - The AI fix demo's alarm step says the 5-minute ack clock starts.
 - This finishes priority 3 in `DAILY_IMPROVEMENT.md`.
 
+Heat path walks the heat from the yard coolers through the hall, rack, one-line, fleet, control, port map, and sessions. Next and Back move one view at a time, and it also advances on its own until the last view.
+
 ## 2026-11-22
 
 The Full demo test passes again. It still looked for the old lowercase "one-line" caption, so it waited while the tour ran ahead on its own and then failed on the 3D rack step. The test now steps through the tour by hand, checks each beat by its step number and its `Operate · …` caption, and checks auto-advance once at the end. No app change.
+
+The floor has Orbit left, right, up, and down between Pan and Zoom. Each press turns or tilts the view, focus stays on the button, and Reset view restores the starting angle.
+
+The floor has Pan left, right, up, and down beside Zoom. Each press moves the view 48 pixels, focus stays on the button, and Reset view returns to the center.
+
+Each grid's drawer opens its own feeder. Feeder A returns to grid 1, and Feeder B returns to grid 2.
+
+The floor List has Feeder A and Feeder B. Enter opens that utility feeder and an Open the grid button, and focus stays in the panel.
+
+Show on floor is in the alarm banner on every screen. Enter opens the floor List on that rack's hall, and Back returns to the screen you left.
+
+The Yard list includes Supply piping and Return piping. Enter opens that pipe's details, and focus stays in the panel.
+
+The hall List has an Open Hall overview button. It opens that hall's rows, racks, infrastructure, and nearing-capacity list, and focus stays in the panel.
+
+Each expanded floor alarm has a Show on floor button. It opens the List on that rack's hall and puts focus on the rack's row.
+
+The floor view has a List button. Outside, it opens the halls. In a hall, it opens the racks, power and cooling, and the watch list. Focus stays in that panel while you drill in.
+
+The KVM console is named for the device and screen it drives. The instructions say to Tab in and type, and the echo reads "Typed: nothing yet" until a key is sent.
+
+Alarm responses are their own buttons, beside the row that expands the details. Each one is named with the asset, and the banner chip reads its priority and count.
+
+Outlet confirmation keeps the keyboard inside the dialog. Focus starts on the first field (or Cancel), Tab stays in the card, Escape cancels, and the page behind the dialog is inert until the operator confirms or cancels. Focus returns to the button that opened it.
 
 Demo paths use the screen names from the headings. The sign-in tours and their captions say `Operate · Fleet`, `Operate · Rack`, `Operate · Sessions`, `Operate · Control`, `Operate · One-line`, `Plan · Campus`, `Plan · Halls`, and `Plan · DCIM` for the screens they open.
 

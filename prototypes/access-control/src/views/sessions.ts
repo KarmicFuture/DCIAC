@@ -51,17 +51,25 @@ export function rdpDesk(d, dead) {
 }
 
 export function kvmBody(d, s) {
+  const keyEcho = s.keys ? esc(s.keys) : "nothing yet";
+  const help =
+    "Click the console or Tab to it, then type. Keys go to " + d.name +
+    ". Tab leaves the console. HTML5 viewer. Java and JNLP are unsupported.";
+  const toggleLead =
+    '<div class="toggle" role="group" aria-label="' + esc("Console screen for " + d.name) + '">';
   if (s.rdpFailover && s.screen !== "bios") {
-    return '<div class="toggle"><button type="button" class="act" data-act="screen" data-session="' + s.id +
+    return toggleLead + '<button type="button" class="act" data-act="screen" data-session="' + s.id +
       '" data-screen="bios" aria-pressed="false">BIOS</button>' +
       '<button type="button" class="act" data-act="screen" data-session="' + s.id +
       '" data-screen="os" aria-pressed="true">OS</button></div>' +
       '<div class="rdp kvm-take" data-kvm="' + s.id + '" tabindex="0" id="kvm-' + s.id + '" data-focus-key="kvm-' + s.id +
-      '"><div class="rdp-bar"><span>MPU2 KVM · HTML5</span><span class="mono">port ' + d.mpu +
+      '" role="application" aria-label="' + esc("KVM failover console for " + d.name + ", OS screen") +
+      '" aria-describedby="kvm-help-' + s.id + " kvm-keys-" + s.id + '">' +
+      '<div class="rdp-bar"><span>MPU2 KVM · HTML5</span><span class="mono">port ' + d.mpu +
       '</span></div><div class="rdp-stage"><p class="kicker">RDP failover</p><p class="rdp-title">' + esc(d.name) +
       '</p><p>In-band remote desktop disconnected. Graphical console moved to this MPU2 KVM path. RM1048 did not take the failover.</p>' +
-      '<div class="keys">Typed <span data-keys>' + esc(s.keys || "") + "</span></div></div></div>" +
-      '<p class="fine">Click the console, then type. HTML5 viewer. Java and JNLP are unsupported.</p>' +
+      '<div class="keys" id="kvm-keys-' + s.id + '">Typed: <span data-keys>' + keyEcho + "</span></div></div></div>" +
+      '<p class="fine" id="kvm-help-' + s.id + '">' + esc(help) + "</p>" +
       mediaControls(s);
   }
   const lines = s.screen === "bios"
@@ -81,14 +89,17 @@ export function kvmBody(d, s) {
       "Virtual media      " + (s.media || "empty"),
       "HTML5 keyboard attached",
     ];
-  return '<div class="toggle"><button type="button" class="act" data-act="screen" data-session="' + s.id +
+  const screenLabel = s.screen === "bios" ? "BIOS" : "OS";
+  return toggleLead + '<button type="button" class="act" data-act="screen" data-session="' + s.id +
     '" data-screen="bios" aria-pressed="' + (s.screen === "bios") + '">BIOS</button>' +
     '<button type="button" class="act" data-act="screen" data-session="' + s.id +
     '" data-screen="os" aria-pressed="' + (s.screen === "os") + '">OS</button></div>' +
-    '<div class="bios" data-kvm="' + s.id + '" tabindex="0" id="kvm-' + s.id + '" data-focus-key="kvm-' + s.id + '">' +
+    '<div class="bios" data-kvm="' + s.id + '" tabindex="0" id="kvm-' + s.id + '" data-focus-key="kvm-' + s.id +
+    '" role="application" aria-label="' + esc("KVM console for " + d.name + ", " + screenLabel + " screen") +
+    '" aria-describedby="kvm-help-' + s.id + " kvm-keys-" + s.id + '">' +
     lines.map((line) => "<div>" + esc(line) + "</div>").join("") +
-    '<div class="keys">Typed <span data-keys>' + esc(s.keys || "") + "</span></div></div>" +
-    '<p class="fine">Click the console, then type. HTML5 viewer. Java and JNLP are unsupported.</p>' +
+    '<div class="keys" id="kvm-keys-' + s.id + '">Typed: <span data-keys>' + keyEcho + "</span></div></div>" +
+    '<p class="fine" id="kvm-help-' + s.id + '">' + esc(help) + "</p>" +
     mediaControls(s);
 }
 

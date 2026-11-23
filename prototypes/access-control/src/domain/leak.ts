@@ -57,7 +57,7 @@ export function leakCard() {
     const reason = outletReason(outletByN(n));
     const dis = reason ? " disabled" : "";
     const title = reason ? ' title="' + esc(reason) + '"' : "";
-    return '<button type="button" class="act danger" data-act="outlet" data-outlet="' + n +
+    return '<button type="button" class="act danger" id="leak-shed-' + n + '" data-act="outlet" data-outlet="' + n +
       '" data-op="off" data-source="DI-1"' + dis + title + ">Shed Outlet " + n + "</button>";
   }).join("");
   return '<section class="alarm" role="status"><h2>DI-1 leak alarm</h2><p>Location: ' + esc(LEAK.location) +

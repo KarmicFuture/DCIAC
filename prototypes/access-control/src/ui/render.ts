@@ -20,7 +20,7 @@ import { applyCapacitySeed, stepCapacity, tick, toggleBmc } from "../domain/fail
 import { onHashChange, syncHash } from "../domain/route";
 import { restoreWorld, saveWorld } from "../domain/storage";
 import { toggleLeak } from "../domain/leak";
-import { actAll, actOutlet, cancelOutlet, settleOutletHold, showOutlet, submitOutletConfirm, undoOutlet } from "../domain/outlet-policy";
+import { actAll, actOutlet, cancelOutlet, outletConfirmHtml, settleOutletHold, showOutlet, submitOutletConfirm, undoOutlet } from "../domain/outlet-policy";
 import { closeSession, failRdpToKvm, fallback, openSession, refuseEndpoint, restoreRdp, sendSerial, sessionById, setScreen, toggleMedia } from "../domain/sessions";
 import { copyTerm, downloadLog, focusTerm, mountTerminals, searchTerm, sendBreak } from "./terminal";
 import { sessionBlocked, toggleRm } from "../domain/single-master";
@@ -33,10 +33,11 @@ import { bindRender, render } from "./schedule";
 import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
-import { applyCamera, closeFloorDetail, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { applyCamera, closeFloorDetail, floorDetailOpen, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, orbitFloor, panFloor, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { drillOpenHall, setFleetDrill, toggleFleetRacks } from "../views/fleet";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
+import { advanceHeat, backHeat, heatPathHtml, heatPathOn, stopHeat, toggleHeat } from "../domain/heat-path";
 import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo, toggleTheme } from "../domain/demo";
 import { diagnoseBoot, runBootFix } from "../domain/autofix";
 import { launchMp1000Kvm } from "../domain/mp1000";
@@ -72,7 +73,7 @@ export function settle() {
     state.focusField = "";
     if (field) {
       field.focus({ preventScroll: true });
-      const end = field.value.length;
+      const end = (field.value || "").length;
       if (field.setSelectionRange) field.setSelectionRange(end, end);
     }
   }
@@ -175,6 +176,112 @@ function clearBootNote(root) {
   });
 }
 
+function syncOutletInert() {
+  const open = !!(state.outletGate && state.outletGate.phase === "confirm");
+  const app = document.getElementById("app");
+  if (!app) return;
+  const targets = [];
+  Array.from(app.children).forEach((child) => {
+    if (child instanceof HTMLElement && !child.classList.contains("shell")) targets.push(child);
+  });
+  const shell = app.querySelector(".shell");
+  if (shell) {
+    Array.from(shell.children).forEach((child) => {
+      if (child instanceof HTMLElement && child.dataset.slot !== "confirm") targets.push(child);
+    });
+  }
+  const railNav = document.querySelector("header.rail nav");
+  if (railNav instanceof HTMLElement) targets.push(railNav);
+  targets.forEach((node) => {
+    if (open) node.setAttribute("inert", "");
+    else node.removeAttribute("inert");
+  });
+}
+
+function confirmFocusables() {
+  const card = document.querySelector(".confirm-card");
+  if (!card) return [];
+  return Array.from(card.querySelectorAll('button, input, select, textarea, [href], [tabindex]:not([tabindex="-1"])'))
+    .filter((el) => {
+      if (!(el instanceof HTMLElement)) return false;
+      if (el.getAttribute("aria-disabled") === "true") return false;
+      if (el.hasAttribute("disabled")) return false;
+      return el.tabIndex !== -1;
+    });
+}
+
+function outletConfirmKeys(event) {
+  const gate = state.outletGate;
+  if (!gate || gate.phase !== "confirm") return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    cancelOutlet();
+    return true;
+  }
+  if (event.key !== "Tab") return false;
+  const items = confirmFocusables();
+  if (!items.length) return false;
+  const active = document.activeElement;
+  const idx = items.indexOf(active);
+  const last = items.length - 1;
+  if (!event.shiftKey && idx === last) {
+    event.preventDefault();
+    items[0].focus({ preventScroll: true });
+    return true;
+  }
+  if (event.shiftKey && idx === 0) {
+    event.preventDefault();
+    items[last].focus({ preventScroll: true });
+    return true;
+  }
+  return false;
+}
+
+let floorDrawerFocusRestore = "";
+
+const floorDrawerAttrKeys = ["pod", "rack", "row", "server", "level", "feed", "part", "plan"];
+
+function recordFloorDrawerFocus() {
+  floorDrawerFocusRestore = "";
+  if (state.view !== "floor") return;
+  const drawer = document.getElementById("floor-detail");
+  if (!drawer) return;
+  const active = document.activeElement;
+  if (!active || active === document.body || (active !== drawer && !drawer.contains(active))) return;
+  if (active === drawer) {
+    floorDrawerFocusRestore = "#floor-detail";
+    return;
+  }
+  const el = active.closest("[data-act]");
+  if (!el || !drawer.contains(el)) {
+    floorDrawerFocusRestore = "#floor-detail";
+    return;
+  }
+  let sel = '[data-act="' + el.getAttribute("data-act") + '"]';
+  floorDrawerAttrKeys.forEach((key) => {
+    const val = el.getAttribute("data-" + key);
+    if (val) sel += '[data-' + key + '="' + val + '"]';
+  });
+  floorDrawerFocusRestore = sel;
+}
+
+function restoreFloorDrawerFocus() {
+  const sel = floorDrawerFocusRestore;
+  floorDrawerFocusRestore = "";
+  if (!sel) return;
+  const active = document.activeElement;
+  if (active && active !== document.body) return;
+  const drawer = document.getElementById("floor-detail");
+  if (!drawer) return;
+  if (sel === "#floor-detail") {
+    drawer.focus({ preventScroll: true });
+    return;
+  }
+  const target = drawer.querySelector(sel);
+  if (target && target.focus) target.focus({ preventScroll: true });
+  else drawer.focus({ preventScroll: true });
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
@@ -190,7 +297,8 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}</div>`, root);
+  recordFloorDrawerFocus();
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   updateAlarmClocks();
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
@@ -198,7 +306,9 @@ function paint() {
   dressChrome();
   mountTerminals();
   markScrollers();
+  syncOutletInert();
   settle();
+  restoreFloorDrawerFocus();
   applyCamera();
   paintHeat();
   placeDemoHighlights();
@@ -333,6 +443,10 @@ export function onClick(event) {
   else if (act === "briefing-start") startBriefing();
   else if (act === "briefing-next") advanceBriefing();
   else if (act === "briefing-skip") skipBriefing();
+  else if (act === "heat-path") toggleHeat();
+  else if (act === "heat-next") advanceHeat(true);
+  else if (act === "heat-back") backHeat();
+  else if (act === "heat-stop") stopHeat(true);
   else if (act === "lab-open" || act === "simulate") {
     state.labOpen = false;
     state.menuOpen = false;
@@ -446,6 +560,7 @@ export function onClick(event) {
     state.floor.zoom = Math.max(state.floor.zoom, 0.9);
     render();
   }
+  else if (act === "floor-overview") openPod(el.dataset.pod);
   else if (act === "floor-go") goFloor(el.dataset.level);
   else if (act === "floor-serial") floorSerial(el.dataset.device);
   else if (act === "rdp-open") openSession(el.dataset.device, "rdp", "desktop", "");
@@ -468,12 +583,18 @@ export function onClick(event) {
     render();
   }
   else if (act === "floor-zoom") zoomFloor(el.dataset.dir);
+  else if (act === "floor-pan") panFloor(el.dataset.dir);
+  else if (act === "floor-orbit") orbitFloor(el.dataset.dir);
   else if (act === "alarm-ack") ackBannerAlarm(el.dataset.alarm);
   else if (act === "alarm-focus") {
     if (state.view === "floor") {
       const alarm = activeAlarms().find((item) => item.id === el.dataset.alarm);
       if (alarm) focusFloorAlarm(alarm);
     }
+  }
+  else if (act === "alarm-floor") {
+    const alarm = activeAlarms().find((item) => item.id === el.dataset.alarm);
+    if (alarm) focusFloorAlarm(alarm, { list: true });
   }
   else if (act === "alarm-go") {
     event.preventDefault();
@@ -483,6 +604,11 @@ export function onClick(event) {
   else if (act === "explain-run") runExplain(el.dataset.explainKind, el.dataset.explainId);
   else if (act === "plan-maker") { state.plan.maker = el.dataset.maker; render(); }
   else if (act === "library-open") { state.libraryOpen = !state.libraryOpen; render(); }
+  else if (act === "floor-list") {
+    if (floorDetailOpen()) { closeFloorDetail(); state.focusField = "floor-list-toggle"; }
+    else { state.floorListOpen = true; state.focusField = "floor-detail"; }
+    render();
+  }
   else if (act === "plan-preview") {
     state.plan.preview = el.dataset.catalog;
     state.plan.selected = "";
@@ -644,13 +770,19 @@ export function onChange(event) {
 }
 
 export function onKeyDown(event) {
+  if (outletConfirmKeys(event)) return;
   if (rackKey(event)) return;
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");
     if (typing) return;
-    if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.plan.selected || state.plan.preview)) {
+    if (heatPathOn()) {
+      stopHeat(true);
+      return;
+    }
+    if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.floorListOpen || state.plan.selected || state.plan.preview)) {
       state.libraryOpen = false;
       closeFloorDetail();
+      state.focusField = document.getElementById("floor-list-toggle") ? "floor-list-toggle" : "content";
       render();
     }
     return;

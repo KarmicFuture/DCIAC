@@ -94,6 +94,25 @@ function holdBusy() {
   return state.outletGate && state.outletGate.phase === "undo";
 }
 
+function firstConfirmFocus(n) {
+  const outlet = outletByN(n);
+  const mapped = outlet && outlet.deviceId ? deviceById(outlet.deviceId) : null;
+  if (!maintenanceOpen()) return "outlet-wo";
+  if (mapped && mapped.kind === "GPU tray") return "outlet-short";
+  return "outlet-cancel";
+}
+
+export function outletReturnFocusId(gate) {
+  if (gate.opener) {
+    const opener = document.getElementById(gate.opener);
+    if (opener && !opener.disabled && opener.getAttribute("aria-disabled") !== "true") return gate.opener;
+  }
+  if (gate.op === "all") return "content";
+  const rowId = "outlet-" + gate.n + "-" + gate.op;
+  if (document.getElementById(rowId)) return rowId;
+  return "content";
+}
+
 export function actOutlet(n, op, source) {
   const outlet = outletByN(n);
   if (!outlet) return;
@@ -122,6 +141,8 @@ export function actOutlet(n, op, source) {
     render();
     return;
   }
+  const active = document.activeElement;
+  const opener = active && active.id ? active.id : "";
   state.outletGate = {
     phase: "confirm",
     n: Number(n),
@@ -132,21 +153,26 @@ export function actOutlet(n, op, source) {
     error: "",
     wo: state.wo || "",
     typed: "",
+    opener,
+    busy: false,
   };
   state.view = "control";
   state.toast = "";
+  state.focusField = firstConfirmFocus(Number(n));
   render();
 }
 
 export function cancelOutlet() {
-  if (!state.outletGate || state.outletGate.phase !== "confirm") return;
+  const gate = state.outletGate;
+  if (!gate || gate.phase !== "confirm") return;
+  state.focusField = outletReturnFocusId(gate);
   state.outletGate = null;
   render();
 }
 
 export async function submitOutletConfirm() {
   const gate = state.outletGate;
-  if (!gate || gate.phase !== "confirm") return;
+  if (!gate || gate.phase !== "confirm" || gate.busy) return;
   const woEl = document.getElementById("outlet-wo");
   const shortEl = document.getElementById("outlet-short");
   const wo = (woEl ? woEl.value : gate.wo).trim();
@@ -157,6 +183,7 @@ export async function submitOutletConfirm() {
     gate.error = "A work order number is required outside a maintenance window.";
     gate.wo = wo;
     gate.typed = typed;
+    state.focusField = "outlet-wo";
     render();
     return;
   }
@@ -164,10 +191,13 @@ export async function submitOutletConfirm() {
     gate.error = "Type the device short name " + mapped.short + " to confirm.";
     gate.wo = wo;
     gate.typed = typed;
+    state.focusField = "outlet-short";
     render();
     return;
   }
   const maintenance = maintenanceOpen();
+  gate.busy = true;
+  render();
   try {
     const response = await fetch("/api/v1/actions/outlet", {
       method: "POST",
@@ -183,22 +213,28 @@ export async function submitOutletConfirm() {
     });
     const body = await response.json();
     if (!response.ok) {
+      gate.busy = false;
       gate.error = body.error || "The outlet change was refused.";
       gate.wo = wo;
       gate.typed = typed;
+      state.focusField = "outlet-cancel";
       render();
       return;
     }
   } catch (err) {
+    gate.busy = false;
     gate.error = "The outlet change was refused.";
     gate.wo = wo;
     gate.typed = typed;
+    state.focusField = "outlet-cancel";
     render();
     return;
   }
   const reason = outlet ? outletReason(outlet) : "That outlet is not on this PDU.";
   if (!outlet || reason) {
+    gate.busy = false;
     gate.error = reason || "That outlet is not on this PDU.";
+    state.focusField = "outlet-cancel";
     render();
     return;
   }
@@ -206,9 +242,11 @@ export async function submitOutletConfirm() {
   gate.wo = wo || currentWo();
   gate.typed = typed;
   gate.error = "";
+  gate.busy = false;
   gate.phase = "undo";
   gate.until = Date.now() + HOLD_MS;
   state.toast = "";
+  state.focusField = "outlet-undo";
   render();
 }
 
@@ -224,6 +262,7 @@ export function undoOutlet() {
     detail: powerDetail(gate.before || "unchanged", gate.before || "unchanged", "Undo before commit."),
     wo: gate.wo,
   });
+  state.focusField = outletReturnFocusId(gate);
   state.outletGate = null;
   state.toast = "Outlet change undone. Power was not changed.";
   render();
@@ -251,6 +290,7 @@ function commitOne(outlet, op, source, wo) {
 }
 
 function commitHold(gate) {
+  const undoFocused = document.activeElement && document.activeElement.id === "outlet-undo";
   state.outletGate = null;
   if (gate.op === "all") {
     const name = state.maintenance ? state.maintenance.name : "";
@@ -283,6 +323,7 @@ function commitHold(gate) {
   const verb = gate.op === "off" ? "Off" : "Cycle";
   state.toast = verb + " Outlet " + gate.n + " · " + assetName(outlet);
   state.view = "control";
+  if (undoFocused) state.focusField = outletReturnFocusId(gate);
   render();
 }
 
@@ -329,6 +370,8 @@ export function actAll() {
     error: "",
     wo: currentWo(),
     typed: "",
+    opener: "",
+    busy: false,
   };
   state.toast = "";
   render();
@@ -345,13 +388,16 @@ function undoCopy(gate) {
     "</b> seconds. Power is still " + esc(gate.before) + ".";
 }
 
-export function outletHoldHtml() {
+export function outletUndoHtml() {
   const gate = state.outletGate;
-  if (!gate) return "";
-  if (gate.phase === "undo") {
-    return '<div class="toast"><span>' + undoCopy(gate) +
-      '</span><button type="button" data-act="outlet-undo">Undo</button></div>';
-  }
+  if (!gate || gate.phase !== "undo") return "";
+  return '<div class="toast"><span>' + undoCopy(gate) +
+    '</span><button type="button" id="outlet-undo" data-act="outlet-undo">Undo</button></div>';
+}
+
+export function outletConfirmHtml() {
+  const gate = state.outletGate;
+  if (!gate || gate.phase !== "confirm") return "";
   const outlet = outletByN(gate.n);
   if (!outlet) return "";
   const mapped = outlet.deviceId ? deviceById(outlet.deviceId) : null;
@@ -362,6 +408,8 @@ export function outletHoldHtml() {
   const title = (gate.op === "off" ? "Turn off" : "Cycle") + " Outlet " + gate.n;
   const needsWo = !maintenanceOpen();
   const needsShort = mapped && mapped.kind === "GPU tray";
+  const confirmLabel = gate.busy ? "Confirming…" : "Confirm";
+  const confirmBusy = gate.busy ? ' aria-disabled="true" aria-busy="true"' : "";
   return '<div class="confirm-back"><section class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="outlet-confirm-title">' +
     '<h2 id="outlet-confirm-title">' + esc(title) + "</h2>" +
     "<p><strong>Bound device.</strong> " + esc(mapped ? mapped.name : "None. This outlet is unbound.") + "</p>" +
@@ -374,6 +422,6 @@ export function outletHoldHtml() {
       ? '<label>Type ' + esc(mapped.short) + ' to confirm<input id="outlet-short" autocomplete="off" spellcheck="false" aria-label="Device short name"></label>'
       : "") +
     (gate.error ? '<p class="reason" role="alert">' + esc(gate.error) + "</p>" : "") +
-    '<div class="confirm-actions"><button type="button" class="act" data-act="outlet-cancel">Cancel</button>' +
-    '<button type="button" class="act primary" data-act="outlet-confirm">Confirm</button></div></section></div>';
+    '<div class="confirm-actions"><button type="button" class="act" id="outlet-cancel" data-act="outlet-cancel">Cancel</button>' +
+    '<button type="button" class="act primary" id="outlet-confirm" data-act="outlet-confirm"' + confirmBusy + ">" + confirmLabel + "</button></div></section></div>";
 }

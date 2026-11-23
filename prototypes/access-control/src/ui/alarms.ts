@@ -10,7 +10,7 @@ import { alarmInput, explainHtml } from "./explain";
 import { esc } from "./format";
 import { render } from "./schedule";
 import { go } from "./shell";
-import { floorSerial, openFloorServer, openPart } from "../views/floor";
+import { floorAlarmRackId, floorSerial, openFloorServer, openPart } from "../views/floor";
 import { launchAlarmSerial } from "../domain/autofix";
 import { thermalReading } from "../views/rack";
 
@@ -227,20 +227,29 @@ export function alarmBanner() {
   const rows = alarms.map((alarm) => {
     const unacked = !state.acked[alarm.id];
     const clock = alarmClock(alarm);
-    const action = alarm.response
-      ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id + '">' + esc(alarm.response) + "</button>"
+    const go = alarm.response
+      ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id +
+        '" aria-label="' + esc(alarm.response) + " · " + esc(alarm.asset) + '">' + esc(alarm.response) + "</button>"
       : "";
-    return '<details class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><summary data-act="alarm-focus" data-alarm="' +
-      alarm.id + '"><span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + "</span><b>" +
-      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + '</span><span class="alarm-clock" data-alarm-clock="' +
-      alarm.id + '"></span>' + action +
-      '</summary><div class="alarm-extra"><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
-      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><span class="fine alarm-target">P' + alarm.pri +
-      " ack target " + ACK_TARGET_MIN[alarm.pri] + " min" + (unacked ? ", due " + fmt(clock.due) : "") + '.</span><details class="explain-fold"><summary>Explain</summary>' +
-      explainHtml(alarmInput(alarm)) + "</details></div></details>";
+    return '<div class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '" role="listitem">' +
+      '<details class="alarm-fold"><summary data-act="alarm-focus" data-alarm="' + alarm.id + '">' +
+      '<span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + '</span>' +
+      '<span class="sr-only">Priority ' + alarm.pri + ". </span><b>" + esc(alarm.asset) + '</b>' +
+      '<span class="alarm-line">' + esc(alarm.text) + '</span><span class="alarm-clock" data-alarm-clock="' + alarm.id + '"></span></summary><div class="alarm-extra">' +
+      '<button type="button" class="act" data-act="alarm-ack" data-alarm="' + alarm.id + '"' +
+      (unacked ? "" : " disabled") + ">Ack</button>" +
+      '<span class="fine alarm-target">P' + alarm.pri + " ack target " + ACK_TARGET_MIN[alarm.pri] + " min" +
+      (unacked ? ", due " + fmt(clock.due) : "") + ".</span>" +
+      (floorAlarmRackId(alarm)
+        ? '<button type="button" class="act" data-act="alarm-floor" data-alarm="' + alarm.id +
+          '" aria-label="Show on floor · ' + esc(alarm.asset) + '">Show on floor</button>'
+        : "") +
+      '<details class="explain-fold"><summary>Explain</summary>' +
+      explainHtml(alarmInput(alarm)) + "</details></div></details>" + go + "</div>";
   }).join("");
-  return '<details class="alarm-banner"><summary class="alarm-chip" aria-label="Abnormal conditions"><span class="pri-mark pri-' +
-    top.pri + '" aria-hidden="true">' + top.pri + "</span><span data-alarm-count>P" + top.pri + " · " + alarms.length + "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
+  return '<details class="alarm-banner"><summary class="alarm-chip"><span class="sr-only">Abnormal conditions: </span><span class="pri-mark pri-' +
+    top.pri + '" aria-hidden="true">' + top.pri + "</span><span data-alarm-count>P" + top.pri + " · " + alarms.length +
+    "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
 }
 
 export function ackAlarm(id) {

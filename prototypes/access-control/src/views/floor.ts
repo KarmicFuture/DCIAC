@@ -17,6 +17,7 @@ import {
 } from "../domain/events";
 import type { SimImpact } from "../domain/events";
 import { waiting } from "../domain/failover";
+import { heatPathButton } from "../domain/heat-path";
 import { openSession } from "../domain/sessions";
 import { runtime, state } from "../state";
 import { activeAlarms } from "../ui/alarms";
@@ -563,10 +564,22 @@ function locateAlarm(alarm) {
   return null;
 }
 
-export function focusFloorAlarm(alarm) {
-  if (state.view !== "floor" || !alarm) return;
+export function floorAlarmRackId(alarm) {
+  const place = locateAlarm(alarm);
+  return place && place.kind === "rack" ? place.rack.id : "";
+}
+
+export function focusFloorAlarm(alarm, opts: { list?: boolean } = {}) {
+  if (!alarm) return;
+  if (state.view !== "floor" && !opts.list) return;
   const place = locateAlarm(alarm);
   if (!place) return;
+  if (opts.list && place.kind !== "rack") return;
+  if (state.view !== "floor") {
+    state.view = "floor";
+    state.toast = "";
+    state.menuOpen = false;
+  }
   if (runtime.walk) stopWalk(false, false);
   const from = {
     panX: state.floor.panX,
@@ -579,6 +592,7 @@ export function focusFloorAlarm(alarm) {
     ? state.floor.level === "hall" && state.floor.podId === place.pod.id
     : state.floor.level === "site";
   state.inspectorOpen = false;
+  if (opts.list) state.floorListOpen = true;
   state.floor.serverId = "";
   state.floor.feedId = "";
   state.floor.partId = "";
@@ -595,13 +609,31 @@ export function focusFloorAlarm(alarm) {
     Object.assign(state.floor, aimPoint(place.item.x + (place.item.w || 0) / 2, place.item.y + (place.item.d || 0) / 2));
     armPulse(place.item.id);
   }
-  if (!same) render();
+  if (!same || opts.list) render();
   glideCamera(from);
   const selector = place.kind === "rack"
     ? '.rackbox[data-rack="' + place.rack.id + '"]'
     : '.rackbox[data-server="' + place.item.id + '"]';
   const box = document.querySelector(selector);
   if (box) box.classList.add("is-pulse");
+  if (opts.list && place.kind === "rack") {
+    const drawer = document.getElementById("floor-detail");
+    const row = drawer && drawer.querySelector('[data-act="floor-rack"][data-rack="' + place.rack.id + '"]');
+    if (row && (row as HTMLElement).focus) {
+      (row as HTMLElement).focus({ preventScroll: true });
+      if (drawer) {
+        const rowEl = row as HTMLElement;
+        const top = rowEl.offsetTop;
+        const visibleTop = drawer.scrollTop;
+        const visibleBottom = visibleTop + drawer.clientHeight;
+        if (top < visibleTop || top + rowEl.offsetHeight > visibleBottom) {
+          drawer.scrollTop = top - drawer.clientHeight / 2;
+        }
+      }
+    } else if (drawer && drawer.focus) {
+      drawer.focus({ preventScroll: true });
+    }
+  }
 }
 
 function walkElapsed(now) {
@@ -779,6 +811,7 @@ function walkBar() {
 
 export function closeFloorDetail() {
   state.inspectorOpen = false;
+  state.floorListOpen = false;
   state.plan.selected = "";
   state.plan.preview = "";
 }
@@ -1023,14 +1056,18 @@ export function hudHtml(legend) {
   const walkBtn = outside || walking
     ? ""
     : '<button type="button" class="act walk-start" data-act="floor-walk">Walk through</button>';
+  const listBtn = walking
+    ? ""
+    : '<button type="button" class="act" id="floor-list-toggle" data-act="floor-list" aria-expanded="' + (floorDetailOpen() ? "true" : "false") + '">List</button>';
   const addBtn = walking
     ? ""
     : '<button type="button" class="act" data-act="library-open" aria-pressed="' + (state.libraryOpen ? "true" : "false") + '">Add equipment</button>';
   return simStripeHtml() + '<div class="hud">' + pills() + '<p class="hud-mission">' + esc(hudLine()) +
     '</p><div class="hud-controls">' + themeButton() + '<div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
-    walkBtn + addBtn +
+    walkBtn + listBtn + addBtn +
+    heatPathButton(false) +
     '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
-    (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
+    (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Pan"><button type="button" data-act="floor-pan" data-dir="left" aria-label="Pan left">←</button><button type="button" data-act="floor-pan" data-dir="right" aria-label="Pan right">→</button><button type="button" data-act="floor-pan" data-dir="up" aria-label="Pan up">↑</button><button type="button" data-act="floor-pan" data-dir="down" aria-label="Pan down">↓</button></div><div class="zoom-cluster" role="group" aria-label="Orbit"><button type="button" data-act="floor-orbit" data-dir="left" aria-label="Orbit left">↺</button><button type="button" data-act="floor-orbit" data-dir="right" aria-label="Orbit right">↻</button><button type="button" data-act="floor-orbit" data-dir="up" aria-label="Orbit up">⤒</button><button type="button" data-act="floor-orbit" data-dir="down" aria-label="Orbit down">⤓</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
     (runtime.sim.barOpen ? simBarHtml() : "");
 }
 
@@ -1631,8 +1668,9 @@ export function serverInspector(entity) {
   } else if (managed) {
     action = "";
   } else if (entity.kind === "Grid") {
+    const side = entity.id === "grid-2" ? "b" : "a";
     action = yardArt(entity) + "<p>The utility grid lands on a gantry outside the shell. One feeder is closed through the transformer and the power module, and it stops at the hall wall.</p>" +
-      '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr">Open the feeder</button>';
+      '<button type="button" class="act" data-act="floor-feed" data-feed="grid-xfmr-' + side + '">Open Feeder ' + side.toUpperCase() + "</button>";
   } else if (entity.kind === "Pipe") {
     const supply = entity.id === "pipe-sup";
     action = yardArt(entity) + "<p>" + (supply
@@ -1741,6 +1779,10 @@ export function feedPanel() {
   } else if (id === "grid-xfmr") {
     copy = "Utility feeder from the grid gantry to the MV transformer. Energized. The conductor stays in the yard.";
     next = '<button type="button" class="act" data-act="floor-server" data-server="grid-1">Open the grid</button>';
+  } else if (id === "grid-xfmr-a" || id === "grid-xfmr-b") {
+    const side = id === "grid-xfmr-a" ? "A" : "B";
+    copy = "Feeder " + side + ". Utility feeder from the grid gantry to MV transformer " + side + ". " + copy + " The conductor stays in the yard.";
+    next = '<button type="button" class="act" data-act="floor-server" data-server="' + (side === "A" ? "grid-1" : "grid-2") + '">Open the grid</button>';
   } else if (id === "grid-future") {
     copy = "Second feeder to the planned power module. It is drawn with the future state, beside the feeder that is closed today.";
   } else if (id === "xfmr-mod") {
@@ -1770,7 +1812,7 @@ export function rowPanel(pod, row) {
 
 export function ledDot(entityOrList) {
   const tone = Array.isArray(entityOrList) ? listTone(entityOrList) : conditionTone(entityOrList);
-  return '<i class="led" title="' + esc(tone.word) + '" style="background:' + tone.color + '"></i>';
+  return '<i class="led" role="img" aria-label="' + esc(tone.word) + '" title="' + esc(tone.word) + '" style="background:' + tone.color + '"></i>';
 }
 
 export function rowButton(entity) {
@@ -1816,7 +1858,10 @@ export function renderInspector() {
     body = "<h2>Ten halls</h2><p class=\"fine\">" + PLANT.halls + " halls × " + PLANT.racksPerHall + " AI racks × " + PLANT.kwPerRack + " kW = " + PLANT.itMw + " MW of IT. Two " + PLANT.feederMw + " MW feeders (either one can carry the site) and " + PLANT.coolMw + " MW of heat rejection sit outside. Each hall has a " + PLANT.cduMw + " MW CDU for " + PLANT.hallItMw + " MW of racks.</p><h3>Halls</h3>" +
       PODS.map((hall) => '<button type="button" class="floor-row" data-act="floor-hall" data-pod="' + hall.id + '"><span>' + esc(hall.name) + "</span><b>" + PLANT.racksPerHall + " racks</b></button>").join("") +
       '<h3>Yard</h3>' +
-      infra.filter((item) => item.yard && item.kind !== "Pipe").map(rowButton).join("");
+      infra.filter((item) => item.yard).map(rowButton).join("") +
+      '<h3>Feeders</h3>' +
+      '<button type="button" class="floor-row" data-act="floor-feed" data-feed="grid-xfmr-a">Feeder A</button>' +
+      '<button type="button" class="floor-row" data-act="floor-feed" data-feed="grid-xfmr-b">Feeder B</button>';
   } else if (level === "part") {
     const entity = entityById(state.floor.serverId);
     body = entity ? partPanel(entity) : '<p class="fine">Select a device.</p>';
@@ -1849,20 +1894,21 @@ export function renderInspector() {
         esc(item.name) + "</span><b>Between aisles</b></button>").join("") +
       "<h3>Racks</h3>" + pod.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' +
       pod.id + '" data-rack="' + item.id + '">' + ledDot(rackEntities(item)) + '<span>' + esc(item.name) +
-      "</span><b>" + rackEntities(item).length + "</b></button>").join("") +
+      '</span><b>' + rackEntities(item).length + '<span class="sr-only"> devices</span></b></button>').join("") +
       "<h3>Infrastructure</h3>" + infra.filter((item) => item.pod === pod.id).map(rowButton).join("") +
       "<h3>Nearing capacity</h3>" + (servers.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical").map(rowButton).join("") || '<p class="fine">None right now.</p>');
   } else {
     const hall = podById(state.floor.podId) || PODS[0];
     const managed = devices.filter((entity) => heatBand(entity) === "near" || heatBand(entity) === "critical" || heatBand(entity) === "failover");
     body = "<h2>" + esc(hall.name) + "</h2><p class=\"fine\">" + PLANT.racksPerHall + " AI racks in two rows of ten. " + PLANT.hallItMw + " MW of IT against a " + PLANT.cduMw + " MW CDU. " +
-      (hall.managed ? "Rack A14 fails over to ACS serial." : "This hall is simulated. ACS-A14 stays in Hall 1.") + "</p><h3>Racks</h3>" +
+      (hall.managed ? "Rack A14 fails over to ACS serial." : "This hall is simulated. ACS-A14 stays in Hall 1.") + "</p>" +
+      '<button type="button" class="act" data-act="floor-overview" data-pod="' + esc(hall.id) + '">Open ' + esc(hall.name) + ' overview</button><h3>Racks</h3>' +
       hall.racks.map((item) => '<button type="button" class="floor-row" data-act="floor-rack" data-pod="' + hall.id + '" data-rack="' + item.id + '">' +
-        ledDot(rackEntities(item)) + '<span>' + esc(item.name) + "</span><b>" + rackEntities(item).length + "</b></button>").join("") +
+        ledDot(rackEntities(item)) + '<span>' + esc(item.name) + '</span><b>' + rackEntities(item).length + '<span class="sr-only"> devices</span></b></button>').join("") +
       "<h3>Power and cooling</h3>" + infra.filter((item) => item.pod === hall.id && item.kind !== "Aisle").map(rowButton).join("") +
       "<h3>Watch list</h3>" + (managed.map(rowButton).join("") || '<p class="fine">All rack A14 servers are nominal.</p>');
   }
-  return '<aside class="inspector drawer"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
+  return '<aside class="inspector drawer" id="floor-detail" tabindex="-1" aria-label="Floor details"><div class="crumbs">' + crumbs.join("<span>/</span>") + "</div>" + sheet + body + "</aside>";
 }
 
 export function planSheet() {
@@ -1895,11 +1941,11 @@ export function planSheet() {
 }
 
 export function floorDetailOpen() {
-  if (!state.inspectorOpen && !state.plan.selected && !state.plan.preview) return false;
+  if (!state.inspectorOpen && !state.floorListOpen && !state.plan.selected && !state.plan.preview) return false;
   if (state.plan.selected || state.plan.preview) return true;
   const level = state.floor.level;
-  if (level === "site") return !!state.floor.serverId;
-  if (level === "hall" || level === "elevation") return false;
+  if (level === "site") return !!state.floor.serverId || state.floorListOpen;
+  if (level === "hall" || level === "elevation") return state.floorListOpen;
   return level === "pod" || level === "row" || level === "rack" || level === "server" || level === "part" || level === "feed";
 }
 
@@ -1945,6 +1991,28 @@ export function zoomFloor(dir) {
     state.floor.zoom = clamp(state.floor.zoom / 1.16, 0.42, 1.9);
     state.floor.chassisZoom = clamp(state.floor.chassisZoom / 1.12, 0.65, 1.85);
   }
+  applyCamera();
+}
+
+export function panFloor(dir) {
+  if (runtime.walk) stopWalk(false, false);
+  const step = 48;
+  if (dir === "left") state.floor.panX -= step;
+  else if (dir === "right") state.floor.panX += step;
+  else if (dir === "up") state.floor.panY -= step;
+  else if (dir === "down") state.floor.panY += step;
+  state.floor.panX = clamp(state.floor.panX, -480, 480);
+  state.floor.panY = clamp(state.floor.panY, -320, 320);
+  applyCamera();
+}
+
+export function orbitFloor(dir) {
+  if (runtime.walk) stopWalk(false, false);
+  if (dir === "left") state.floor.yaw -= 8;
+  else if (dir === "right") state.floor.yaw += 8;
+  else if (dir === "up") state.floor.pitch += 4;
+  else if (dir === "down") state.floor.pitch -= 4;
+  state.floor.pitch = clamp(state.floor.pitch, 16, 84);
   applyCamera();
 }
 

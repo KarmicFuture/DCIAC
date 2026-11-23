@@ -1,4 +1,5 @@
 import { briefingButton } from "../domain/briefing";
+import { heatPathButton } from "../domain/heat-path";
 import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
@@ -91,7 +92,7 @@ export function topbar() {
   const open = state.menuOpen ? "true" : "false";
   return '<div class="topbar">' + briefingButton() + '<button type="button" class="menu-btn" data-act="menu" aria-expanded="' + open +
     '" aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></button><strong>Access</strong><span class="topbar-view">' +
-    esc(title) + "</span>" + themeButton() + "</div>" +
+    esc(title) + "</span>" + heatPathButton(false) + themeButton() + "</div>" +
     '<button type="button" class="menu-back" data-act="menu-close" aria-label="Close menu"></button>';
 }
 
@@ -111,6 +112,7 @@ export function rail() {
     briefingButton() +
     wordmark() +
     '<div class="product-name">Access</div>' +
+    heatPathButton() +
     "<nav>" +
     navButton("floor", "Floor", FLOOR_VIEWS) +
     navButton("rack", "Operate", OPERATE_VIEWS) +

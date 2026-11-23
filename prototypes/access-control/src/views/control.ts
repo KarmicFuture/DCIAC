@@ -37,9 +37,9 @@ export function outletActions(o) {
   const dis = reason ? " disabled" : "";
   const title = reason ? ' title="' + esc(reason) + '"' : "";
   return '<div class="row-actions">' +
-    '<button type="button" class="act" data-act="outlet" data-outlet="' + o.n + '" data-op="on"' + dis + title + ">On</button>" +
-    '<button type="button" class="act" data-act="outlet" data-outlet="' + o.n + '" data-op="off"' + dis + title + ">Off</button>" +
-    '<button type="button" class="act primary" data-act="outlet" data-outlet="' + o.n + '" data-op="cycle"' + dis + title + ">Cycle</button>" +
+    '<button type="button" class="act" id="outlet-' + o.n + '-on" data-act="outlet" data-outlet="' + o.n + '" data-op="on"' + dis + title + ">On</button>" +
+    '<button type="button" class="act" id="outlet-' + o.n + '-off" data-act="outlet" data-outlet="' + o.n + '" data-op="off"' + dis + title + ">Off</button>" +
+    '<button type="button" class="act primary" id="outlet-' + o.n + '-cycle" data-act="outlet" data-outlet="' + o.n + '" data-op="cycle"' + dis + title + ">Cycle</button>" +
     "</div>";
 }
 
