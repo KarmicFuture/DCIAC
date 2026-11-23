@@ -6,6 +6,8 @@ Heat path walks the heat from the yard coolers through the hall, rack, one-line,
 
 ## 2026-11-22
 
+The Full demo test passes again. It still looked for the old lowercase "one-line" caption, so it waited while the tour ran ahead on its own and then failed on the 3D rack step. The test now steps through the tour by hand, checks each beat by its step number and its `Operate · …` caption, and checks auto-advance once at the end. No app change.
+
 The floor has Orbit left, right, up, and down between Pan and Zoom. Each press turns or tilts the view, focus stays on the button, and Reset view restores the starting angle.
 
 The floor has Pan left, right, up, and down beside Zoom. Each press moves the view 48 pixels, focus stays on the button, and Reset view returns to the center.
