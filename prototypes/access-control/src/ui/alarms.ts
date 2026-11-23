@@ -150,7 +150,74 @@ export function activeAlarms(): Alarm[] {
     });
   });
   plantAlarms().forEach((alarm) => list.push(alarm));
+  trackAlarmClocks(list);
   return list.sort((a, b) => a.pri - b.pri || a.asset.localeCompare(b.asset));
+}
+
+/* Minutes an alarm may stay unacknowledged before it escalates, by priority. */
+export const ACK_TARGET_MIN = { 1: 5, 2: 15, 3: 60 };
+
+function clockKey(alarm) {
+  return alarm.id + "@" + alarm.pri;
+}
+
+/* Start a clock when an alarm first appears; drop clocks for alarms that cleared. */
+export function trackAlarmClocks(list) {
+  const now = Date.now();
+  const live = {};
+  list.forEach((alarm) => {
+    const key = clockKey(alarm);
+    live[key] = true;
+    if (!state.alarmSince[key]) state.alarmSince[key] = now;
+  });
+  Object.keys(state.alarmSince).forEach((key) => { if (!live[key]) delete state.alarmSince[key]; });
+}
+
+export function span(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + "m";
+  return Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m";
+}
+
+export function alarmClock(alarm, now = Date.now()) {
+  const since = state.alarmSince[clockKey(alarm)] || now;
+  const target = (ACK_TARGET_MIN[alarm.pri] || 60) * 60000;
+  const open = now - since;
+  const acked = !!state.acked[alarm.id];
+  const escalated = !acked && open >= target;
+  const text = acked
+    ? "Acked · open " + span(open)
+    : escalated
+      ? "Escalated · " + span(open - target) + " past " + ACK_TARGET_MIN[alarm.pri] + "m"
+      : "Open " + span(open) + " · escalates in " + span(target - open);
+  return { open, escalated, acked, text, due: since + target };
+}
+
+/* Fill the open and escalation clocks after each paint and between renders. The banner
+   HTML itself stays the same while the alarms do, so an open alarm list is not rebuilt. */
+export function updateAlarmClocks() {
+  const els = document.querySelectorAll("[data-alarm-clock]");
+  if (!els.length) return;
+  const byId = {};
+  const alarms = activeAlarms();
+  alarms.forEach((alarm) => { byId[alarm.id] = alarm; });
+  const count = document.querySelector("[data-alarm-count]");
+  if (count && alarms.length) count.textContent = chipText(alarms);
+  els.forEach((el) => {
+    const alarm = byId[el.getAttribute("data-alarm-clock")];
+    if (!alarm) return;
+    const clock = alarmClock(alarm);
+    if (el.textContent !== clock.text) el.textContent = clock.text;
+    el.classList.toggle("is-escalated", clock.escalated);
+    el.closest(".alarm-row")?.classList.toggle("escalated", clock.escalated);
+  });
+}
+
+function chipText(alarms) {
+  const late = alarms.filter((alarm) => alarmClock(alarm).escalated).length;
+  return "P" + alarms[0].pri + " · " + alarms.length + (late ? " · " + late + " escalated" : "");
 }
 
 export function alarmBanner() {
@@ -159,19 +226,21 @@ export function alarmBanner() {
   const top = alarms[0];
   const rows = alarms.map((alarm) => {
     const unacked = !state.acked[alarm.id];
+    const clock = alarmClock(alarm);
     const action = alarm.response
       ? '<button type="button" class="act primary" data-act="alarm-go" data-alarm="' + alarm.id + '">' + esc(alarm.response) + "</button>"
       : "";
     return '<details class="alarm-row pri-' + alarm.pri + (unacked ? " unacked" : "") + '"><summary data-act="alarm-focus" data-alarm="' +
       alarm.id + '"><span class="pri-mark pri-' + alarm.pri + '" aria-hidden="true">' + alarm.pri + "</span><b>" +
-      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + "</span>" + action +
+      esc(alarm.asset) + '</b><span class="alarm-line">' + esc(alarm.text) + '</span><span class="alarm-clock" data-alarm-clock="' +
+      alarm.id + '"></span>' + action +
       '</summary><div class="alarm-extra"><button type="button" class="act" data-act="alarm-ack" data-alarm="' +
-      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><details class="explain-fold"><summary>Explain</summary>' +
+      alarm.id + '"' + (unacked ? "" : " disabled") + '>Ack</button><span class="fine alarm-target">P' + alarm.pri +
+      " ack target " + ACK_TARGET_MIN[alarm.pri] + " min" + (unacked ? ", due " + fmt(clock.due) : "") + '.</span><details class="explain-fold"><summary>Explain</summary>' +
       explainHtml(alarmInput(alarm)) + "</details></div></details>";
   }).join("");
   return '<details class="alarm-banner"><summary class="alarm-chip" aria-label="Abnormal conditions"><span class="pri-mark pri-' +
-    top.pri + '" aria-hidden="true">' + top.pri + "</span><span>P" + top.pri + " · " + alarms.length +
-    "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
+    top.pri + '" aria-hidden="true">' + top.pri + "</span><span data-alarm-count>P" + top.pri + " · " + alarms.length + "</span></summary><div class=\"alarm-list\" role=\"list\">" + rows + "</div></details>";
 }
 
 export function ackAlarm(id) {

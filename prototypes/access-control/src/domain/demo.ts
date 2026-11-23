@@ -478,7 +478,7 @@ const FIX_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: () => "Operate · Rack — acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1.",
+    pop: () => "Operate · Rack — acs.watch reads " + fixTty() + ": a UEFI shell, not a login prompt. It raises a P1, and its 5-minute ack clock starts.",
     target: 'details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"]), .alarm-banner',
     open: '.alarm-banner, details.alarm-row:has(summary[data-alarm="watch-' + FIX_DEVICE + '"])',
     enter() {

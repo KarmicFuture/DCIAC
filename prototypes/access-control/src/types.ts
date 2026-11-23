@@ -143,6 +143,7 @@ export interface AppState {
     awarded: Record<string, boolean>;
   };
   acked: Record<string, boolean>;
+  alarmSince: Record<string, number>;
   rm1048: string;
   leak: boolean;
   maintenance: { name: string; wo: string } | null;

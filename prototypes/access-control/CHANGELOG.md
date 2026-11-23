@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-23
+
+Alarm SLA and escalation clocks (the alarm chip at the top of every Operate and Floor screen):
+
+- Each alarm shows how long it has been open and how long until it escalates, for example
+  `Open 2m · escalates in 3m`. The clock ticks live.
+- Ack targets by priority: P1 5 minutes, P2 15 minutes, P3 60 minutes. Opening a row shows
+  the target and the time it is due.
+- An unacked alarm past its target reads `Escalated · 1m past 5m` in red, its row is tinted,
+  and the chip adds the count, for example `P1 · 7 · 2 escalated`.
+- Ack stops the escalation; the row then reads `Acked · open 6m`.
+- A clock starts when the alarm first appears and is dropped when the alarm clears. If an
+  alarm changes priority it gets a fresh clock, the same way its ack is reset. Clocks are
+  kept across a page reload and cleared by Lab › Reset.
+- The banner's Ack button works again. Two functions named `ackAlarm` were imported into the
+  click handler and the DCIM one won, so Ack in the banner never acknowledged the alarm.
+- The AI fix demo's alarm step says the 5-minute ack clock starts.
+- This finishes priority 3 in `DAILY_IMPROVEMENT.md`.
+
 ## 2026-11-22
 
 The Full demo test passes again. It still looked for the old lowercase "one-line" caption, so it waited while the tour ran ahead on its own and then failed on the 3D rack step. The test now steps through the tour by hand, checks each beat by its step number and its `Operate · …` caption, and checks auto-advance once at the end. No app change.
