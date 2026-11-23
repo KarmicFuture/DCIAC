@@ -25,7 +25,7 @@ import { closeSession, failRdpToKvm, fallback, openSession, refuseEndpoint, rest
 import { copyTerm, downloadLog, focusTerm, mountTerminals, searchTerm, sendBreak } from "./terminal";
 import { sessionBlocked, toggleRm } from "../domain/single-master";
 import { runtime, state } from "../state";
-import { ackAlarm, alarmBanner, activeAlarms, goAlarm, refreshSerialWatch } from "./alarms";
+import { ackAlarm as ackBannerAlarm, alarmBanner, activeAlarms, goAlarm, refreshSerialWatch, updateAlarmClocks } from "./alarms";
 import { alarmInput, serialInput } from "./explain";
 import { explain, gateAction } from "../domain/analyzer";
 import { userAudit } from "../domain/audit";
@@ -44,7 +44,7 @@ import { launchMp1000Kvm } from "../domain/mp1000";
 import { lab, postLabReadings, resetWorld, saveAsset, toggleMaint } from "../views/lab";
 import { login, signIn, signOut } from "../views/login";
 import { loadWorld } from "../data/repository";
-import { ackAlarm, addScenarioChange, advanceWork, applyInventoryFilter, cancelCable, chooseCablePort, collectSample, compareScenario, createWorkOrder, decideDiscovery, dropCable, exportCables, findHome, importCables, loadAlarms, loadFuturePlan, loadTrend, openHall, openRackCapacity, openReport, planHome, promoteScenario, reportMissing, reservePort, sampleSweep, saveCable, scanAsset, scheduleReport, sendServiceNow, showCableRack, traceCable } from "../views/dcim";
+import { ackAlarm as ackDcimAlarm, addScenarioChange, advanceWork, applyInventoryFilter, cancelCable, chooseCablePort, collectSample, compareScenario, createWorkOrder, decideDiscovery, dropCable, exportCables, findHome, importCables, loadAlarms, loadFuturePlan, loadTrend, openHall, openRackCapacity, openReport, planHome, promoteScenario, reportMissing, reservePort, sampleSweep, saveCable, scanAsset, scheduleReport, sendServiceNow, showCableRack, traceCable } from "../views/dcim";
 import { dropNetworkCable, exportElevation, saveNetworkCable } from "../views/elevation";
 import { failPower, setPowerMode } from "../views/power";
 import { cloneModel, importModels, saveModel } from "../views/models";
@@ -299,6 +299,7 @@ function paint() {
   runtime.lastRenderedView = viewKey;
   recordFloorDrawerFocus();
   litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
+  updateAlarmClocks();
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
@@ -523,7 +524,7 @@ export function onClick(event) {
   else if (act === "dcim-report") openReport(el.dataset.kind || "capacity", "");
   else if (act === "dcim-csv") openReport(runtime.dcim.reportKind || "capacity", "csv");
   else if (act === "dcim-pdf") openReport(runtime.dcim.reportKind || "capacity", "pdf");
-  else if (act === "dcim-ack") ackAlarm(el.dataset.id || "");
+  else if (act === "dcim-ack") ackDcimAlarm(el.dataset.id || "");
   else if (act === "dcim-decide") decideDiscovery(el.dataset.id || "", el.dataset.accept !== "0");
   else if (act === "dcim-scan") scanAsset();
   else if (act === "dcim-hall") openHall(el.dataset.id || "");
@@ -584,7 +585,7 @@ export function onClick(event) {
   else if (act === "floor-zoom") zoomFloor(el.dataset.dir);
   else if (act === "floor-pan") panFloor(el.dataset.dir);
   else if (act === "floor-orbit") orbitFloor(el.dataset.dir);
-  else if (act === "alarm-ack") ackAlarm(el.dataset.alarm);
+  else if (act === "alarm-ack") ackBannerAlarm(el.dataset.alarm);
   else if (act === "alarm-focus") {
     if (state.view === "floor") {
       const alarm = activeAlarms().find((item) => item.id === el.dataset.alarm);
@@ -846,7 +847,7 @@ export async function boot() {
   document.body.addEventListener("dragover", onDragOver);
   document.body.addEventListener("drop", onDrop);
   document.body.addEventListener("dragend", onDragEnd);
-  setInterval(() => { tick(); settleOutletHold(); }, 250);
+  setInterval(() => { tick(); settleOutletHold(); updateAlarmClocks(); }, 250);
   setInterval(() => stepSimCapacity(stepCapacity, 1000), 100);
   render();
 }

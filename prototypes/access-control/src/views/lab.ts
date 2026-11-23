@@ -78,6 +78,7 @@ export function resetWorld() {
   state.game.catches = 0;
   state.game.awarded = {};
   state.acked = {};
+  state.alarmSince = {};
   state.rm1048 = "healthy";
   state.leak = false;
   state.outletGate = null;

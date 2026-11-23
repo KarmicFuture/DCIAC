@@ -3717,3 +3717,10 @@ button.act.launch.primary small { color: #d9d0c6; }
 .dv-go .act { margin: 0; }
 .inspector .device-view h3 { font-size: var(--text-sm); }
 .inspector .dv-port { min-width: 72px; }
+
+/* Alarm open time and escalation clock. */
+.alarm-fold > summary:has(.alarm-clock) { flex-wrap: wrap; row-gap: 0; }
+.alarm-clock { order: 3; flex: 1 1 100%; padding-left: 28px; font-size: var(--text-xs, 12px); font-variant-numeric: tabular-nums; color: var(--muted, inherit); white-space: nowrap; }
+.alarm-clock.is-escalated { color: #b3261e; font-weight: 600; }
+.alarm-row.escalated .alarm-fold > summary { background: color-mix(in srgb, #b3261e 10%, transparent); }
+.alarm-target { align-self: center; }

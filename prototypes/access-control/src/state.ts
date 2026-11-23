@@ -95,6 +95,7 @@ export const state: AppState = {
   },
   game: { score: 0, streak: 0, best: 0, catches: 0, awarded: {} },
   acked: {},
+  alarmSince: {},
   rm1048: "healthy",
   leak: false,
   maintenance: null,
