@@ -18,37 +18,43 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await expect(page.locator('.topbar [data-act="demo-full"]')).toHaveCount(0);
   await expect(page.locator(".shell")).toHaveAttribute("data-demo", "full");
 
-  await page.evaluate(() => {
-    window.AccessDemo.setDemoPauseMs(250);
-    window.AccessDemo.advanceDemo();
-  });
-  await expect.poll(async () => page.locator("#demo-caption").textContent(), { timeout: 5000 })
-    .toContain("Hall 1");
+  // Advance by hand with a long pause so the tour cannot drift ahead of the checks.
+  // Each beat is also checked by its step number, so a later beat with similar
+  // wording cannot satisfy a check meant for an earlier one.
+  const step = () => page.evaluate(() => window.AccessDemo.tourBeatInfo().step);
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
+  expect(await step()).toBe(1);
+  await expect(page.locator("#demo-caption")).toContainText("Hall 1");
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "floor");
 
   // Fleet, then the one-line.
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "fleet");
-  await expect(page.locator("#demo-caption")).toContainText("Fleet");
+  expect(await step()).toBe(2);
+  await expect(page.locator("#demo-caption")).toContainText("Operate · Fleet");
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect.poll(async () => page.locator(".shell").getAttribute("data-view"), { timeout: 5000 })
     .toBe("oneline");
   await expect(page.locator(".oneline-sheet")).toBeVisible();
-  await expect(page.locator("#demo-caption")).toContainText("one-line");
+  expect(await step()).toBe(3);
+  await expect(page.locator("#demo-caption")).toContainText("Operate · One-line");
 
   // The 3D rack from the rear, then the device view on a dark BMC.
   await page.evaluate(() => window.AccessDemo.advanceDemo());
-  await expect(page.locator("#demo-caption")).toContainText("Rack A14 in 3D");
+  expect(await step()).toBe(4);
+  await expect(page.locator("#demo-caption")).toContainText("Operate · Rack — Rack A14 in 3D");
   await expect(page.locator(".rack3d-panel .r3-world")).toHaveAttribute("data-view", "rear");
   await page.evaluate(() => window.AccessDemo.advanceDemo());
+  expect(await step()).toBe(5);
   await expect(page.locator("#demo-caption")).toContainText("device view");
   await expect(page.locator('.device-view tr.best[data-band="oob"]')).toHaveAttribute("data-path", "acs-serial");
   await expect(page.locator('.device-view tr[data-path="bmc"]')).toContainText("BMC dark");
 
-  // Skip ahead to the Plan date progression.
+  // Skip Sessions, Control, the leak, maintenance, and the feeder fault to the Plan dates.
   for (let i = 0; i < 6; i += 1) {
     await page.evaluate(() => window.AccessDemo.advanceDemo());
   }
+  expect(await step()).toBe(11);
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "plan");
   await expect(page.locator("#demo-caption")).toContainText("Nov 2026");
   await expect(page.locator(".build-scene")).toBeVisible();
@@ -73,6 +79,15 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await page.evaluate(() => window.AccessDemo.advanceDemo());
   await expect(page.locator("#demo-caption")).toContainText("Oct 2027");
   await expect(page.locator(".plan-day")).toContainText("1 Oct 2027");
+
+  expect(await step()).toBe(17);
+
+  // The tour also moves on by itself once the pause runs out.
+  await page.evaluate(() => {
+    window.AccessDemo.setDemoPauseMs(250);
+    window.AccessDemo.advanceDemo();
+  });
+  await expect.poll(step, { timeout: 5000 }).toBeGreaterThan(18);
 
   await page.evaluate(() => window.AccessDemo.stopDemo());
   await expect(page.locator(".demo-tour")).toHaveCount(0);
