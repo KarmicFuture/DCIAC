@@ -355,16 +355,16 @@ nav button small { display: block; color: var(--rail-muted); font-size: var(--te
   padding: 10px 12px;
 }
 .lab-open[aria-current="page"] { background: #2a2a2a; border-style: solid; }
-.rail-foot .heat-path-toggle {
+.rail > .heat-path-toggle {
   text-align: left;
-  background: transparent;
-  color: #f6f3ee;
-  border: 1px dashed var(--amber);
-}
-.rail-foot .heat-path-toggle[aria-pressed="true"] {
+  margin-top: 12px;
   background: var(--amber);
   color: #fff;
-  border-style: solid;
+  border: 1px solid var(--amber);
+}
+.rail > .heat-path-toggle[aria-pressed="true"] {
+  background: #8a3410;
+  border-color: #8a3410;
 }
 .view-tabs {
   display: flex;
@@ -406,8 +406,9 @@ main { padding: var(--s5) var(--s6) var(--s7); min-width: 0; }
   padding: 0 12px;
 }
 .hud .heat-path-toggle {
-  background: transparent;
-  color: var(--ink);
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #fff;
 }
 .heat-path-toggle[aria-pressed="true"] {
   background: var(--amber);

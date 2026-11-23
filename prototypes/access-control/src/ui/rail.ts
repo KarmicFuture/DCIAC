@@ -112,6 +112,7 @@ export function rail() {
     briefingButton() +
     wordmark() +
     '<div class="product-name">Access</div>' +
+    heatPathButton() +
     "<nav>" +
     navButton("floor", "Floor", FLOOR_VIEWS) +
     navButton("rack", "Operate", OPERATE_VIEWS) +
@@ -120,7 +121,6 @@ export function rail() {
     "</nav>" +
     '<div class="rail-foot">' + leak +
     themeButton() +
-    heatPathButton() +
     '<button type="button" class="lab-open" data-act="simulate"' + (state.view === "simulate" ? ' aria-current="page"' : "") + ">Simulate</button>" +
     '<div class="who"><strong>' + esc(state.user.id) + "</strong><span>" + esc(state.user.role) +
     "</span>" + (state.user.expiresAt ? '<small>until ' + esc(String(state.user.expiresAt).slice(11, 16)) + " UTC</small>" : "") +

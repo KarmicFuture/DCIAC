@@ -17,6 +17,7 @@ import {
 } from "../domain/events";
 import type { SimImpact } from "../domain/events";
 import { waiting } from "../domain/failover";
+import { heatPathButton } from "../domain/heat-path";
 import { openSession } from "../domain/sessions";
 import { runtime, state } from "../state";
 import { activeAlarms } from "../ui/alarms";
@@ -1064,6 +1065,7 @@ export function hudHtml(legend) {
   return simStripeHtml() + '<div class="hud">' + pills() + '<p class="hud-mission">' + esc(hudLine()) +
     '</p><div class="hud-controls">' + themeButton() + '<div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
     walkBtn + listBtn + addBtn +
+    heatPathButton(false) +
     '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
     (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Pan"><button type="button" data-act="floor-pan" data-dir="left" aria-label="Pan left">←</button><button type="button" data-act="floor-pan" data-dir="right" aria-label="Pan right">→</button><button type="button" data-act="floor-pan" data-dir="up" aria-label="Pan up">↑</button><button type="button" data-act="floor-pan" data-dir="down" aria-label="Pan down">↓</button></div><div class="zoom-cluster" role="group" aria-label="Orbit"><button type="button" data-act="floor-orbit" data-dir="left" aria-label="Orbit left">↺</button><button type="button" data-act="floor-orbit" data-dir="right" aria-label="Orbit right">↻</button><button type="button" data-act="floor-orbit" data-dir="up" aria-label="Orbit up">⤒</button><button type="button" data-act="floor-orbit" data-dir="down" aria-label="Orbit down">⤓</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
     (runtime.sim.barOpen ? simBarHtml() : "");
