@@ -94,6 +94,7 @@ export interface AuditEntry {
   outlet: string;
   wo: string;
   detail: string;
+  via?: string;
 }
 
 export interface Alarm {

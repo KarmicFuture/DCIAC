@@ -19,7 +19,7 @@ test("AI fix demo: alarm, serial session, AI diagnosis, automatic fix, verified"
   await page.locator('.login-wrap [data-act="demo-fix"]').click();
   await expect(page.locator(".demo-tour")).toBeVisible({ timeout: 10000 });
   await expect(page.locator(".shell")).toHaveAttribute("data-demo", "fix");
-  await expect(page.locator(".demo-kicker")).toContainText("AI fix demo · 1 of 11");
+  await expect(page.locator(".demo-kicker")).toContainText("AI fix demo · 1 of 12");
   await expect(caption(page)).toContainText("acs.watch logs in");
 
   // 2-3: the tray reboots; its device view shows no OS in band, and acs.watch raises a P1.
@@ -31,6 +31,11 @@ test("AI fix demo: alarm, serial session, AI diagnosis, automatic fix, verified"
   const alarmRow = page.locator('summary[data-alarm="watch-tray-05"]');
   await expect(alarmRow).toBeVisible();
   await expect(alarmRow).toContainText("UEFI shell");
+
+  // Ask answers from the same evidence before the session opens.
+  await next(page);
+  await expect(caption(page)).toContainText("Ask — “Why is GPU Tray 05 down?”");
+  await expect(page.locator('.ask-turn[data-kind="explain"] .ask-lead')).toContainText("P1 on GPU Tray 05");
 
   // 4-5: the alarm launches an ACS serial session that shows the stuck boot.
   await next(page);

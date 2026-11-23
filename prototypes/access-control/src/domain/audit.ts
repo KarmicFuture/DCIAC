@@ -31,6 +31,7 @@ export function audit(entry) {
     outlet: entry.outlet || "",
     wo: entry.wo || "",
     detail: entry.detail || "",
+    via: entry.via || "",
   });
   if (state.audit.length > 300) state.audit.length = 300;
 }

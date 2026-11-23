@@ -1,4 +1,5 @@
 import { deviceById } from "../data/devices";
+import { demoAsk, resetAsk } from "../ui/ask";
 import { USERS } from "../data/users";
 import { runtime, state } from "../state";
 import { esc } from "../ui/format";
@@ -118,6 +119,7 @@ function closeDemoSessions() {
 }
 
 function tidyFullDemo() {
+  resetAsk();
   closeDemoSessions();
   closeMaintenance();
   if (state.leak) setLeak(false, true);
@@ -430,7 +432,17 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Done. Floor, Operate · Fleet, Operate · One-line, Operate · Rack, Operate · Control, Plan · Campus, Plan · DCIM, Audit — day to day.",
+    pop: "Ask — plain-English questions, answered from DCIAC's own data with the source shown. Actions wait for a confirm; power still goes through Control.",
+    target: ".ask-panel",
+    weight: 1.25,
+    enter() {
+      showFloor("hall");
+      state.floor.podId = "pod-a";
+      demoAsk("What's wrong in Hall 1?");
+    },
+  },
+  {
+    pop: "Done. Floor, Operate · Fleet, Operate · One-line, Operate · Rack, Operate · Control, Plan · Campus, Plan · DCIM, Audit, Ask — day to day.",
     target: ".scene",
     enter() {
       tidyFullDemo();
@@ -444,6 +456,7 @@ let fixSessionId = "";
 const FIX_DEVICE = "tray-05";
 
 function tidyFixDemo() {
+  resetAsk();
   cancelFix();
   clearBoot(FIX_DEVICE);
   closeDemoSessions();
@@ -485,6 +498,15 @@ const FIX_TOUR: TourBeat[] = [
     enter() {
       state.view = "rack";
       state.selected = FIX_DEVICE;
+    },
+  },
+  {
+    pop: "Ask — “Why is GPU Tray 05 down?” Ask reads the same evidence as Explain: a UEFI shell, no OS. The best way in is ACS serial.",
+    target: ".ask-panel",
+    enter() {
+      state.view = "rack";
+      state.selected = FIX_DEVICE;
+      demoAsk("Why is GPU Tray 05 down?");
     },
   },
   {
@@ -753,6 +775,7 @@ function enterTourBeat(index: number) {
   state.demoDone = false;
   state.labOpen = false;
   calmChrome();
+  resetAsk();
   beat.enter();
 }
 

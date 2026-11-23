@@ -45,7 +45,7 @@ const STEPS = [
   },
   {
     title: "The record",
-    copy: "Console opens and outlet changes are written down with the person, the asset, and the work order. That is the record to ask for.",
+    copy: "Console opens and outlet changes are written down with the person, the asset, and the work order. That is the record to ask for. Ask, below Audit, answers plain-English questions from this same data and shows its source. It can't switch power or skip a confirm, and everything asked there is in the record, tagged via Ask.",
     show() {
       state.view = "audit";
     },

@@ -162,15 +162,27 @@ function clockKey(alarm) {
 }
 
 /* Start a clock when an alarm first appears; drop clocks for alarms that cleared. */
+/* Alarms that cleared this session, newest first, for the Ask shift handover. */
+export const clearedAlarms: { id: string; pri: number; asset: string; text: string; since: number; at: number }[] = [];
+const lastSeen: Record<string, { id: string; pri: number; asset: string; text: string }> = {};
+
 export function trackAlarmClocks(list) {
   const now = Date.now();
   const live = {};
   list.forEach((alarm) => {
     const key = clockKey(alarm);
     live[key] = true;
+    lastSeen[key] = { id: alarm.id, pri: alarm.pri, asset: alarm.asset, text: alarm.text };
     if (!state.alarmSince[key]) state.alarmSince[key] = now;
   });
-  Object.keys(state.alarmSince).forEach((key) => { if (!live[key]) delete state.alarmSince[key]; });
+  Object.keys(state.alarmSince).forEach((key) => {
+    if (live[key]) return;
+    const seen = lastSeen[key];
+    if (seen) clearedAlarms.unshift({ ...seen, since: state.alarmSince[key], at: now });
+    if (clearedAlarms.length > 200) clearedAlarms.length = 200;
+    delete lastSeen[key];
+    delete state.alarmSince[key];
+  });
 }
 
 export function span(ms) {

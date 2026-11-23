@@ -3724,3 +3724,83 @@ button.act.launch.primary small { color: #d9d0c6; }
 .alarm-clock.is-escalated { color: #b3261e; font-weight: 600; }
 .alarm-row.escalated .alarm-fold > summary { background: color-mix(in srgb, #b3261e 10%, transparent); }
 .alarm-target { align-self: center; }
+
+/* Ask DCIAC: side menu entry, drawer, and answer cards. Tokens only, so the NOC theme follows. */
+nav .ask-nav { margin-top: var(--s2); border-top: 1px solid #3a3a3a; border-radius: 0 0 8px 8px; }
+nav .ask-nav[aria-expanded="true"] { background: #2a2a2a; border-color: #3a3a3a; }
+.shell[data-ask="open"] { grid-template-columns: 240px minmax(0, 1fr) 400px; }
+.ask-panel {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  color: var(--ink);
+  z-index: 30;
+}
+.ask-head { display: flex; align-items: center; gap: var(--s2); padding: var(--s4) var(--s4) 0; }
+.ask-head h2 { margin: 0; font-size: var(--text-lg); flex: 1; }
+.ask-demo { font-size: var(--text-xs); }
+.ask-context { margin: var(--s2) var(--s4) 0; font-size: var(--text-sm); color: var(--muted); }
+.ask-label { font-weight: 600; }
+.ask-log { flex: 1; overflow-y: auto; padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s4); border-top: 1px solid var(--line); margin-top: var(--s3); }
+.ask-empty p { margin: 0 0 var(--s2); color: var(--muted); }
+.ask-options { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.ask-suggest { text-align: left; white-space: normal; }
+.ask-turn { display: flex; flex-direction: column; gap: var(--s2); }
+.ask-q { align-self: flex-end; max-width: 90%; margin: 0; padding: 6px 10px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.ask-a { outline: none; display: flex; flex-direction: column; gap: var(--s2); }
+.ask-a:focus-visible { box-shadow: 0 0 0 2px var(--focus); border-radius: 8px; }
+.ask-card { border: 1px solid var(--line); border-radius: 8px; padding: var(--s3); display: flex; flex-direction: column; gap: var(--s2); font-size: var(--text-sm); min-width: 0; }
+.ask-card p, .ask-card ul, .ask-card ol, .ask-card h3 { margin: 0; }
+.ask-card ul, .ask-card ol { padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.ask-card h3 { font-size: var(--text-sm); margin-top: var(--s1); }
+.ask-lead { font-size: var(--text-md); }
+.ask-proposal, .ask-handoff { background: var(--amber-soft); border-color: #efd2c2; color: var(--amber-ink); }
+.ask-proposal.is-done { background: var(--ok-soft); border-color: #bfe0cd; color: var(--ok-ink); }
+.ask-proposal.is-cancelled { background: var(--paper); color: var(--muted); }
+.ask-refusal { background: var(--reject-soft); border-color: #e2c1bd; color: var(--danger-ink); }
+.ask-unknown, .ask-ambiguous { background: var(--paper); }
+.ask-confirm { display: flex; gap: var(--s2); }
+.ask-src { font-size: var(--text-xs); color: var(--muted); }
+.ask-muted { color: var(--muted); }
+.ask-note { color: var(--muted); }
+.ask-warn { background: var(--warn-soft); color: var(--warn-ink); padding: 6px 8px; border-radius: 6px; }
+.ask-stale { display: inline-block; font-size: var(--text-xs); background: var(--warn-soft); color: var(--warn-ink); padding: 1px 6px; border-radius: 999px; }
+.ask-table { overflow-x: auto; max-width: 100%; }
+.ask-table table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.ask-table th, .ask-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ask-clock { white-space: nowrap; color: var(--muted); }
+.ask-clock.is-escalated, .ask-muted.is-escalated { color: #b3261e; font-weight: 600; }
+.ask-link { background: none; border: 0; padding: 0; color: var(--focus); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
+.ask-card .explain { margin: 0; }
+.ask-form { display: flex; gap: var(--s2); align-items: flex-end; padding: var(--s3) var(--s4) var(--s4); border-top: 1px solid var(--line); }
+.ask-form textarea { flex: 1; min-width: 0; resize: none; font: inherit; font-size: var(--text-md); padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); }
+.ask-form textarea:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.audit-filter { display: flex; gap: var(--s2); margin-bottom: var(--s3); }
+.audit-filter [aria-pressed="true"] { background: var(--action); color: var(--on-action); border-color: var(--action); }
+.pill.via-ask { font-size: var(--text-xs); background: var(--nvidia-soft); color: var(--nvidia); border-color: transparent; padding: 1px 6px; }
+@media (max-width: 980px) {
+  .shell[data-ask="open"] { grid-template-columns: 1fr; }
+  .ask-panel { position: fixed; top: 0; right: 0; width: min(400px, 100vw); height: 100%; z-index: 45; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
+}
+@media (max-width: 767px) {
+  .tabbar { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tabbar .ask-nav[aria-expanded="true"] { color: #f6f3ee; background: #2a2a2a; }
+  .ask-panel { inset: 0; width: 100vw; height: 100dvh; z-index: 50; box-shadow: none; border-left: 0; }
+  .ask-head { padding-top: calc(var(--s3) + env(safe-area-inset-top)); }
+  .ask-form { padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 980px) {
+  .ask-panel { animation: ask-in 160ms ease-out; }
+}
+@keyframes ask-in { from { transform: translateX(24px); opacity: 0.6; } to { transform: none; opacity: 1; } }
+.ask-card ul.ask-alarms { list-style: none; padding: 0; gap: 0; }
+.ask-alarms li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.ask-alarms li:last-child { border-bottom: 0; }
+.ask-alarms .ask-link { font-weight: 600; white-space: nowrap; }
+.ask-alarms .ask-clock { margin-left: auto; font-size: var(--text-xs); }
+.ask-alarms .ask-what { flex: 1 1 100%; padding-left: 26px; }
