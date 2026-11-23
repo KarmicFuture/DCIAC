@@ -49,6 +49,7 @@ import { dropNetworkCable, exportElevation, saveNetworkCable } from "../views/el
 import { failPower, setPowerMode } from "../views/power";
 import { cloneModel, importModels, saveModel } from "../views/models";
 import { selectDevice } from "../views/rack";
+import { askAfterPaint, askControl, askFormHtml, askHeadHtml, askInputGrow, askInputKey, askLink, askLogHtml, askOpen, askShortcut, cancelAsk, closeAsk, confirmAsk, sendAsk, setAuditFilter, toggleAsk } from "./ask";
 
 function hydrateFields() {
   const fields = {
@@ -298,8 +299,9 @@ function paint() {
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
   recordFloorDrawerFocus();
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"} data-ask=${askOpen() ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${askOpen() ? html`<aside id="ask-panel" class="ask-panel" aria-labelledby="ask-title">${unsafeHTML(askHeadHtml())}${unsafeHTML(askLogHtml())}${unsafeHTML(askFormHtml())}</aside>` : ""}${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   updateAlarmClocks();
+  askAfterPaint();
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
@@ -330,7 +332,7 @@ export function syncFields() {
 export function onClick(event) {
   if (rackSwallowsClick()) return;
   let el = event.target.closest("[data-act]");
-  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour")) {
+  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour, .ask-panel")) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }
@@ -383,6 +385,14 @@ export function onClick(event) {
   }
   if (act === "signout") signOut();
   else if (act === "menu") { state.menuOpen = !state.menuOpen; render(); }
+  else if (act === "ask-toggle") toggleAsk(el.id);
+  else if (act === "ask-close") closeAsk();
+  else if (act === "ask-option") sendAsk(el.dataset.q || "");
+  else if (act === "ask-confirm") confirmAsk(Number(el.dataset.turn));
+  else if (act === "ask-cancel") cancelAsk(Number(el.dataset.turn));
+  else if (act === "ask-control") askControl(Number(el.dataset.outlet), el.dataset.op || "cycle");
+  else if (act === "ask-link") askLink(el.dataset.route || "", el.dataset.auditFilter || "");
+  else if (act === "audit-filter") { setAuditFilter(el.dataset.filter || "all"); render(); }
   else if (act === "menu-close") { state.menuOpen = false; render(); }
   else if (act === "nav") go(el.dataset.view);
   else if (act === "port-filter") { state.portFilter = el.dataset.filter || "all"; render(); }
@@ -712,6 +722,14 @@ export function onSubmit(event) {
     saveModel(form);
     return;
   }
+  if (form.dataset.act === "ask-send") {
+    event.preventDefault();
+    const field = form.querySelector("textarea");
+    const text = field ? field.value : "";
+    if (field) { field.value = ""; field.rows = 1; }
+    sendAsk(text);
+    return;
+  }
   if (form.dataset.act !== "serial-line") return;
   event.preventDefault();
   sendSerial(form.dataset.session, new FormData(form).get("line"));
@@ -725,6 +743,7 @@ export function onInput(event) {
   if (target.id === "asset-tag") state.assetTagDraft = target.value;
   if (state.outletGate && target.id === "outlet-wo") state.outletGate.wo = target.value;
   if (state.outletGate && target.id === "outlet-short") state.outletGate.typed = target.value;
+  if (target.id === "ask-input") askInputGrow(target);
   if (target.id === "port-search") {
     state.portQuery = target.value;
     state.focusField = "port-search";
@@ -771,6 +790,13 @@ export function onChange(event) {
 
 export function onKeyDown(event) {
   if (outletConfirmKeys(event)) return;
+  if (event.target && event.target.id === "ask-input" && askInputKey(event)) return;
+  if (event.key === "Escape" && askOpen() && (!event.target.closest || event.target.closest(".ask-panel") || !event.target.closest("input, textarea, select"))) {
+    event.preventDefault();
+    closeAsk();
+    return;
+  }
+  if (askShortcut(event)) return;
   if (rackKey(event)) return;
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");

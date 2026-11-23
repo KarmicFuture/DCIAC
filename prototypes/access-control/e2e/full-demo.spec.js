@@ -82,12 +82,21 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
 
   expect(await step()).toBe(17);
 
-  // The tour also moves on by itself once the pause runs out.
+  // DCIM and Audit, then Ask answering "What's wrong in Hall 1?" beside the floor.
+  for (let i = 0; i < 3; i += 1) {
+    await page.evaluate(() => window.AccessDemo.advanceDemo());
+  }
+  expect(await step()).toBe(20);
+  await expect(page.locator("#demo-caption")).toContainText("Ask — plain-English questions");
+  await expect(page.locator('.ask-turn[data-kind="alarms"] .ask-lead')).toContainText("open alarms in Hall 1");
+
+  // The tour also moves on by itself once the pause runs out, and Ask closes again.
   await page.evaluate(() => {
     window.AccessDemo.setDemoPauseMs(250);
     window.AccessDemo.advanceDemo();
   });
-  await expect.poll(step, { timeout: 5000 }).toBeGreaterThan(18);
+  await expect.poll(step, { timeout: 5000 }).toBeGreaterThan(20);
+  await expect(page.locator("#ask-panel")).toHaveCount(0);
 
   await page.evaluate(() => window.AccessDemo.stopDemo());
   await expect(page.locator(".demo-tour")).toHaveCount(0);

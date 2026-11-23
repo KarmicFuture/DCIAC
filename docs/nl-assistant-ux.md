@@ -1,6 +1,8 @@
 # Ask DCIAC: natural-language assistant, UI user stories
 
-Status: proposal for review. No code yet.
+Status: built in `prototypes/access-control` (2026-11-23). Tests: `e2e/ask.spec.js`, one test
+per story. Answers come from a built-in parser ("Demo answers"); a language model can replace
+it through `setAskParser()` in `src/domain/ask.ts` without changing any gate.
 Written 2026-11-23 from a UI designer's point of view. It turns the product user stories
 for a natural-language assistant into screens, states, and acceptance criteria that fit the
 DCIAC prototype as it stands (`prototypes/access-control`).
@@ -27,8 +29,8 @@ Three principles drive every story below:
 
 | Surface | Desktop (1024 px and wider) | Phone (up to 767 px) |
 |---|---|---|
-| Entry point | "Ask" button in the top bar, left of the NOC theme button | "Ask" as a fifth item in the bottom tab bar (Floor, Operate, Plan, Audit, Ask) |
-| Panel | Right-side drawer, 400 px wide, pushes content (does not cover the alarm chip or the page heading) | Full-height sheet over the current view, with a Close button top-left |
+| Entry point | "Ask" in the side menu, directly below Audit (decided by Vinu) | "Ask" as a fifth item in the bottom tab bar (Floor, Operate, Plan, Audit, Ask) |
+| Panel | Right-side drawer, 400 px wide, pushes content (does not cover the alarm chip or the page heading). Between 768 and 980 px it slides over the page. | Full-height sheet over the current view, with a Close button top-right |
 | Shortcut | `/` opens the panel when focus is not in a terminal, KVM console, or text field. The serial and KVM consoles keep every keystroke. | None |
 | Context | The panel header shows what the assistant can see: "Looking at: Operate · Rack · A14 · GPU Tray 06" | Same, truncated to the last two parts |
 
@@ -36,11 +38,11 @@ Wireframe, desktop:
 
 ```
 +--------+------------------------------------------+---------------------+
-| rail   | [P1 · 7 · 2 escalated]                   | Ask DCIAC        [x]|
-|        | Operate · Rack           [Ask] [NOC]     | Looking at: Rack A14|
-|        | Rack  Port map  Control  Sessions ...    |---------------------|
-|        |                                          | You: why is tray 06 |
-|        |   (current view, unchanged)              |  alarming?          |
+| Floor  | [P1 · 7 · 2 escalated]                   | Ask DCIAC        [x]|
+| Operate| Operate · Rack                 [NOC]     | Looking at: Rack A14|
+| Plan   | Rack  Port map  Control  Sessions ...    |---------------------|
+| Audit  |                                          | You: why is tray 06 |
+| Ask    |   (current view, unchanged)              |  alarming?          |
 |        |                                          | +-----------------+ |
 |        |                                          | | What happened   | |
 |        |                                          | | Evidence  (3)   | |
@@ -227,9 +229,21 @@ Per `DAILY_IMPROVEMENT.md`, visible changes update the demos:
 - UI-13 hostile text test.
 - Layout checks at 1440 px and 390 px: heading and alarm chip stay above the fold.
 
+## As built: decisions and limits
+
+- Placement: Ask is in the side menu below Audit, and the fifth phone tab.
+- Bulk ack is capped at 20 alarms per request; larger requests are refused with a hint to narrow them.
+- Stale limit: 5 minutes on the newest evidence line in an explanation.
+- The conversation lasts until the page reloads; it is not saved.
+- "Where can I fit…" answers at hall level from IT power headroom and feed state. Rack positions,
+  cooling and floor space stay in Plan · Halls.
+- Opening a session is a proposal; after Confirm, DCIAC's usual console check still runs (an
+  in-progress work order outside a failover), so the card says "Requested", not "Opened".
+- Escape inside a serial or KVM console stays with the console; use Close to leave Ask there.
+
 ## Questions for Vinu
 
-1. Ask button in the top bar, or a floating button bottom-right?
+1. (Decided: side menu below Audit.)
 2. Should the panel remember the conversation across screens and reloads, or start fresh
    per screen?
 3. Should operators be able to confirm bulk non-power actions, and with what cap?

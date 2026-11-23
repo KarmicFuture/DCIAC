@@ -2,6 +2,25 @@
 
 ## 2026-11-23
 
+Ask DCIAC, a natural-language assistant (side menu, below Audit; fifth tab on phones). Built from
+`docs/nl-assistant-ux.md`, all 14 UI stories:
+
+- Ask questions in plain English: "What's wrong in Hall 1?", "Why is GPU Tray 06 alarming?",
+  "Which halls have less than 50% headroom?", "Where can I fit 2 more 120 kW racks?", "What happened
+  last shift?", "How do I power-cycle GPU Tray 03?". Every answer shows its source and read time.
+- Navigate by asking: "Open rack A14 from the rear", "Show Hall 3's racks by power". Unclear names
+  ask back with options.
+- Actions are proposals: "Ack all P3 inlet alarms in Hall 1" and "Open a serial session on Tray 05"
+  wait for Confirm. Power requests only hand off to Control's own confirmation. Role limits and the
+  DI-1 leak interlock show as refusals with no override. Text from devices is treated as data.
+- Every question, proposal, confirm and cancel is in Audit, tagged "via Ask", with a new
+  All / Manual / via Ask filter.
+- `/` opens Ask (not inside a console), Escape closes it, and focus moves to each new answer.
+- Answers come from a built-in parser, labelled "Demo answers". A language model can replace it
+  through `setAskParser()` without touching the gates.
+- The Full demo has an Ask step, the AI fix demo asks "Why is GPU Tray 05 down?", and the executive
+  briefing mentions Ask.
+
 Alarm SLA and escalation clocks (the alarm chip at the top of every Operate and Floor screen):
 
 - Each alarm shows how long it has been open and how long until it escalates, for example

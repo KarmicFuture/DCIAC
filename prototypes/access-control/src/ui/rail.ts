@@ -3,6 +3,7 @@ import { heatPathButton } from "../domain/heat-path";
 import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
+import { askOpen } from "./ask";
 
 export const OPERATE_VIEWS = ["rack", "map", "control", "sessions", "oneline", "fleet"];
 export const PLAN_VIEWS = ["plan", "halls", "models", "dcim"];
@@ -96,6 +97,11 @@ export function topbar() {
     '<button type="button" class="menu-back" data-act="menu-close" aria-label="Close menu"></button>';
 }
 
+function askButton(id) {
+  return '<button type="button" id="' + id + '" class="ask-nav" data-act="ask-toggle" aria-controls="ask-panel" aria-expanded="' +
+    (askOpen() ? "true" : "false") + '">Ask</button>';
+}
+
 export function tabbar() {
   const tabs = TAB_VIEWS.map((pair) => {
     const views = pair[0] === "rack" ? OPERATE_VIEWS : (pair[0] === "plan" ? PLAN_VIEWS : (pair[0] === "floor" ? FLOOR_VIEWS : [pair[0]]));
@@ -103,7 +109,7 @@ export function tabbar() {
     return '<button type="button" data-act="nav" data-view="' + pair[0] + '"' + current + ">" +
       esc(pair[1]) + "</button>";
   }).join("");
-  return '<div class="tabbar" role="navigation" aria-label="Primary">' + tabs + "</div>";
+  return '<div class="tabbar" role="navigation" aria-label="Primary">' + tabs + askButton("ask-tab") + "</div>";
 }
 
 export function rail() {
@@ -118,6 +124,7 @@ export function rail() {
     navButton("rack", "Operate", OPERATE_VIEWS) +
     navButton("plan", "Plan", PLAN_VIEWS) +
     navButton("audit", "Audit") +
+    askButton("ask-nav") +
     "</nav>" +
     '<div class="rail-foot">' + leak +
     themeButton() +
