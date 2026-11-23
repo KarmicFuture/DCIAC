@@ -37,6 +37,7 @@ import { applyCamera, closeFloorDetail, floorDetailOpen, floorSerial, focusFloor
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { drillOpenHall, setFleetDrill, toggleFleetRacks } from "../views/fleet";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
+import { advanceHeat, backHeat, heatPathHtml, heatPathOn, stopHeat, toggleHeat } from "../domain/heat-path";
 import { advanceDemo, demoCoachHtml, loadTheme, placeDemoHighlights, startDemo, startFixDemo, startFullDemo, startMp1000Demo, stopDemo, toggleTheme } from "../domain/demo";
 import { diagnoseBoot, runBootFix } from "../domain/autofix";
 import { launchMp1000Kvm } from "../domain/mp1000";
@@ -297,7 +298,7 @@ function paint() {
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
   recordFloorDrawerFocus();
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   if (viewChanged) window.scrollTo(0, 0);
   else window.scrollTo(scrollX, scrollY);
   hydrateFields();
@@ -441,6 +442,10 @@ export function onClick(event) {
   else if (act === "briefing-start") startBriefing();
   else if (act === "briefing-next") advanceBriefing();
   else if (act === "briefing-skip") skipBriefing();
+  else if (act === "heat-path") toggleHeat();
+  else if (act === "heat-next") advanceHeat(true);
+  else if (act === "heat-back") backHeat();
+  else if (act === "heat-stop") stopHeat(true);
   else if (act === "lab-open" || act === "simulate") {
     state.labOpen = false;
     state.menuOpen = false;
@@ -769,6 +774,10 @@ export function onKeyDown(event) {
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");
     if (typing) return;
+    if (heatPathOn()) {
+      stopHeat(true);
+      return;
+    }
     if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.floorListOpen || state.plan.selected || state.plan.preview)) {
       state.libraryOpen = false;
       closeFloorDetail();

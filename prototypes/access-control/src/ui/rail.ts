@@ -1,4 +1,5 @@
 import { briefingButton } from "../domain/briefing";
+import { heatPathButton } from "../domain/heat-path";
 import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
@@ -91,7 +92,7 @@ export function topbar() {
   const open = state.menuOpen ? "true" : "false";
   return '<div class="topbar">' + briefingButton() + '<button type="button" class="menu-btn" data-act="menu" aria-expanded="' + open +
     '" aria-label="Menu"><span class="menu-glyph" aria-hidden="true"></span></button><strong>Access</strong><span class="topbar-view">' +
-    esc(title) + "</span>" + themeButton() + "</div>" +
+    esc(title) + "</span>" + heatPathButton(false) + themeButton() + "</div>" +
     '<button type="button" class="menu-back" data-act="menu-close" aria-label="Close menu"></button>';
 }
 
@@ -119,6 +120,7 @@ export function rail() {
     "</nav>" +
     '<div class="rail-foot">' + leak +
     themeButton() +
+    heatPathButton() +
     '<button type="button" class="lab-open" data-act="simulate"' + (state.view === "simulate" ? ' aria-current="page"' : "") + ">Simulate</button>" +
     '<div class="who"><strong>' + esc(state.user.id) + "</strong><span>" + esc(state.user.role) +
     "</span>" + (state.user.expiresAt ? '<small>until ' + esc(String(state.user.expiresAt).slice(11, 16)) + " UTC</small>" : "") +

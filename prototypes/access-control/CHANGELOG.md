@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-23
+
+Heat path walks the heat from the yard coolers through the hall, rack, one-line, fleet, control, port map, and sessions. Next and Back move one view at a time, and it also advances on its own until the last view.
+
 ## 2026-11-22
 
 The floor has Orbit left, right, up, and down between Pan and Zoom. Each press turns or tilts the view, focus stays on the button, and Reset view restores the starting angle.

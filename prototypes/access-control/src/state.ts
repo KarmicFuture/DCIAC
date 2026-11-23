@@ -13,6 +13,7 @@ export const runtime = {
   networkRack: null as any,
   futureChanges: [] as any[],
   pulse: null as { id: string; until: number } | null,
+  heat: { step: -1, timer: 0 as any },
   pulseTimer: 0 as any,
   consolePass: false,
   demoPauseMs: 4000,
