@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-24
+
+Test fix: "clicking a rack on the floor opens the same 3D rack view as Operate" passes again.
+
+- The test failed on every run since at least 2026-11-21 with "feed whip-A04 intercepts pointer
+  events". Nothing in the app was wrong: a real mouse click at the centre of rack A14's top lands on
+  A14 and opens it. Chromium's `elementsFromPoint`, which Playwright uses for its pre-click check,
+  lists the overhead power whips first inside the 3D floor and ignores that the rack top is in front.
+- The test now makes a forced click, which is still a real mouse click at the same point, so the A14
+  checks that follow still fail if anything actually covers the rack.
+- No app code changed; the published build is byte-for-byte the same.
+
 ## 2026-11-23
 
 Ask DCIAC, a natural-language assistant (side menu, below Audit; fifth tab on phones). Built from

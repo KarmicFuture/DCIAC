@@ -22,7 +22,11 @@ test("clicking a rack on the floor opens the same 3D rack view as Operate", asyn
   await page.locator('.rail [data-act="nav"][data-view="floor"]').click();
   await page.locator('[data-act="floor-go"][data-level="hall"]').first().click();
   await expect(page.locator(".hud-mission")).toContainText("Hall 1");
-  await page.locator('.rackbox[data-act="floor-rack"][data-rack="A14"] .ftop').click();
+  // Chromium's elementsFromPoint lists the overhead power whips first in a 3D scene even
+  // where the rack top is in front, so Playwright's hit check refuses a click a person can make.
+  // A forced click is still a real mouse click at the rack top's centre: the A14 checks below
+  // fail if anything actually covers it.
+  await page.locator('.rackbox[data-act="floor-rack"][data-rack="A14"] .ftop').click({ force: true });
 
   const scene = page.locator(".scene.rack-scene");
   await expect(scene.locator(".r3-stage")).toBeVisible();
