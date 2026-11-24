@@ -173,13 +173,51 @@ test("UI-7 power requests hand off to the Control confirmation", async ({ page }
   await expect(bulk.locator('[data-act="ask-control"]')).toHaveCount(0);
 });
 
-test("UI-8 role limits show as a refusal with no action", async ({ page }) => {
+test("UI-8 Ask is for operators: the read-only role has no Ask at all", async ({ page }) => {
   await signIn(page, "colo.readonly");
+  const items = await page.locator("header.rail nav button").allInnerTexts();
+  expect(items.map((t) => t.trim())).toEqual(["Floor", "Operate", "Plan", "Audit"]);
+  await expect(page.locator("#ask-nav")).toHaveCount(0);
+  await page.locator("h1").click();
+  await page.keyboard.press("/");
+  await expect(page.locator("#ask-panel")).toHaveCount(0);
+});
+
+test("UI-6 bulk non-power actions have no cap but still wait for Confirm", async ({ page }) => {
+  await signIn(page, "dsvs.admin");
   await page.locator("#ask-nav").click();
-  const turn = await ask(page, "Power-cycle GPU Tray 06");
-  await expect(turn.locator(".ask-refusal")).toContainText("Your role can't switch outlets.");
-  await expect(turn.locator(".ask-refusal")).toContainText("An Operator or Administrator can");
-  await expect(turn.locator('[data-act="ask-control"], [data-act="ask-confirm"]')).toHaveCount(0);
+  const chip = await page.locator(".alarm-chip [data-alarm-count]").innerText();
+  const total = Number(chip.split("·")[1]);
+  const turn = await ask(page, "Ack all alarms");
+  await expect(turn.locator(".ask-proposal .ask-lead")).toHaveText("Ack " + total + " alarms?");
+  expect(await page.evaluate(() => Object.keys(window.AccessDemo.state.acked).length)).toBe(0);
+  await turn.locator('[data-act="ask-confirm"]').click();
+  await expect(turn.locator(".ask-result")).toHaveText(new RegExp("^Acked " + total + " alarms"));
+});
+
+test("UI-12 evidence older than 1 minute is flagged stale", async ({ page }) => {
+  await page.clock.install();
+  await signIn(page);
+  await page.clock.fastForward("02:00");
+  await page.locator("#ask-nav").click();
+  const turn = await ask(page, "Why is GPU Tray 07 alarming?");
+  await expect(turn.locator(".ask-stale")).toHaveText(/^Newest reading 2m old$/);
+});
+
+test("the conversation is kept between logins, per user", async ({ page }) => {
+  await signIn(page);
+  await page.locator("#ask-nav").click();
+  await ask(page, "What's wrong in Hall 1?");
+  await page.locator('[data-act="signout"]').click();
+  await page.locator('[data-user="dsvs.admin"]').click();
+  await page.locator("#ask-nav").click();
+  await expect(page.locator(".ask-turn")).toHaveCount(0);
+  await page.locator('[data-act="signout"]').click();
+  await page.reload();
+  await page.locator('[data-user="dsvs.operator"]').click();
+  await page.locator("#ask-nav").click();
+  await expect(page.locator(".ask-turn")).toHaveCount(1);
+  await expect(page.locator(".ask-turn .ask-q")).toContainText("What's wrong in Hall 1?");
 });
 
 test("UI-9 the DI-1 leak interlock is explained, never overridden", async ({ page }) => {

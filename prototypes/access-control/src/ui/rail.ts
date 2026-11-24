@@ -3,7 +3,7 @@ import { heatPathButton } from "../domain/heat-path";
 import { state } from "../state";
 import { esc } from "./format";
 import { themeButton, wordmark } from "./shell";
-import { askOpen } from "./ask";
+import { askAllowed, askOpen } from "./ask";
 
 export const OPERATE_VIEWS = ["rack", "map", "control", "sessions", "oneline", "fleet"];
 export const PLAN_VIEWS = ["plan", "halls", "models", "dcim"];
@@ -98,6 +98,7 @@ export function topbar() {
 }
 
 function askButton(id) {
+  if (!askAllowed()) return "";
   return '<button type="button" id="' + id + '" class="ask-nav" data-act="ask-toggle" aria-controls="ask-panel" aria-expanded="' +
     (askOpen() ? "true" : "false") + '">Ask</button>';
 }
