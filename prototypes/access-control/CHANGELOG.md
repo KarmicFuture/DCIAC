@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-11-24
+
+Ask decisions from Vinu, applied:
+
+- Ask is for operators. The Operator and Administrator roles see it below Audit; the read-only
+  colo role has no Ask button and `/` does nothing.
+- Bulk non-power actions have no cap. "Ack all alarms" proposes every open alarm and still waits
+  for Confirm. Power is never bulk.
+- The conversation is kept between logins and reloads, per user, in this browser (last 30 turns).
+  Demo tours don't add to it.
+- An explanation flags its evidence as stale after 1 minute instead of 5.
+- Answers stay scripted ("Demo answers"). The plan for a small self-hosted model is in
+  `docs/nl-assistant-ux.md`.
+
 ## 2026-11-23
 
 Ask DCIAC, a natural-language assistant (side menu, below Audit; fifth tab on phones). Built from

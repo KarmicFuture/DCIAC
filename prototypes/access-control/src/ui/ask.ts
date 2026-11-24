@@ -18,9 +18,10 @@ import { alarmInput, explainHtml } from "./explain";
 import { esc } from "./format";
 import { render } from "./schedule";
 
-/* Bulk ack cap and the evidence age that counts as stale. */
-export const ACK_CAP = 20;
-export const STALE_MS = 5 * 60000;
+/* The evidence age that counts as stale, and who gets Ask. Bulk non-power actions have
+   no cap: every one still waits for Confirm. Power is never bulk. */
+export const STALE_MS = 60000;
+export const ASK_ROLES = ["Operator", "Administrator"];
 
 interface Proposal {
   type: "ack" | "session";
@@ -39,19 +40,67 @@ interface Turn {
   proposal?: Proposal;
 }
 
-const ask = { open: false, opener: "", seq: 0, turns: [] as Turn[], scroll: false };
+const ask = { open: false, opener: "", seq: 0, turns: [] as Turn[], scroll: false, owner: "" };
+const STORE = "dciac.ask.";
+
+export function askAllowed() {
+  return !!(state.user && ASK_ROLES.indexOf(state.user.role) >= 0);
+}
 
 export function askOpen() {
-  return ask.open;
+  return ask.open && askAllowed();
+}
+
+/* The conversation belongs to the signed-in user and is kept between logins. */
+export function syncAskUser() {
+  const id = state.user ? state.user.id : "";
+  if (id === ask.owner) return;
+  ask.owner = id;
+  ask.open = false;
+  ask.turns = [];
+  ask.seq = 0;
+  if (!id) return;
+  try {
+    const raw = localStorage.getItem(STORE + id);
+    const data = raw ? JSON.parse(raw) : null;
+    if (data && Array.isArray(data.turns)) {
+      ask.turns = data.turns.filter((t) => t && typeof t.n === "number" && typeof t.q === "string" && typeof t.body === "string").slice(-30);
+      ask.seq = ask.turns.reduce((max, t) => Math.max(max, t.n), 0);
+    }
+  } catch (err) {
+    /* a conversation that cannot be read starts fresh */
+  }
+}
+
+function saveAsk() {
+  if (!ask.owner) return;
+  try {
+    localStorage.setItem(STORE + ask.owner, JSON.stringify({ turns: ask.turns }));
+  } catch (err) {
+    /* storage full or blocked: the conversation still works for this page */
+  }
+}
+
+export function clearAskHistory() {
+  ask.turns = [];
+  ask.seq = 0;
+  saveAsk();
 }
 
 export function askTurns() {
   return ask.turns.map((turn) => ({ q: turn.q, kind: turn.kind, proposal: turn.proposal ? turn.proposal.status : "" }));
 }
 
+/* Demos start each beat with Ask closed; a demo's own question does not join the saved history. */
+let demoSaved: Turn[] | null = null;
+
 export function resetAsk() {
-  ask.turns = [];
   ask.open = false;
+  if (demoSaved) {
+    ask.turns = demoSaved;
+    ask.seq = ask.turns.reduce((max, t) => Math.max(max, t.n), 0);
+    demoSaved = null;
+  }
 }
 
 function phone() {
@@ -60,14 +109,17 @@ function phone() {
 
 /* Demos: open Ask and ask one question without moving keyboard focus. */
 export function demoAsk(q: string) {
+  if (!askAllowed()) return;
+  if (!demoSaved) demoSaved = ask.turns;
   ask.open = true;
   ask.turns = [];
   ask.opener = "ask-nav";
-  sendAsk(q);
+  sendAsk(q, true);
   state.focusField = "";
 }
 
 export function openAsk(opener?: string) {
+  if (!askAllowed()) return;
   ask.open = true;
   ask.opener = opener || ask.opener || "ask-nav";
   state.menuOpen = false;
@@ -396,9 +448,6 @@ function ackProposal(intent: AskIntent, turn: Turn) {
   const list = matching(intent).filter((alarm) => !state.acked[alarm.id]);
   const { what, where } = scope(intent);
   if (!list.length) return card("answer", lead("No unacked " + esc(what) + esc(where) + ".") + source("the alarm list"));
-  if (list.length > ACK_CAP) {
-    return refusal("That's " + list.length + " alarms.", "Ask acks up to " + ACK_CAP + " at once. Narrow it by hall, priority, or kind, for example “ack P3 inlet alarms in Hall 1”.");
-  }
   turn.proposal = { type: "ack", ids: list.map((alarm) => alarm.id), status: "open" };
   return "";
 }
@@ -436,7 +485,8 @@ function assetOf(intent: AskIntent) {
   return "";
 }
 
-export function sendAsk(text: string) {
+export function sendAsk(text: string, demo = false) {
+  if (!askAllowed()) return;
   const intent = parseQuestion(text);
   if (intent.kind === "empty") return;
   const turn: Turn = { n: ++ask.seq, q: intent.text, kind: intent.kind, body: "" };
@@ -459,6 +509,7 @@ export function sendAsk(text: string) {
   turn.body = body;
   ask.turns.push(turn);
   if (ask.turns.length > 30) ask.turns.shift();
+  if (!demo) saveAsk();
   userAudit("ask", {
     asset: assetOf(intent),
     detail: "“" + intent.text + "” → " + intent.kind + (turn.proposal ? " (proposal, waiting for confirm)" : "") +
@@ -481,6 +532,7 @@ export function confirmAsk(n: number) {
     p.result = "Acked " + live.length + (live.length === 1 ? " alarm." : " alarms.") + (live.length < (p.ids || []).length ? " The rest had cleared or were already acked." : "");
     userAudit("ask ack", { asset: live.map((a) => a.asset).join(", ").slice(0, 200), detail: p.result + " Confirmed by the user.", via: "ask" });
     p.status = "done";
+    saveAsk();
     state.focusField = "ask-a-" + n;
     render();
     return;
@@ -489,6 +541,7 @@ export function confirmAsk(n: number) {
   const d = deviceById(p.device);
   p.result = "Requested " + (p.path === "kvm" ? "MPU2 KVM" : "ACS serial") + " on " + d.name + ". The usual console check still applies; Sessions shows the result.";
   userAudit("ask confirm", { asset: d.name, detail: p.result, via: "ask" });
+  saveAsk();
   if (p.path === "kvm") openSession(p.device, "acs", "kvm", "");
   else openSession(p.device, "acs", "serial", "rs232");
 }
@@ -499,6 +552,7 @@ export function cancelAsk(n: number) {
   turn.proposal.status = "cancelled";
   turn.proposal.result = "Cancelled. Nothing changed.";
   userAudit("ask cancel", { detail: "“" + turn.q + "” cancelled. Nothing changed.", via: "ask" });
+  saveAsk();
   state.focusField = "ask-a-" + n;
   render();
 }
@@ -607,7 +661,7 @@ export function askInputGrow(el: HTMLTextAreaElement) {
 
 /* "/" opens Ask, except while typing or inside a console. */
 export function askShortcut(event: KeyboardEvent) {
-  if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || !state.user) return false;
+  if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || !askAllowed()) return false;
   const t = event.target as HTMLElement;
   if (t && t.closest && t.closest("input, textarea, select, [contenteditable], [data-kvm], .xterm, .xterm-host, .term")) return false;
   if (state.outletGate && state.outletGate.phase === "confirm") return false;

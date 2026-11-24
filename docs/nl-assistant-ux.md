@@ -229,23 +229,42 @@ Per `DAILY_IMPROVEMENT.md`, visible changes update the demos:
 - UI-13 hostile text test.
 - Layout checks at 1440 px and 390 px: heading and alarm chip stay above the fold.
 
-## As built: decisions and limits
+## Decisions (Vinu, 2026-11-24)
 
-- Placement: Ask is in the side menu below Audit, and the fifth phone tab.
-- Bulk ack is capped at 20 alarms per request; larger requests are refused with a hint to narrow them.
-- Stale limit: 5 minutes on the newest evidence line in an explanation.
-- The conversation lasts until the page reloads; it is not saved.
+| Question | Decision | Where it is |
+|---|---|---|
+| Where does Ask live? | Side menu, directly below Audit; fifth tab on phones | `src/ui/rail.ts` |
+| Who gets Ask? | Operators (the Operator and Administrator roles). The read-only colo role has no Ask button and `/` does nothing. | `ASK_ROLES` in `src/ui/ask.ts` |
+| Bulk non-power actions? | Allowed with no cap. Every one is still a proposal that waits for Confirm. Power is never bulk. | `ackProposal` in `src/ui/ask.ts` |
+| Keep the conversation? | Yes, between logins and reloads, per user, last 30 turns, in this browser | `syncAskUser` in `src/ui/ask.ts` |
+| Stale-data limit | 1 minute on the newest evidence line in an explanation | `STALE_MS` in `src/ui/ask.ts` |
+| Model | A small self-hosted model. Scripted answers ("Demo answers") are fine for now. | Plan below |
+
+## Plan: the self-hosted model
+
+Not built yet; scripted answers stay until the model is hosted.
+
+- **Job:** the model only turns a sentence into an `AskIntent` (kind plus hall, rack, device,
+  outlet, filters). It never writes answers, never sees credentials, and never calls actions.
+  Every answer and gate stays in DCIAC code, so a wrong parse can at worst show the wrong
+  read-only answer or a proposal the operator declines.
+- **Size and hosting:** a small instruction-tuned open-weights model (around 1–8B parameters,
+  quantized) served on site by an OpenAI-compatible local server such as llama.cpp or vLLM.
+  No data leaves the site.
+- **Wiring:** `serve.py` gets one endpoint, `POST /api/v1/ask/parse`, that forwards the question
+  with a fixed prompt and the `AskIntent` JSON schema to the local server and validates the reply.
+  The front end calls `setAskParser()` with a parser that uses it and falls back to the scripted
+  parser on error or timeout (target under 1 second).
+- **Checks before switching:** run every question in `e2e/ask.spec.js` plus a set of reworded
+  ones through both parsers and compare intents; keep the hostile-text test.
+- **Open for Vinu:** which hardware it runs on, and which model family is allowed on site.
+
+## As built: limits
+
 - "Where can I fit…" answers at hall level from IT power headroom and feed state. Rack positions,
   cooling and floor space stay in Plan · Halls.
 - Opening a session is a proposal; after Confirm, DCIAC's usual console check still runs (an
   in-progress work order outside a failover), so the card says "Requested", not "Opened".
 - Escape inside a serial or KVM console stays with the console; use Close to leave Ask there.
-
-## Questions for Vinu
-
-1. (Decided: side menu below Audit.)
-2. Should the panel remember the conversation across screens and reloads, or start fresh
-   per screen?
-3. Should operators be able to confirm bulk non-power actions, and with what cap?
-4. Is a scripted "Demo answers" mode acceptable for the live demo site, which has no API key?
-5. What stale-data limit: 1, 5, or 15 minutes?
+- A saved conversation lives in this browser's storage. It does not follow the user to another
+  browser or device.
