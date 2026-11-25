@@ -8,6 +8,10 @@ Adding or moving a device on the 3D hall floor changes that map. A compute load 
 
 The placed device shows its air temperature above the box, the floor scale names that reading instead of clipping it, and Thermal stays marked while the map is on. Placing or moving says the temperature and whether cooling next to it is taking the heat.
 
+The hall shows that air as a volume. The hot aisle stands above the racks. The cold aisles stay low. A load grows a column off the top of its box, and a cooler stays a short pool on the floor. Empty floor is left clear.
+
+That air is an overlay on the hall. The floor keeps a translucent wash, the rising air stays see-through, and the racks remain visible through it.
+
 ## 2026-11-24
 
 The Full demo's feeder fault opens the one-line. Feeder A is drawn open, side B stays live and still feeds every hall, and the hall taps are at risk. The summary reads "No load lost · redundancy gone."

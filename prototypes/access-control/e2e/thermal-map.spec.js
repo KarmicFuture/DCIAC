@@ -15,6 +15,11 @@ test("hall floor overlays a thermal map from inlet and return", async ({ page })
   await expect(map).toHaveAttribute("aria-label", /Cold aisles .+ Hot aisle .+ return/);
   await expect(page.locator('.thermal-map rect[data-tone="cold"]')).toHaveCount(2);
   await expect(page.locator('.thermal-map rect[data-tone="hot"]')).toHaveCount(1);
+  await expect(page.locator('.aircol[data-aisle][data-tone="cold"]')).toHaveCount(2);
+  await expect(page.locator('.aircol[data-aisle][data-tone="hot"]')).toHaveCount(1);
+  const hotColumn = await page.locator('.aircol[data-aisle][data-tone="hot"]').evaluate((el) => parseFloat(el.style.getPropertyValue("--h")));
+  const coldColumn = await page.locator('.aircol[data-aisle][data-tone="cold"]').first().evaluate((el) => parseFloat(el.style.getPropertyValue("--h")));
+  expect(hotColumn).toBeGreaterThan(coldColumn * 2);
   await expect(page.locator(".thermal-scale")).toContainText("Supply 20.5 °C");
   await expect(page.locator('[data-act="thermal-map"]')).toHaveAttribute("aria-pressed", "true");
 
@@ -59,6 +64,14 @@ test("moving a load and a cooler changes the 3D hall heat map", async ({ page })
   await expect(coldGpu).toHaveAttribute("data-mode", "heat");
   const inCold = Number(await coldGpu.getAttribute("data-c"));
   expect(inCold).toBeGreaterThan(24);
+  const plume = page.locator('.aircol.plume[data-gear="gear-gpu"]');
+  await expect(plume).toHaveAttribute("data-mode", "heat");
+  const plumeCold = await plume.evaluate((el) => ({
+    h: parseFloat(el.style.getPropertyValue("--h")),
+    base: parseFloat(el.style.getPropertyValue("--base")),
+  }));
+  expect(plumeCold.base).toBeGreaterThan(40);
+  expect(plumeCold.h).toBeGreaterThan(40);
   const tag = page.locator('.rackbox[data-plan="gear-gpu"] .thermal-tag');
   await expect(tag).toBeVisible();
   await expect(tag).toContainText("°C");
@@ -68,9 +81,17 @@ test("moving a load and a cooler changes the 3D hall heat map", async ({ page })
   await park(page, "gear-gpu", "inv-nvidia-gb200-nvl72", "GB200 1", 356, 129);
   const inHot = Number(await page.locator('.thermal-spot[data-gear="gear-gpu"]').getAttribute("data-c"));
   expect(inHot).toBeGreaterThan(inCold);
+  const plumeHot = await page.locator('.aircol.plume[data-gear="gear-gpu"]').evaluate((el) => parseFloat(el.style.getPropertyValue("--h")));
+  expect(plumeHot).toBeGreaterThan(plumeCold.h);
 
   await park(page, "gear-crac", "vertiv-crac", "CRAC 1", 356, 129);
   const besideCooler = Number(await page.locator('.thermal-spot[data-gear="gear-gpu"]').getAttribute("data-c"));
   expect(besideCooler).toBeLessThan(inHot);
+  const plumeCooled = await page.locator('.aircol.plume[data-gear="gear-gpu"]').evaluate((el) => parseFloat(el.style.getPropertyValue("--h")));
+  expect(plumeCooled).toBeLessThan(plumeHot);
   await expect(page.locator('.thermal-spot[data-gear="gear-crac"]')).toHaveAttribute("data-mode", "cool");
+  const pool = page.locator('.aircol.plume[data-gear="gear-crac"]');
+  await expect(pool).toHaveAttribute("data-tone", "cool");
+  const poolH = await pool.evaluate((el) => parseFloat(el.style.getPropertyValue("--h")));
+  expect(poolH).toBeLessThan(plumeCooled);
 });

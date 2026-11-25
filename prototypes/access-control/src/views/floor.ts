@@ -1500,12 +1500,13 @@ function placedSpots(pod) {
     if (!spec) return;
     let x = 0;
     let y = 0;
+    let rack = null;
     if (item.place === "floor") {
       x = item.x - pod.x + (spec.box.w || 0) / 2;
       y = item.y - pod.y + (spec.box.d || 0) / 2;
       if (x < -80 || y < -80 || x > pod.w + 80 || y > pod.h + 80) return;
     } else if (item.place === "rack") {
-      const rack = (pod.racks || []).find((entry) => entry.id === item.host);
+      rack = (pod.racks || []).find((entry) => entry.id === item.host);
       if (!rack) return;
       x = rack.x + rack.w / 2;
       y = rack.y + rack.d / 2;
@@ -1514,11 +1515,15 @@ function placedSpots(pod) {
     const coolKw = isCooler(spec) ? statedCoolingKw(spec) : 0;
     if (!heatKw && !isCooler(spec)) return;
     const reach = Math.max(spec.box.w || 48, spec.box.d || 48) * (isCooler(spec) ? 3 : 2.2);
+    const rackBox = item.place === "rack";
     spots.push({
       id: item.id,
       name: item.name || spec.name,
       x: x,
       y: y,
+      boxW: rackBox ? rack.w : (spec.box.w || 48),
+      boxD: rackBox ? rack.d : (spec.box.d || 48),
+      boxH: rackBox ? (rack.h || 112) : (spec.box.h || 48),
       heatKw: heatKw,
       coolKw: coolKw,
       holdSupply: isCooler(spec) && !coolKw,
@@ -1576,6 +1581,70 @@ function gradientStops(aisle, samples) {
   if (stops[stops.length - 1].off < 1) stops.push({ off: 1, c: stops[stops.length - 1].c });
   if (stops.length < 2) stops.push({ off: 1, c: stops[0].c });
   return stops;
+}
+
+/* Supply stays near the floor. The contained return stands above the racks. */
+function airColumnPx(celsius: number) {
+  const t = clamp((celsius - 20.5) / 19.5, 0, 1);
+  return Math.round(22 + t * 140);
+}
+
+function meanC(samples) {
+  if (!samples.length) return 20.5;
+  return samples.reduce((sum, sample) => sum + sample.c, 0) / samples.length;
+}
+
+function airColumn(opts) {
+  const gear = opts.gear
+    ? ' data-gear="' + esc(opts.gear) + '" data-mode="' + esc(opts.mode) + '"'
+    : "";
+  const aisle = opts.aisle ? ' data-aisle="' + esc(opts.aisle) + '"' : "";
+  const name = opts.name ? '<span class="air-name">' + esc(opts.name) + "</span>" : "";
+  return '<div class="aircol' + (opts.plume ? " plume" : "") + '" data-tone="' + esc(opts.tone) + '"' + aisle + gear +
+    ' data-c="' + opts.c.toFixed(1) + '" style="--x:' + opts.x.toFixed(1) + "px;--y:" + opts.y.toFixed(1) +
+    "px;--w:" + opts.w.toFixed(1) + "px;--d:" + opts.d.toFixed(1) + "px;--h:" + opts.h + "px;--base:" + (opts.base || 0) +
+    "px;--air:" + opts.color + '"><i class="atop"></i><i class="afront"></i><i class="aside"></i>' + name + "</div>";
+}
+
+function thermalVolumes(pod, fit, spots) {
+  const aisles = (fit.aisles || []).map((aisle) => {
+    const samples = aisleSamples(pod, aisle, state.containment !== "cac");
+    const c = meanC(samples);
+    const hot = aisle.tone === "hot";
+    return airColumn({
+      tone: hot ? "hot" : "cold",
+      aisle: aisle.id,
+      name: (hot ? "Hot" : "Cold") + " · " + c.toFixed(1) + " °C",
+      x: aisle.x,
+      y: aisle.y,
+      w: aisle.w,
+      d: aisle.h,
+      h: airColumnPx(c),
+      c: c,
+      color: airColor(c),
+    });
+  }).join("");
+  const plumes = spots.map((spot) => {
+    const heat = spot.mode === "heat";
+    const span = heat ? Math.max(spot.boxW, spot.boxD) : Math.min(spot.reach, 150);
+    const w = heat ? spot.boxW : span;
+    const d = heat ? spot.boxD : span;
+    return airColumn({
+      plume: true,
+      tone: heat ? "heat" : "cool",
+      mode: spot.mode,
+      gear: spot.id,
+      x: spot.x - w / 2,
+      y: spot.y - d / 2,
+      w: w,
+      d: d,
+      h: heat ? airColumnPx(spot.center) : 18,
+      base: heat ? spot.boxH : 0,
+      c: spot.center,
+      color: airColor(spot.center),
+    });
+  }).join("");
+  return '<div class="thermal-air" aria-hidden="true">' + aisles + plumes + "</div>";
 }
 
 function tempSpan(lo: number, hi: number) {
@@ -1651,7 +1720,7 @@ export function gearAirSentence(item) {
 export function thermalOverlay(pod) {
   const fit = pod && pod.fit;
   const model = hallAir(pod);
-  if (!state.thermalMap || !model) return { svg: "", scale: "" };
+  if (!state.thermalMap || !model) return { svg: "", scale: "", volumes: "" };
   const hac = model.hac;
   const spots = model.spots;
   const rackRise = model.rackRise;
@@ -1702,15 +1771,15 @@ export function thermalOverlay(pod) {
     ? hottest.name + " · " + hottest.center.toFixed(1) + " °C" + (hottest.where ? " · " + hottest.where : "") + (hottest.caught ? " · cooled" : "")
     : (spots.length ? "Cooling on the floor" : "");
   const summary = "Supply 20.5 °C · cold aisles " + (cold || "inlet") + " · hot aisle " + (warm || "return") + (hac ? " return" : " exhaust");
-  const label = "Thermal map. " + (gearLine ? gearLine + ". " : "") + "Supply 20.5 °C. Cold aisles " + (cold || "at the inlet") +
+  const label = "Thermal map. Heat stands in the hot aisle. Cold aisles stay low. " + (gearLine ? gearLine + ". " : "") + "Supply 20.5 °C. Cold aisles " + (cold || "at the inlet") +
     ". Hot aisle " + (warm || "at the return") + (hac ? " return." : " exhaust.");
   const scale = '<div class="thermal-scale"><i aria-hidden="true"></i><span>' +
     (gearLine ? "<b>" + esc(gearLine) + "</b>" : "") + esc(summary) + "</span></div>";
   const svg = '<svg class="thermal-map" role="img" aria-label="' + esc(label) + '" viewBox="0 0 ' + pod.w + " " + pod.h + '" preserveAspectRatio="none">' +
     "<defs>" + grads.join("") + "</defs>" +
-    '<rect class="thermal-room" data-tone="room" width="' + pod.w + '" height="' + pod.h + '" fill="' + airColor(room) + '" opacity="0.55"/>' +
+    '<rect class="thermal-room" data-tone="room" width="' + pod.w + '" height="' + pod.h + '" fill="' + airColor(room) + '" opacity="0.16"/>' +
     rects.join("") + blooms + "</svg>";
-  return { svg, scale };
+  return { svg, scale, volumes: thermalVolumes(pod, fit, spots) };
 }
 
 function airAt(fit, x: number, y: number, hac: boolean, room: number) {
@@ -1837,7 +1906,7 @@ export function renderHall() {
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
     return '<div class="pod' + current + (overlay.svg ? " thermal-on" : "") + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + (overlay.volumes || "") + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
   const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
   return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
