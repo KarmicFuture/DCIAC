@@ -19,10 +19,12 @@ test("install a PowerEdge R760 from Find a home and alarm on Feeder A", async ({
   await page.locator('[data-act="dcim-promote"]').click();
   await expect(note).toContainText("is submitted");
   const workId = ((await note.innerText()).match(/WO-[A-Za-z0-9-]+/) || [""])[0];
+  // Wait for this work order's own confirmation. The list already shows older
+  // Approved and Verified orders, so matching those words alone moved on too early.
   await page.locator(`[data-id="${workId}"][data-to="Approved"]`).click();
-  await expect(page.locator(".dcim")).toContainText("Approved");
+  await expect(note).toContainText(workId + " is Approved.");
   await page.locator(`[data-id="${workId}"][data-to="Verified"]`).click();
-  await expect(page.locator(".dcim")).toContainText("Verified");
+  await expect(note).toContainText(workId + " is Verified.");
 
   await page.locator('[data-act="dcim-tab"][data-tab="capacity"]').click();
   await expect(page.locator(".dcim")).toContainText("PUE 1.05");

@@ -2,6 +2,17 @@
 
 ## 2026-11-25
 
+DCIAC runs as microservices. The backend is split into nine services behind a gateway: identity, inventory, connectivity, power, control, capacity, work orders, monitoring, and reporting. Each has its own API contract and health checks. `docker compose -f services/docker-compose.yml up --build` starts the whole stack, so another platform can host it. The web app, the API paths, and the data are the same. The full browser suite passes against the services as it does against `serve.py`. See `services/README.md` and `services/ROADMAP.md`.
+
+- Safety is unchanged and tested through the gateway: role checks, the outlet work-order gate and
+  reason, the 60-a-minute action limit, and the audit hash chain under concurrent writes from several
+  services. A timed-out power action says the outcome is unknown and points to Audit, so nobody
+  retries it blindly.
+- New UX guard: every main view at desktop and iPhone width must keep its heading above the fold, not
+  scroll sideways, and log no console errors or API 5xx answers.
+- Test fix: the DCIM install test now waits for its own work order to reach Approved and Verified.
+  It used to move on as soon as an older order showed those words.
+
 The hall floor can show a thermal map. Cold aisles take each rack's inlet, the hot aisle takes the contained return (or the exhaust when cold-aisle containment is on), and the rest of the hall stays at the 20.5 °C supply. Thermal in the floor controls turns it off.
 
 Adding or moving a device on the 3D hall floor changes that map. A compute load warms the air at its position, scaled to the hall's kW per rack. A cooler stated in its notes, or a CDU, pulls that air back toward the 20.5 °C supply, and the pull follows the unit when it moves. Gear mounted in a rack warms that rack's place on the aisle.

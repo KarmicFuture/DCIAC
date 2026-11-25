@@ -229,7 +229,7 @@ def connect(path=None):
     global _conn
     path = path or os.environ.get("DCIAC_DB") or DEFAULT_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    _conn = sqlite3.connect(path, check_same_thread=False)
+    _conn = sqlite3.connect(path, check_same_thread=False, timeout=15)
     _conn.row_factory = sqlite3.Row
     _conn.execute("PRAGMA foreign_keys = ON")
     _conn.executescript(SCHEMA)

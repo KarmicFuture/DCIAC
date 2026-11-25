@@ -1,0 +1,141 @@
+# DCIAC as microservices. From prototypes/access-control:
+#   docker compose -f services/docker-compose.yml up --build
+# Open http://127.0.0.1:8766/ . Only the gateway is published to the host.
+
+name: dciac
+
+x-service: &service
+  build:
+    context: ..
+    dockerfile: services/Dockerfile
+    target: service
+  image: dciac-service:local
+  pull_policy: build
+  restart: unless-stopped
+  volumes:
+    - dciac-data:/data
+  networks: [internal]
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  migrate:
+    build:
+      context: ..
+      dockerfile: services/Dockerfile
+      target: service
+    image: dciac-service:local
+    command: ["python3", "services/migrate.py"]
+    volumes:
+      - dciac-data:/data
+    networks: [internal]
+    restart: "no"
+
+  identity:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: identity
+
+  inventory:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: inventory
+
+  connectivity:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: connectivity
+
+  power:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: power
+
+  control:
+    <<: *service
+    # One replica only: the outlet and console rate limit lives in this process.
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: control
+
+  capacity:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: capacity
+
+  workorders:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: workorders
+
+  monitoring:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: monitoring
+
+  reporting:
+    <<: *service
+    environment:
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      DCIAC_SERVICE: reporting
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: services/Dockerfile
+      target: gateway
+    image: dciac-gateway:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DCIAC_PORT:-8766}:8766"
+    environment:
+      # A long random value from services/.env (see services/README.md). Services
+      # trust the forwarded client address only when it comes with this secret.
+      DCIAC_GATEWAY_SECRET: ${DCIAC_GATEWAY_SECRET:?set DCIAC_GATEWAY_SECRET in services/.env}
+      # 1 keeps today's web app working (it sends X-Dciac-User / X-Dciac-Role).
+      DCIAC_DEMO_HEADERS: "1"
+      DCIAC_IDENTITY_URL: http://identity:8080
+      DCIAC_INVENTORY_URL: http://inventory:8080
+      DCIAC_CONNECTIVITY_URL: http://connectivity:8080
+      DCIAC_POWER_URL: http://power:8080
+      DCIAC_CONTROL_URL: http://control:8080
+      DCIAC_CAPACITY_URL: http://capacity:8080
+      DCIAC_WORKORDERS_URL: http://workorders:8080
+      DCIAC_MONITORING_URL: http://monitoring:8080
+      DCIAC_REPORTING_URL: http://reporting:8080
+    networks: [internal, edge]
+    depends_on:
+      identity:
+        condition: service_healthy
+      inventory:
+        condition: service_healthy
+      connectivity:
+        condition: service_healthy
+      power:
+        condition: service_healthy
+      control:
+        condition: service_healthy
+      capacity:
+        condition: service_healthy
+      workorders:
+        condition: service_healthy
+      monitoring:
+        condition: service_healthy
+      reporting:
+        condition: service_healthy
+
+volumes:
+  dciac-data:
+
+networks:
+  internal:
+    internal: true
+  edge: {}

@@ -10,7 +10,15 @@ Edit this file to steer the work. The task reads it from `main` each run.
 
 - Make exactly one focused improvement per run, about 200 changed lines or fewer.
 - Add or update a test that proves the change (Playwright in `e2e/`, or Python in `server/`).
-- All Python tests and all Playwright tests must pass before a pull request opens.
+- All Python tests and all Playwright tests must pass before a pull request opens. That includes
+  `python3 -m unittest services.test_services`, and the Playwright suite run twice: once against
+  `serve.py`, and once against the services (`python3 services/run_local.py` on a copy of the
+  database, then `npx playwright test`).
+- `e2e/ux-guard.spec.js` is a gate. A view that loses its heading above the fold, scrolls sideways
+  at 1440 px or 390 px, logs a console error, or gets an API 5xx answer fails the run. Add new main
+  views to its list.
+- API routes live in `services/catalog.py`. A new route needs an owning service there, or the
+  catalog tests fail. The services must keep answering exactly like `serve.py`.
 - Never weaken power-control confirmations, role permissions, leak or power interlocks,
   or the audit log unless a priority below explicitly asks for it.
 - Do not add Vertiv or Avocent branding.
@@ -97,6 +105,9 @@ the other candidates considered with their scores, and why this one won.
 Mark items done here in the same pull request that finishes them.
 
 1. Fix any failing test, console error, or broken layout on desktop or iPhone width.
+1a. Platform: take the first unchecked item in `services/ROADMAP.md` (backend hardening, then
+   Kubernetes, then moving browser logic into services). Shipped 2026-11-25: phase 1, nine services
+   plus a gateway, Docker Compose, contract tests, and the UX guard.
 2. ~~Fleet view: a summary across halls and racks showing alarms, power, and capacity at a glance.~~
    *Done.* Shipped 2026-11-19: Operate › Fleet (`#/fleet`) lists every hall with open
    alarms, IT power, headroom, and hot-rack counts. Shipped 2026-11-20: "Show racks" on each

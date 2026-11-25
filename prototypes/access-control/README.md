@@ -18,6 +18,10 @@ Sign in as Operator, Administrator, or Read only. The password for all three is 
 
 The database file is `data/unubtanium.sqlite`. Set `DCIAC_DB` to use another file.
 
+## Run as microservices
+
+`services/` runs the same API as nine services behind a gateway, with Docker Compose or `python3 services/run_local.py`. See [services/README.md](services/README.md) and the [roadmap](services/ROADMAP.md).
+
 ## Tests
 
 Python:
