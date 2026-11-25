@@ -259,11 +259,12 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Hall 1: twenty AI racks. A14 is the ACS out-of-band domain.",
+    pop: "Hall 1: twenty AI racks. The floor overlay is the thermal map — cold aisles at the inlet, the hot aisle at the return. A14 is the ACS out-of-band domain.",
     target: ".scene",
     enter() {
       showFloor("hall");
       state.floor.podId = "pod-a";
+      state.thermalMap = true;
     },
   },
   {

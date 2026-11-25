@@ -25,6 +25,7 @@ import { clamp, esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { pills, themeButton } from "../ui/shell";
 import { futureYardHtml } from "./manage";
+import { catalogById } from "../data/library";
 import { deviceFaces, faceplate, thermalCard, thermalReading } from "./rack";
 
 export function updateFloorMeters() {
@@ -1065,6 +1066,7 @@ export function hudHtml(legend) {
   return simStripeHtml() + '<div class="hud">' + pills() + '<p class="hud-mission">' + esc(hudLine()) +
     '</p><div class="hud-controls">' + themeButton() + '<div class="seg" role="group" aria-label="Horizon"><button type="button" data-act="horizon" data-horizon="now"' + (state.horizon === "future" ? "" : ' aria-pressed="true"') + '>Now</button><button type="button" data-act="horizon" data-horizon="future"' + (state.horizon === "future" ? ' aria-pressed="true"' : "") + '>Future</button></div><div class="seg" role="group" aria-label="Place"><button type="button" data-act="floor-go" data-level="site"' + (outside ? ' aria-pressed="true"' : "") + '>Outside</button><button type="button" data-act="floor-go" data-level="hall"' + (outside ? "" : ' aria-pressed="true"') + '>Hall</button></div>' +
     walkBtn + listBtn + addBtn +
+    (outside || walking ? "" : '<button type="button" class="act" data-act="thermal-map" aria-pressed="' + (state.thermalMap ? "true" : "false") + '">Thermal</button>') +
     heatPathButton(false) +
     '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
     (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Pan"><button type="button" data-act="floor-pan" data-dir="left" aria-label="Pan left">←</button><button type="button" data-act="floor-pan" data-dir="right" aria-label="Pan right">→</button><button type="button" data-act="floor-pan" data-dir="up" aria-label="Pan up">↑</button><button type="button" data-act="floor-pan" data-dir="down" aria-label="Pan down">↓</button></div><div class="zoom-cluster" role="group" aria-label="Orbit"><button type="button" data-act="floor-orbit" data-dir="left" aria-label="Orbit left">↺</button><button type="button" data-act="floor-orbit" data-dir="right" aria-label="Orbit right">↻</button><button type="button" data-act="floor-orbit" data-dir="up" aria-label="Orbit up">⤒</button><button type="button" data-act="floor-orbit" data-dir="down" aria-label="Orbit down">⤓</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
@@ -1415,6 +1417,261 @@ export function rowRecord(pod, rowId) {
   return pod.fit.rows.find((row) => row.id === rowId) || null;
 }
 
+/* Supply, the 21–24 °C inlet band, 27 °C above it, and the contained return near 37 °C. */
+const AIR_STOPS = [
+  { c: 20.5, rgb: [47, 111, 138] },
+  { c: 24, rgb: [127, 154, 98] },
+  { c: 27, rgb: [196, 161, 90] },
+  { c: 35, rgb: [196, 106, 50] },
+  { c: 40, rgb: [138, 48, 48] },
+];
+
+function airColor(celsius: number) {
+  const stops = AIR_STOPS;
+  if (celsius <= stops[0].c) return rgb(stops[0].rgb);
+  const last = stops[stops.length - 1];
+  if (celsius >= last.c) return rgb(last.rgb);
+  for (let i = 1; i < stops.length; i += 1) {
+    if (celsius <= stops[i].c) {
+      const lo = stops[i - 1];
+      const hi = stops[i];
+      const t = (celsius - lo.c) / (hi.c - lo.c);
+      return rgb(lo.rgb.map((channel, index) => Math.round(channel + (hi.rgb[index] - channel) * t)));
+    }
+  }
+  return rgb(last.rgb);
+}
+
+function rgb(channels: number[]) {
+  return "rgb(" + channels.join(",") + ")";
+}
+
+function rackAir(rack) {
+  const entities = rackEntities(rack).filter((entity) => entity && entity.load && !isFacility(entity));
+  if (!entities.length) return null;
+  let inlet = -Infinity;
+  let exhaust = -Infinity;
+  let ret = -Infinity;
+  entities.forEach((entity) => {
+    const reading = thermalReading(entity);
+    if (reading.inlet > inlet) inlet = reading.inlet;
+    if (reading.exhaust > exhaust) exhaust = reading.exhaust;
+    if (reading.ret > ret) ret = reading.ret;
+  });
+  return { x: rack.x + rack.w / 2, inlet, exhaust, ret };
+}
+
+function isCooler(spec) {
+  const kind = spec.kind || "";
+  if (kind === "Cooling" || kind === "CRAC") return true;
+  const note = String(spec.note || "").toLowerCase();
+  return note.indexOf("cooling capacity") >= 0 || note.indexOf("coolant distribution") >= 0 || note.indexOf("crac") >= 0 || note.indexOf("crah") >= 0;
+}
+
+function statedCoolingKw(spec) {
+  const match = String(spec.note || "").match(/(\d+(?:\.\d+)?)\s*kW cooling capacity/i);
+  return match ? Number(match[1]) : 0;
+}
+
+function placedHeatKw(spec) {
+  if (!spec || isCooler(spec)) return 0;
+  const kind = spec.kind || "";
+  if (["Power", "UPS", "Facility", "Security", "Busway", "Environmental", "Containment", "Enclosure"].indexOf(kind) >= 0) return 0;
+  if (kind === "Compute" || kind === "Storage" || (spec.watts || 0) >= 1000) return (spec.watts || 0) / 1000;
+  return 0;
+}
+
+/* Floor and rack placements in this hall, in the same coordinates as the thermal map. */
+function placedSpots(pod) {
+  const spots = [];
+  state.plan.placements.forEach((item) => {
+    const spec = catalogById(item.catalogId);
+    if (!spec) return;
+    let x = 0;
+    let y = 0;
+    if (item.place === "floor") {
+      x = item.x - pod.x + (spec.box.w || 0) / 2;
+      y = item.y - pod.y + (spec.box.d || 0) / 2;
+      if (x < -80 || y < -80 || x > pod.w + 80 || y > pod.h + 80) return;
+    } else if (item.place === "rack") {
+      const rack = (pod.racks || []).find((entry) => entry.id === item.host);
+      if (!rack) return;
+      x = rack.x + rack.w / 2;
+      y = rack.y + rack.d / 2;
+    } else return;
+    const heatKw = placedHeatKw(spec);
+    const coolKw = isCooler(spec) ? statedCoolingKw(spec) : 0;
+    if (!heatKw && !isCooler(spec)) return;
+    const reach = Math.max(spec.box.w || 48, spec.box.d || 48) * (isCooler(spec) ? 3 : 2.2);
+    spots.push({
+      id: item.id,
+      name: item.name || spec.name,
+      x: x,
+      y: y,
+      heatKw: heatKw,
+      coolKw: coolKw,
+      holdSupply: isCooler(spec) && !coolKw,
+      reach: reach,
+    });
+  });
+  return spots;
+}
+
+function falloff(dist: number, reach: number) {
+  if (reach <= 0 || dist >= reach) return 0;
+  return 1 - dist / reach;
+}
+
+function spotRise(spot, spots, rackKw: number, rackRise: number) {
+  if (!spot.heatKw || rackKw <= 0) return 0;
+  let captured = 0;
+  spots.forEach((other) => {
+    if (other === spot || (!other.coolKw && !other.holdSupply)) return;
+    const near = falloff(Math.hypot(other.x - spot.x, other.y - spot.y), other.reach);
+    if (!near) return;
+    const share = other.holdSupply ? 1 : Math.min(1, other.coolKw / spot.heatKw);
+    captured += near * share;
+  });
+  const open = Math.max(0, 1 - captured);
+  return rackRise * (spot.heatKw / rackKw) * open;
+}
+
+function aisleSamples(pod, aisle, hac: boolean) {
+  const hot = aisle.tone === "hot";
+  const rows = ((pod.fit && pod.fit.rows) || []).filter((row) => (hot ? row.hot : row.cold) === aisle.id);
+  const rowIds = {};
+  rows.forEach((row) => { rowIds[row.id] = true; });
+  const byX = {};
+  pod.racks.forEach((rack) => {
+    if (!rowIds[rack.row]) return;
+    const air = rackAir(rack);
+    if (!air) return;
+    const value = hot ? (hac ? air.ret : air.exhaust) : air.inlet;
+    const key = String(Math.round(air.x));
+    if (!byX[key] || value > byX[key].c) byX[key] = { x: air.x, c: value };
+  });
+  return Object.keys(byX).map((key) => byX[key]).sort((a, b) => a.x - b.x);
+}
+
+function gradientStops(aisle, samples) {
+  const width = aisle.w || 1;
+  const raw = samples.map((sample) => ({
+    off: clamp((sample.x - aisle.x) / width, 0, 1),
+    c: sample.c,
+  })).sort((a, b) => a.off - b.off);
+  if (!raw.length) return [{ off: 0, c: 20.5 }, { off: 1, c: 20.5 }];
+  const stops = raw.slice();
+  if (stops[0].off > 0) stops.unshift({ off: 0, c: stops[0].c });
+  if (stops[stops.length - 1].off < 1) stops.push({ off: 1, c: stops[stops.length - 1].c });
+  if (stops.length < 2) stops.push({ off: 1, c: stops[0].c });
+  return stops;
+}
+
+function tempSpan(lo: number, hi: number) {
+  if (!isFinite(lo) || !isFinite(hi)) return "";
+  if (Math.abs(lo - hi) < 0.05) return lo.toFixed(1) + " °C";
+  return lo.toFixed(1) + "–" + hi.toFixed(1) + " °C";
+}
+
+function applyPlacedAir(samples, aisle, spots, rackKw: number, rackRise: number) {
+  const midY = aisle.y + (aisle.h || 0) / 2;
+  return samples.map((sample) => {
+    let next = sample.c;
+    spots.forEach((spot) => {
+      if (!spot.heatKw) return;
+      const weight = falloff(Math.hypot(spot.x - sample.x, spot.y - midY), spot.reach);
+      if (weight) next += spotRise(spot, spots, rackKw, rackRise) * weight;
+    });
+    spots.forEach((spot) => {
+      if (spot.heatKw) return;
+      const weight = falloff(Math.hypot(spot.x - sample.x, spot.y - midY), spot.reach);
+      if (!weight) return;
+      const pull = spot.holdSupply ? 1 : (rackKw > 0 ? Math.min(1, spot.coolKw / rackKw) : 0);
+      next -= (next - 20.5) * pull * weight;
+    });
+    return { x: sample.x, c: next };
+  });
+}
+
+export function thermalOverlay(pod) {
+  const fit = pod && pod.fit;
+  if (!state.thermalMap || !fit || !(fit.aisles || []).length) return { svg: "", scale: "" };
+  const hac = state.containment !== "cac";
+  const spots = placedSpots(pod);
+  const hotBase = (fit.aisles || []).filter((aisle) => aisle.tone === "hot")
+    .reduce((list, aisle) => list.concat(aisleSamples(pod, aisle, hac)), []);
+  const rackRise = hotBase.length
+    ? Math.max(8, hotBase.reduce((sum, sample) => sum + sample.c, 0) / hotBase.length - 20.5)
+    : 15.5;
+  const rackKw = PLANT.racksPerHall ? (PLANT.hallItMw * 1000) / PLANT.racksPerHall : 120;
+  let minIn = Infinity;
+  let maxIn = -Infinity;
+  let minHot = Infinity;
+  let maxHot = -Infinity;
+  const grads = [];
+  const rects = [];
+  fit.aisles.forEach((aisle) => {
+    const samples = applyPlacedAir(aisleSamples(pod, aisle, hac), aisle, spots, rackKw, rackRise);
+    const hot = aisle.tone === "hot";
+    samples.forEach((sample) => {
+      if (hot) {
+        if (sample.c < minHot) minHot = sample.c;
+        if (sample.c > maxHot) maxHot = sample.c;
+      } else {
+        if (sample.c < minIn) minIn = sample.c;
+        if (sample.c > maxIn) maxIn = sample.c;
+      }
+    });
+    const id = "therm-" + aisle.id;
+    const stops = gradientStops(aisle, samples);
+    grads.push('<linearGradient id="' + id + '" gradientUnits="userSpaceOnUse" x1="' + aisle.x + '" y1="0" x2="' + (aisle.x + aisle.w) + '" y2="0">' +
+      stops.map((stop) => '<stop offset="' + (stop.off * 100).toFixed(2) + '%" stop-color="' + airColor(stop.c) + '"/>').join("") +
+      "</linearGradient>");
+    const readings = samples.map((sample) => sample.c);
+    const title = esc(aisle.label || "Aisle") + " " + tempSpan(
+      Math.min.apply(null, readings.concat([Infinity])),
+      Math.max.apply(null, readings.concat([-Infinity])),
+    );
+    rects.push('<rect data-aisle="' + esc(aisle.id) + '" data-tone="' + esc(aisle.tone || "") + '" x="' + aisle.x + '" y="' + aisle.y + '" width="' + aisle.w + '" height="' + aisle.h + '" fill="url(#' + id + ')"><title>' + title + "</title></rect>");
+  });
+  const room = hac ? 20.5 : (isFinite(maxHot) ? maxHot : 24);
+  const cold = tempSpan(minIn, maxIn);
+  const warm = tempSpan(minHot, maxHot);
+  const blooms = spots.map((spot) => {
+    const base = airAt(fit, spot.x, spot.y, hac, room);
+    let center = base;
+    if (spot.heatKw) center = base + spotRise(spot, spots, rackKw, rackRise);
+    else if (spot.holdSupply) center = 20.5;
+    else if (spot.coolKw && rackKw > 0) center = base - (base - 20.5) * Math.min(1, spot.coolKw / rackKw);
+    const mode = spot.heatKw ? "heat" : "cool";
+    const id = "therm-spot-" + spot.id;
+    grads.push('<radialGradient id="' + id + '" gradientUnits="userSpaceOnUse" cx="' + spot.x.toFixed(1) + '" cy="' + spot.y.toFixed(1) + '" r="' + spot.reach.toFixed(1) + '">' +
+      '<stop offset="0%" stop-color="' + airColor(center) + '" stop-opacity="0.92"/>' +
+      '<stop offset="100%" stop-color="' + airColor(center) + '" stop-opacity="0"/>' +
+      "</radialGradient>");
+    return '<circle class="thermal-spot" data-mode="' + mode + '" data-gear="' + esc(spot.id) + '" data-c="' + center.toFixed(1) + '" cx="' + spot.x.toFixed(1) + '" cy="' + spot.y.toFixed(1) + '" r="' + spot.reach.toFixed(1) + '" fill="url(#' + id + ')"><title>' + esc(spot.name) + " " + center.toFixed(1) + " °C</title></circle>";
+  }).join("");
+  const placedNote = spots.length ? " Placed gear is included." : "";
+  const label = "Thermal map. Supply 20.5 °C. Cold aisles " + (cold || "at the inlet") +
+    ". Hot aisle " + (warm || "at the return") + (hac ? " return." : " exhaust.") + placedNote;
+  const scale = '<div class="thermal-scale"><i aria-hidden="true"></i><span>' + esc(
+    "Supply 20.5 °C · cold aisles " + (cold || "inlet") + " · hot aisle " + (warm || "return") + (hac ? " return" : " exhaust") +
+    (spots.length ? " · placed gear" : "")
+  ) + "</span></div>";
+  const svg = '<svg class="thermal-map" role="img" aria-label="' + esc(label) + '" viewBox="0 0 ' + pod.w + " " + pod.h + '" preserveAspectRatio="none">' +
+    "<defs>" + grads.join("") + "</defs>" +
+    '<rect class="thermal-room" data-tone="room" width="' + pod.w + '" height="' + pod.h + '" fill="' + airColor(room) + '" opacity="0.55"/>' +
+    rects.join("") + blooms + "</svg>";
+  return { svg, scale };
+}
+
+function airAt(fit, x: number, y: number, hac: boolean, room: number) {
+  const aisle = (fit.aisles || []).find((band) => x >= band.x && x <= band.x + band.w && y >= band.y && y <= band.y + band.h);
+  if (!aisle) return room;
+  if (aisle.tone === "cold") return 22;
+  return hac ? 36 : room;
+}
+
 export function fitHtml(pod, report?: SimImpact | null) {
   const fit = pod.fit;
   if (!fit) return "";
@@ -1505,6 +1762,7 @@ export function renderHall() {
   const open = podById(state.floor.podId) || PODS[0];
   if (runtime.walk && runtime.walk.podId === open.id) return renderPov(open);
   const report = impact(runtime.sim);
+  const overlay = thermalOverlay(open);
   const pods = [open].map((pod) => {
     const racks = pod.racks.map((rack) => {
       const facing = (rack.row || "").slice(-1) === "s" ? "face-south" : "face-north";
@@ -1529,15 +1787,15 @@ export function renderHall() {
       }, report);
     }).join("");
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
-    return '<div class="pod' + current + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
+    return '<div class="pod' + current + (overlay.svg ? " thermal-on" : "") + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + fitHtml(pod, report) + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
   const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
   return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
     (report.active ? " sim-active" : "") + '" data-lod="' + floorLod() + '" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + planBoxes("floor") +
-    "</div></div>" + walkBar() + "</div>";
+    "</div></div>" + overlay.scale + walkBar() + "</div>";
 }
 
 export function renderSite() {

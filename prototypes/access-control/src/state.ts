@@ -132,6 +132,7 @@ export const state: AppState = {
   inspectorOpen: false,
   manage: { layer: "bmc", device: "tray-01" },
   containment: "hac",
+  thermalMap: true,
   theme: "paper",
   collapsed: {} as Record<string, boolean>,
   scenePop: false,

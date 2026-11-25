@@ -431,6 +431,7 @@ export function onClick(event) {
   }
   else if (act === "build-live" && el.dataset.pod) { openOnelineHall(el.dataset.pod); render(); }
   else if (act === "contain") { state.containment = el.dataset.mode === "cac" ? "cac" : "hac"; render(); }
+  else if (act === "thermal-map") { state.thermalMap = !state.thermalMap; render(); }
   else if (act === "horizon-focus") { state.horizon = "future"; state.view = "manage"; render(); loadFuturePlan(); }
   else if (act === "manage-layer") { state.manage.layer = el.dataset.layer || "bmc"; render(); }
   else if (act === "manage-device") { state.manage.device = el.dataset.device; state.selected = el.dataset.device; render(); }
