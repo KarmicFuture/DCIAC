@@ -3788,7 +3788,7 @@ nav .ask-nav[aria-expanded="true"] { background: #2a2a2a; border-color: #3a3a3a;
   .ask-panel { position: fixed; top: 0; right: 0; width: min(400px, 100vw); height: 100%; z-index: 45; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18); }
 }
 @media (max-width: 767px) {
-  .tabbar { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tabbar:has(.ask-nav) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .tabbar .ask-nav[aria-expanded="true"] { color: #f6f3ee; background: #2a2a2a; }
   .ask-panel { inset: 0; width: 100vw; height: 100dvh; z-index: 50; box-shadow: none; border-left: 0; }
   .ask-head { padding-top: calc(var(--s3) + env(safe-area-inset-top)); }

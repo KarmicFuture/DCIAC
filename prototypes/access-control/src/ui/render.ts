@@ -49,7 +49,7 @@ import { dropNetworkCable, exportElevation, saveNetworkCable } from "../views/el
 import { failPower, setPowerMode } from "../views/power";
 import { cloneModel, importModels, saveModel } from "../views/models";
 import { selectDevice } from "../views/rack";
-import { askAfterPaint, askControl, askFormHtml, askHeadHtml, askInputGrow, askInputKey, askLink, askLogHtml, askOpen, askShortcut, cancelAsk, closeAsk, confirmAsk, sendAsk, setAuditFilter, toggleAsk } from "./ask";
+import { askAfterPaint, askControl, askFormHtml, askHeadHtml, askInputGrow, askInputKey, askLink, askLogHtml, askOpen, askShortcut, cancelAsk, closeAsk, confirmAsk, sendAsk, setAuditFilter, syncAskUser, toggleAsk } from "./ask";
 
 function hydrateFields() {
   const fields = {
@@ -298,6 +298,7 @@ function paint() {
   const scrollX = window.scrollX;
   const scrollY = window.scrollY;
   runtime.lastRenderedView = viewKey;
+  syncAskUser();
   recordFloorDrawerFocus();
   litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"} data-ask=${askOpen() ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}${unsafeHTML(heatPathHtml())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${askOpen() ? html`<aside id="ask-panel" class="ask-panel" aria-labelledby="ask-title">${unsafeHTML(askHeadHtml())}${unsafeHTML(askLogHtml())}${unsafeHTML(askFormHtml())}</aside>` : ""}${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   updateAlarmClocks();
