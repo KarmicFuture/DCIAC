@@ -200,6 +200,6 @@ test.describe("outlet confirmation dialog", () => {
     await expect(page.locator("#outlet-undo")).toBeFocused();
     await page.evaluate(() => window.AccessDemo.finishOutletHold());
     await expect(page.locator("#outlet-9-cycle")).toBeFocused();
-    await expect(page.evaluate(() => document.activeElement.tagName)).not.toBe("BODY");
+    expect(await page.evaluate(() => document.activeElement.tagName)).not.toBe("BODY");
   });
 });
