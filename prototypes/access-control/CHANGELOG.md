@@ -2,6 +2,8 @@
 
 ## 2026-11-24
 
+The Full demo's feeder fault opens the one-line. Feeder A is drawn open, side B stays live and still feeds every hall, and the hall taps are at risk. The summary reads "No load lost · redundancy gone."
+
 Ask decisions from Vinu, applied:
 
 - Ask is for operators. The Operator and Administrator roles see it below Audit; the read-only

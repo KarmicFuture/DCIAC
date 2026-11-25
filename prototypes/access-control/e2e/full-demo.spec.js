@@ -50,10 +50,23 @@ test("Full demo starts from login and auto-advances with highlight pops", async 
   await expect(page.locator('.device-view tr.best[data-band="oob"]')).toHaveAttribute("data-path", "acs-serial");
   await expect(page.locator('.device-view tr[data-path="bmc"]')).toContainText("BMC dark");
 
-  // Skip Sessions, Control, the leak, maintenance, and the feeder fault to the Plan dates.
-  for (let i = 0; i < 6; i += 1) {
+  // Sessions, Control, the leak, and maintenance, then the feeder fault on the one-line.
+  for (let i = 0; i < 5; i += 1) {
     await page.evaluate(() => window.AccessDemo.advanceDemo());
   }
+  expect(await step()).toBe(10);
+  await expect(page.locator(".shell")).toHaveAttribute("data-view", "oneline");
+  await expect(page.locator("#demo-caption")).toContainText("Feeder A is open");
+  await expect(page.locator(".ol-summary")).toContainText("No load lost · redundancy gone");
+  await expect(page.locator('.ol-node.failed[data-server="grid-1"]')).toHaveCount(1);
+  await expect(page.locator('.ol-node.live[data-server="grid-2"]')).toHaveCount(1);
+  await expect(page.locator('.ol-node.failed[data-server="pwr-mod"]')).toHaveCount(1);
+  await expect(page.locator('.ol-node.live[data-server="pwr-2"]')).toHaveCount(1);
+  await expect(page.locator(".ol-hall.hit")).toHaveCount(10);
+  await expect(page.locator('.ol-line.failed[data-feed="grid-xfmr-a"]')).not.toHaveCount(0);
+  await expect(page.locator('.ol-line.live[data-feed="grid-xfmr-b"]')).not.toHaveCount(0);
+
+  await page.evaluate(() => window.AccessDemo.advanceDemo());
   expect(await step()).toBe(11);
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "plan");
   await expect(page.locator("#demo-caption")).toContainText("Nov 2026");

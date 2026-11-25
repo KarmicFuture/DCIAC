@@ -351,16 +351,16 @@ const FULL_TOUR: TourBeat[] = [
     },
   },
   {
-    pop: "Feeder A open — redundancy gone. Outside paints the failed feed.",
-    target: ".scene, .sim-bar, .sim-dock",
+    pop: "Operate · One-line — Feeder A is open. No IT is lost. Side B still feeds every hall, and the hall taps are at risk.",
+    target: ".oneline-sheet, .ol-svg",
+    weight: 1.35,
     enter() {
       if (state.leak) setLeak(false, true);
       closeMaintenance();
-      showFloor("site");
-      runtime.sim.barOpen = true;
+      runtime.sim.barOpen = false;
       fireEvent("feeder-a-loss", "", { quiet: true, stay: true });
-      state.view = "floor";
-      state.floor.level = "site";
+      state.view = "oneline";
+      state.onelineBuild = false;
     },
   },
   {

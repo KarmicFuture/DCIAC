@@ -46,15 +46,40 @@ function yardName(id: string, fallback: string) {
   return (item && (item.name || item.id)) || fallback;
 }
 
+const SIDE_A = ["grid-1", "xfmr-1", "pwr-mod", "pwr-3", "grid-xfmr-a", "xfmr-mod-a", "mod-bus", "mod-c"];
+const SIDE_B = ["grid-2", "xfmr-2", "pwr-2", "pwr-4", "grid-xfmr-b", "xfmr-mod-b", "mod-bus-b", "mod-d"];
+
+function feederDown(id: string) {
+  return !!(runtime.sim.feedersDown && runtime.sim.feedersDown[id]);
+}
+
+/* One open feeder de-energizes that side and leaves the other side carrying the halls. */
+function carriedTone(ids: string[], report: SimImpact) {
+  if (!report.active) return "";
+  const aDown = feederDown("grid-1");
+  const bDown = feederDown("grid-2");
+  if (!aDown && !bDown) return "";
+  const onA = ids.every((id) => SIDE_A.indexOf(id) >= 0);
+  const onB = ids.every((id) => SIDE_B.indexOf(id) >= 0);
+  if (onA && aDown) return "failed";
+  if (onB && bDown) return "failed";
+  if (onA && bDown && !aDown) return "live";
+  if (onB && aDown && !bDown) return "live";
+  if (ids.length === 1 && ids[0] === "mod-riser" && aDown !== bDown) return "live";
+  return "";
+}
+
 function nodeTone(id: string, report: SimImpact) {
   if (buildStage) return builtOn(id) ? "live" : "future";
-  if (runtime.sim.feedersDown && runtime.sim.feedersDown[id]) return "failed";
+  if (feederDown(id)) return "failed";
   if (report.active && report.failedFeeds.indexOf(id) >= 0) return "failed";
   if (report.active && report.affected[id]) return "hit";
   const entity = entityById(id);
   if (entity && entity.bmc === "down") return "failed";
   if (entity && heatBand(entity) === "critical") return "hot";
   if (entity && heatBand(entity) === "near") return "warm";
+  const carried = carriedTone([id], report);
+  if (carried) return carried;
   if (report.active) return "dim";
   return "live";
 }
@@ -62,8 +87,10 @@ function nodeTone(id: string, report: SimImpact) {
 function edgeTone(ids: string[], report: SimImpact) {
   if (buildStage) return buildEdgeTone(ids);
   if (ids.some((id) => report.active && report.failedFeeds.indexOf(id) >= 0)) return "failed";
-  if (ids.some((id) => runtime.sim.feedersDown && runtime.sim.feedersDown[id])) return "failed";
+  if (ids.some((id) => feederDown(id))) return "failed";
   if (report.active && ids.some((id) => report.affected[id])) return "hit";
+  const carried = carriedTone(ids, report);
+  if (carried) return carried;
   if (report.active) return "dim";
   return "live";
 }
@@ -155,7 +182,7 @@ function diagramSvg(report: SimImpact) {
 
   const toneA = edgeTone(["grid-1", "grid-xfmr-a", "xfmr-mod-a", "mod-bus"], report);
   const toneB = edgeTone(["grid-2", "grid-xfmr-b", "xfmr-mod-b", "mod-bus-b"], report);
-  const toneBus = edgeTone(["mod-riser", "mod-bus", "mod-bus-b"], report);
+  const toneBus = edgeTone(["mod-riser"], report);
   const bothDown = !!(runtime.sim.feedersDown && runtime.sim.feedersDown["grid-1"] && runtime.sim.feedersDown["grid-2"]);
   const hallEdge = bothDown || (report.active && report.loadLost) ? "failed" : (report.active && report.redundancyGone ? "hit" : (report.active ? "dim" : "live"));
 
