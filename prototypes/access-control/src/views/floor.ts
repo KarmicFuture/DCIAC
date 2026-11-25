@@ -1015,6 +1015,7 @@ export function boxHtml(item, band, act, extra, report?: SimImpact | null) {
   const face = extra.face || "";
   const cap = extra.cap ? '<span class="cap-label">' + esc(extra.cap) + "</span>" : "";
   const tag = extra.rack ? '<span class="rack-tag">' + esc(extra.rack) + "</span>" : "";
+  const airTag = extra.air ? '<span class="thermal-tag ' + extra.air.mode + '">' + esc(extra.air.text) + "</span>" : "";
   const planAttr = extra.plan ? ' data-plan="' + extra.plan + '"' : "";
   const attrs = extra.attrs || "";
   const label = boxLabel(extra, band);
@@ -1030,7 +1031,7 @@ export function boxHtml(item, band, act, extra, report?: SimImpact | null) {
   return '<div class="rackbox' + (extra.plan ? " planned" : "") + (extra.klass ? " " + extra.klass : "") + simClass + '" role="button" tabindex="0" aria-label="' + esc(named) + '" data-act="' + act + '" data-band="' + band + '" data-pri="' + (tone.pri || 0) + heatAttr +
     '" style="--x:' + item.x + "px;--y:" + item.y + "px;--w:" + item.w + "px;--d:" + item.d + "px;--h:" + item.h +
     "px;--heat:" + (extra.color || tone.color) + '" data-pod="' + (extra.pod || "") + '" data-rack="' + (extra.rack || "") +
-    '" data-server="' + (extra.server || "") + '"' + planAttr + attrs + ">" + tag + '<i class="ftop" aria-hidden="true">' + cap + '</i><i class="ffront" aria-hidden="true">' + mark + leds + face +
+    '" data-server="' + (extra.server || "") + '"' + planAttr + attrs + ">" + tag + airTag + '<i class="ftop" aria-hidden="true">' + cap + '</i><i class="ffront" aria-hidden="true">' + mark + leds + face +
     '</i><i class="fside" aria-hidden="true"></i></div>';
 }
 
@@ -1107,6 +1108,16 @@ export function placeWord(place) {
   return "Rack";
 }
 
+function airTagFor(item) {
+  if (!state.thermalMap || item.place !== "floor" || state.floor.level === "site") return null;
+  const pod = podById(state.floor.podId) || PODS[0];
+  const air = hallAir(pod);
+  const spot = air && air.spots.find((entry) => entry.id === item.id);
+  if (!spot) return null;
+  if (spot.mode === "cool") return { mode: "cool", text: "Cooling" };
+  return { mode: "heat", text: spot.center.toFixed(1) + " °C" + (spot.caught ? " · cooled" : "") };
+}
+
 export function planBoxes(place) {
   return state.plan.placements.filter((item) => item.place === place).map((item) => {
     const spec = catalogById(item.catalogId);
@@ -1114,7 +1125,7 @@ export function planBoxes(place) {
       { x: item.x, y: item.y, w: spec.box.w, d: spec.box.d, h: spec.box.h },
       "ok",
       "plan-select",
-      { plan: item.id, color: makerColor(spec.maker), face: faceplateHtml(spec) }
+      { plan: item.id, color: makerColor(spec.maker), face: faceplateHtml(spec), air: airTagFor(item) }
     );
   }).join("");
 }
@@ -1593,9 +1604,9 @@ function applyPlacedAir(samples, aisle, spots, rackKw: number, rackRise: number)
   });
 }
 
-export function thermalOverlay(pod) {
+function hallAir(pod) {
   const fit = pod && pod.fit;
-  if (!state.thermalMap || !fit || !(fit.aisles || []).length) return { svg: "", scale: "" };
+  if (!fit || !(fit.aisles || []).length) return null;
   const hac = state.containment !== "cac";
   const spots = placedSpots(pod);
   const hotBase = (fit.aisles || []).filter((aisle) => aisle.tone === "hot")
@@ -1604,6 +1615,47 @@ export function thermalOverlay(pod) {
     ? Math.max(8, hotBase.reduce((sum, sample) => sum + sample.c, 0) / hotBase.length - 20.5)
     : 15.5;
   const rackKw = PLANT.racksPerHall ? (PLANT.hallItMw * 1000) / PLANT.racksPerHall : 120;
+  const roomBase = hac ? 20.5 : (hotBase.length ? Math.max.apply(null, hotBase.map((sample) => sample.c)) : 24);
+  const decorated = spots.map((spot) => {
+    const base = airAt(fit, spot.x, spot.y, hac, roomBase);
+    const full = spot.heatKw && rackKw > 0 ? rackRise * (spot.heatKw / rackKw) : 0;
+    const rise = spotRise(spot, spots, rackKw, rackRise);
+    let center = base;
+    if (spot.heatKw) center = base + rise;
+    else if (spot.holdSupply) center = 20.5;
+    else if (spot.coolKw && rackKw > 0) center = base - (base - 20.5) * Math.min(1, spot.coolKw / rackKw);
+    const aisle = (fit.aisles || []).find((band) => spot.x >= band.x && spot.x <= band.x + band.w && spot.y >= band.y && spot.y <= band.y + band.h);
+    const where = aisle ? (aisle.tone === "hot" ? "hot aisle" : "cold aisle") : "";
+    return Object.assign({}, spot, {
+      center: center,
+      mode: spot.heatKw ? "heat" : "cool",
+      where: where,
+      caught: !!(spot.heatKw && full - rise > 0.05),
+    });
+  });
+  return { hac, spots: decorated, rackKw, rackRise, roomBase };
+}
+
+export function gearAirSentence(item) {
+  if (!state.thermalMap || !item) return "";
+  const pod = podById(state.floor.podId) || PODS[0];
+  const air = hallAir(pod);
+  const spot = air && air.spots.find((entry) => entry.id === item.id);
+  if (!spot) return "";
+  if (spot.mode === "cool") return " It pulls nearby air toward the 20.5 °C supply.";
+  const place = spot.where ? " in the " + spot.where : "";
+  const cooled = spot.caught ? " Cooling next to it is taking that heat." : "";
+  return " Air here is " + spot.center.toFixed(1) + " °C" + place + "." + cooled;
+}
+
+export function thermalOverlay(pod) {
+  const fit = pod && pod.fit;
+  const model = hallAir(pod);
+  if (!state.thermalMap || !model) return { svg: "", scale: "" };
+  const hac = model.hac;
+  const spots = model.spots;
+  const rackRise = model.rackRise;
+  const rackKw = model.rackKw;
   let minIn = Infinity;
   let maxIn = -Infinity;
   let minHot = Infinity;
@@ -1634,30 +1686,26 @@ export function thermalOverlay(pod) {
     );
     rects.push('<rect data-aisle="' + esc(aisle.id) + '" data-tone="' + esc(aisle.tone || "") + '" x="' + aisle.x + '" y="' + aisle.y + '" width="' + aisle.w + '" height="' + aisle.h + '" fill="url(#' + id + ')"><title>' + title + "</title></rect>");
   });
-  const room = hac ? 20.5 : (isFinite(maxHot) ? maxHot : 24);
+  const room = hac ? 20.5 : (isFinite(maxHot) ? maxHot : model.roomBase);
   const cold = tempSpan(minIn, maxIn);
   const warm = tempSpan(minHot, maxHot);
   const blooms = spots.map((spot) => {
-    const base = airAt(fit, spot.x, spot.y, hac, room);
-    let center = base;
-    if (spot.heatKw) center = base + spotRise(spot, spots, rackKw, rackRise);
-    else if (spot.holdSupply) center = 20.5;
-    else if (spot.coolKw && rackKw > 0) center = base - (base - 20.5) * Math.min(1, spot.coolKw / rackKw);
-    const mode = spot.heatKw ? "heat" : "cool";
     const id = "therm-spot-" + spot.id;
     grads.push('<radialGradient id="' + id + '" gradientUnits="userSpaceOnUse" cx="' + spot.x.toFixed(1) + '" cy="' + spot.y.toFixed(1) + '" r="' + spot.reach.toFixed(1) + '">' +
-      '<stop offset="0%" stop-color="' + airColor(center) + '" stop-opacity="0.92"/>' +
-      '<stop offset="100%" stop-color="' + airColor(center) + '" stop-opacity="0"/>' +
+      '<stop offset="0%" stop-color="' + airColor(spot.center) + '" stop-opacity="0.92"/>' +
+      '<stop offset="100%" stop-color="' + airColor(spot.center) + '" stop-opacity="0"/>' +
       "</radialGradient>");
-    return '<circle class="thermal-spot" data-mode="' + mode + '" data-gear="' + esc(spot.id) + '" data-c="' + center.toFixed(1) + '" cx="' + spot.x.toFixed(1) + '" cy="' + spot.y.toFixed(1) + '" r="' + spot.reach.toFixed(1) + '" fill="url(#' + id + ')"><title>' + esc(spot.name) + " " + center.toFixed(1) + " °C</title></circle>";
+    return '<circle class="thermal-spot" data-mode="' + spot.mode + '" data-gear="' + esc(spot.id) + '" data-c="' + spot.center.toFixed(1) + '" cx="' + spot.x.toFixed(1) + '" cy="' + spot.y.toFixed(1) + '" r="' + spot.reach.toFixed(1) + '" fill="url(#' + id + ')"><title>' + esc(spot.name) + " " + spot.center.toFixed(1) + " °C</title></circle>";
   }).join("");
-  const placedNote = spots.length ? " Placed gear is included." : "";
-  const label = "Thermal map. Supply 20.5 °C. Cold aisles " + (cold || "at the inlet") +
-    ". Hot aisle " + (warm || "at the return") + (hac ? " return." : " exhaust.") + placedNote;
-  const scale = '<div class="thermal-scale"><i aria-hidden="true"></i><span>' + esc(
-    "Supply 20.5 °C · cold aisles " + (cold || "inlet") + " · hot aisle " + (warm || "return") + (hac ? " return" : " exhaust") +
-    (spots.length ? " · placed gear" : "")
-  ) + "</span></div>";
+  const hottest = spots.filter((spot) => spot.mode === "heat").sort((a, b) => b.center - a.center)[0];
+  const gearLine = hottest
+    ? hottest.name + " · " + hottest.center.toFixed(1) + " °C" + (hottest.where ? " · " + hottest.where : "") + (hottest.caught ? " · cooled" : "")
+    : (spots.length ? "Cooling on the floor" : "");
+  const summary = "Supply 20.5 °C · cold aisles " + (cold || "inlet") + " · hot aisle " + (warm || "return") + (hac ? " return" : " exhaust");
+  const label = "Thermal map. " + (gearLine ? gearLine + ". " : "") + "Supply 20.5 °C. Cold aisles " + (cold || "at the inlet") +
+    ". Hot aisle " + (warm || "at the return") + (hac ? " return." : " exhaust.");
+  const scale = '<div class="thermal-scale"><i aria-hidden="true"></i><span>' +
+    (gearLine ? "<b>" + esc(gearLine) + "</b>" : "") + esc(summary) + "</span></div>";
   const svg = '<svg class="thermal-map" role="img" aria-label="' + esc(label) + '" viewBox="0 0 ' + pod.w + " " + pod.h + '" preserveAspectRatio="none">' +
     "<defs>" + grads.join("") + "</defs>" +
     '<rect class="thermal-room" data-tone="room" width="' + pod.w + '" height="' + pod.h + '" fill="' + airColor(room) + '" opacity="0.55"/>' +
@@ -2360,7 +2408,7 @@ export async function placeCatalog(specItem, host, point) {
   state.plan.placements.push(item);
   state.plan.selected = item.id;
   state.plan.preview = "";
-  state.toast = item.name + " placed" + (body.uPosition ? " at U" + body.uPosition : "") + ". " + specItem.powerLabel + " · " + specItem.ampLabel + ".";
+  state.toast = item.name + " placed" + (body.uPosition ? " at U" + body.uPosition : "") + ". " + specItem.powerLabel + " · " + specItem.ampLabel + "." + gearAirSentence(item);
   if (body.model) {
     applyModels(MODELS.map((model) => model.id === body.model.id ? body.model : model));
   }
@@ -2472,7 +2520,7 @@ export function onDrop(event) {
       item.x = point.x;
       item.y = point.y;
       state.plan.selected = item.id;
-      state.toast = item.name + " moved.";
+      state.toast = item.name + " moved." + gearAirSentence(item);
       render();
     }
     return;

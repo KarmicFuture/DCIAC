@@ -3,8 +3,7 @@ const { test, expect } = require("@playwright/test");
 async function signInHall(page) {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/#/floor/hall", { waitUntil: "domcontentloaded" });
-  const user = page.locator('[data-user="dsvs.operator"]');
-  if (await user.count()) await user.click();
+  await page.locator('[data-user="dsvs.operator"]').click();
   await expect(page.locator("#app")).not.toContainText("Loading the asset repository");
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "floor");
 }
@@ -60,6 +59,10 @@ test("moving a load and a cooler changes the 3D hall heat map", async ({ page })
   await expect(coldGpu).toHaveAttribute("data-mode", "heat");
   const inCold = Number(await coldGpu.getAttribute("data-c"));
   expect(inCold).toBeGreaterThan(24);
+  const tag = page.locator('.rackbox[data-plan="gear-gpu"] .thermal-tag');
+  await expect(tag).toBeVisible();
+  await expect(tag).toContainText("°C");
+  await expect(page.locator('[data-act="thermal-map"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".thermal-scale")).not.toHaveText(coldBefore);
 
   await park(page, "gear-gpu", "inv-nvidia-gb200-nvl72", "GB200 1", 356, 129);

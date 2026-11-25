@@ -6,6 +6,8 @@ The hall floor can show a thermal map. Cold aisles take each rack's inlet, the h
 
 Adding or moving a device on the 3D hall floor changes that map. A compute load warms the air at its position, scaled to the hall's kW per rack. A cooler stated in its notes, or a CDU, pulls that air back toward the 20.5 °C supply, and the pull follows the unit when it moves. Gear mounted in a rack warms that rack's place on the aisle.
 
+The placed device shows its air temperature above the box, the floor scale names that reading instead of clipping it, and Thermal stays marked while the map is on. Placing or moving says the temperature and whether cooling next to it is taking the heat.
+
 ## 2026-11-24
 
 The Full demo's feeder fault opens the one-line. Feeder A is drawn open, side B stays live and still feeds every hall, and the hall taps are at risk. The summary reads "No load lost · redundancy gone."
