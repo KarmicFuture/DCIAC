@@ -238,7 +238,7 @@ function diagramSvg(report: SimImpact) {
   ], edgeTone(["batt-a"], report), "batt-a");
   body += batt(battAy, nodeTone("batt-1", report));
   body += '<text class="ol-sub" x="' + (battAy.x + 28) + '" y="' + (battAy.y + 4) + '">Batt A</text>';
-  body += '<g data-act="oneline-open" data-server="batt-1" role="button" tabindex="0"><rect class="ol-hit" x="' +
+  body += '<g data-act="oneline-open" data-server="batt-1" role="button" tabindex="0" aria-label="Battery A"><rect class="ol-hit" x="' +
     (battAy.x - 18) + '" y="' + (battAy.y - 18) + '" width="70" height="36" /></g>';
 
   body += poly([
@@ -248,7 +248,7 @@ function diagramSvg(report: SimImpact) {
   ], edgeTone(["batt-b"], report), "batt-b");
   body += batt(battBy, nodeTone("batt-2", report));
   body += '<text class="ol-sub" x="' + (battBy.x + 28) + '" y="' + (battBy.y + 4) + '">Batt B</text>';
-  body += '<g data-act="oneline-open" data-server="batt-2" role="button" tabindex="0"><rect class="ol-hit" x="' +
+  body += '<g data-act="oneline-open" data-server="batt-2" role="button" tabindex="0" aria-label="Battery B"><rect class="ol-hit" x="' +
     (battBy.x - 18) + '" y="' + (battBy.y - 18) + '" width="70" height="36" /></g>';
 
   // Main bus riser

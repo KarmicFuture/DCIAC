@@ -2,6 +2,31 @@
 
 ## 2026-11-25
 
+900 service checks and 450 usability tests.
+
+- `services/test_matrix.py` adds 879 generated checks to the 21 in `test_services.py`. Every
+  service refuses every route it doesn't own. The gateway sends every route to its owner. Every route
+  answers the same through the gateway as from `serve.py` for anonymous, read-only, operator and
+  administrator callers. Each route is documented only by its owner, and every service passes its
+  health checks.
+- `e2e/usability.spec.js` checks 15 views at 5 screen sizes (1440, 1024, 768, 390 and 360 px)
+  against 6 rules: the heading names the view above the fold, nothing scrolls sideways, there are no
+  console errors or failed API calls, every control has a name, touch targets are at least 24 px,
+  and keyboard focus is visible.
+- Fixed what the new tests found:
+  - The rear-exhaust button on Operate › Rack had no name for screen readers.
+  - The Battery A and B hit areas on the one-line diagram had no name for screen readers.
+  - Inside a rack on the floor on a phone, nothing on screen said which rack it was. The top bar
+    now reads "Floor · A14".
+- Known UX debt, listed in the test's `KNOWN_SMALL` list: controls under 24 px.
+  - Outlet sockets on the 3D rack PDU
+  - Text links in detail panels
+  - Gantt bars
+  - Simulate ticks
+  - Floor-plan racks on tablets and phones
+  - One-line diagram boxes on phones
+  - Floor breadcrumbs (at 24 px they slide under the drawer's Pop out button)
+
 DCIAC runs as microservices. The backend is split into nine services behind a gateway: identity, inventory, connectivity, power, control, capacity, work orders, monitoring, and reporting. Each has its own API contract and health checks. `docker compose -f services/docker-compose.yml up --build` starts the whole stack, so another platform can host it. The web app, the API paths, and the data are the same. The full browser suite passes against the services as it does against `serve.py`. See `services/README.md` and `services/ROADMAP.md`.
 
 - Safety is unchanged and tested through the gateway: role checks, the outlet work-order gate and

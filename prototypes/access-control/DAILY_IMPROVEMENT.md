@@ -11,9 +11,12 @@ Edit this file to steer the work. The task reads it from `main` each run.
 - Make exactly one focused improvement per run, about 200 changed lines or fewer.
 - Add or update a test that proves the change (Playwright in `e2e/`, or Python in `server/`).
 - All Python tests and all Playwright tests must pass before a pull request opens. That includes
-  `python3 -m unittest services.test_services`, and the Playwright suite run twice: once against
+  `python3 -m unittest services.test_services services.test_matrix` (900 service checks), and the
+  Playwright suite run twice: once against
   `serve.py`, and once against the services (`python3 services/run_local.py` on a copy of the
   database, then `npx playwright test`).
+- `e2e/usability.spec.js` (450 tests: 15 views × 5 screen sizes × 6 rules) is a gate. Never add to
+  its `KNOWN_SMALL` list to get green; fixing an entry there is a valid improvement.
 - `e2e/ux-guard.spec.js` is a gate. A view that loses its heading above the fold, scrolls sideways
   at 1440 px or 390 px, logs a console error, or gets an API 5xx answer fails the run. Add new main
   views to its list.
