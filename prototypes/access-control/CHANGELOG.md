@@ -12,6 +12,13 @@ The hall shows that air as a volume. The hot aisle stands above the racks. The c
 
 That air is an overlay on the hall. The floor keeps a translucent wash, the rising air stays see-through, and the racks remain visible through it.
 
+Test fix: "outlet confirmation dialog › 11 — commit restores focus when Undo was focused" no longer fails at random.
+
+- Its last check handed an unfinished page read to `expect` without waiting for it, so the test
+  could end while the read was still running ("page.evaluate: Test ended"), and the check itself
+  never looked at the answer. It now waits for the read and fails if focus has fallen to the page body.
+- No app code changed; the published build is byte-for-byte the same.
+
 ## 2026-11-24
 
 The Full demo's feeder fault opens the one-line. Feeder A is drawn open, side B stays live and still feeds every hall, and the hall taps are at risk. The summary reads "No load lost · redundancy gone."
