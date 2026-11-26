@@ -359,6 +359,8 @@ export function onPointerDown(event) {
     return;
   }
   if (state.view !== "floor") return;
+  // The experimental three.js floor runs its own orbit controls.
+  if (event.target.closest(".floor3d-host")) return;
   if (event.target.closest(".lib, .hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, button, a, input, select")) return;
   const box = floorBoxAt(event);
   const record = box ? floorRecord(box) : null;
@@ -440,7 +442,7 @@ export function onPointerUp(event) {
 
 export function onWheel(event) {
   const scene = event.target.closest && event.target.closest(".scene");
-  if (!scene || !state.user || state.view !== "floor") return;
+  if (!scene || !state.user || state.view !== "floor" || event.target.closest(".floor3d-host")) return;
   event.preventDefault();
   if (runtime.walk) stopWalk(false, false);
   const factor = event.deltaY > 0 ? 0.92 : 1.08;
@@ -1069,6 +1071,7 @@ export function hudHtml(legend) {
     walkBtn + listBtn + addBtn +
     (outside || walking ? "" : '<button type="button" class="act" data-act="thermal-map" aria-pressed="' + (state.thermalMap ? "true" : "false") + '">Thermal</button>') +
     heatPathButton(false) +
+    (outside || walking ? "" : '<button type="button" class="act floor3d-toggle" id="floor3d-toggle" data-act="floor-3d" aria-pressed="' + (runtime.floor3d ? "true" : "false") + '" title="Experimental 3D hall drawn with three.js">Experimental</button>') +
     '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
     (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Pan"><button type="button" data-act="floor-pan" data-dir="left" aria-label="Pan left">←</button><button type="button" data-act="floor-pan" data-dir="right" aria-label="Pan right">→</button><button type="button" data-act="floor-pan" data-dir="up" aria-label="Pan up">↑</button><button type="button" data-act="floor-pan" data-dir="down" aria-label="Pan down">↓</button></div><div class="zoom-cluster" role="group" aria-label="Orbit"><button type="button" data-act="floor-orbit" data-dir="left" aria-label="Orbit left">↺</button><button type="button" data-act="floor-orbit" data-dir="right" aria-label="Orbit right">↻</button><button type="button" data-act="floor-orbit" data-dir="up" aria-label="Orbit up">⤒</button><button type="button" data-act="floor-orbit" data-dir="down" aria-label="Orbit down">⤓</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
     (runtime.sim.barOpen ? simBarHtml() : "");
@@ -2050,10 +2053,27 @@ export function renderHall() {
       esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + (overlay.volumes || "") + rowBuses(pod) + racks + boxes + clouds.svg + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
   const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
+  if (runtime.floor3d) return renderHall3d(open, legend, overlay.scale);
   return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
     (report.active ? " sim-active" : "") + '" data-lod="' + floorLod() + '" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + planBoxes("floor") +
     "</div></div>" + overlay.scale + walkBar() + "</div>";
+}
+
+/* Experimental: views/floor3d.ts draws the hall into this host with three.js after paint. */
+function renderHall3d(pod, legend, scale) {
+  const hot = heatCloudModel(pod).filter((cloud) => cloud.kind === "hot").length;
+  const label = "Experimental 3D view of " + pod.name + ". " + pod.racks.length + " racks, " + hot +
+    " heat sources. Drag to orbit, scroll to zoom, click a rack to open it. Use List for the same racks by keyboard.";
+  return '<div class="scene thermal floor3d-scene">' + hudHtml(legend) + '<div class="stage floor3d-stage"><div id="floor3d-host" class="floor3d-host" role="img" aria-label="' +
+    esc(label) + '" data-floor3d="loading"><span class="floor3d-badge">Experimental · three.js</span></div></div>' + scale + "</div>";
+}
+
+export function toggleFloor3d() {
+  runtime.floor3d = !runtime.floor3d;
+  if (runtime.floor3d) stopWalk(true, false);
+  state.focusField = "floor3d-toggle";
+  render();
 }
 
 export function renderSite() {

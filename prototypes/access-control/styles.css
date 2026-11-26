@@ -3944,3 +3944,45 @@ nav .ask-nav[aria-expanded="true"] { background: #2a2a2a; border-color: #3a3a3a;
 .ask-alarms .ask-link { font-weight: 600; white-space: nowrap; }
 .ask-alarms .ask-clock { margin-left: auto; font-size: var(--text-xs); }
 .ask-alarms .ask-what { flex: 1 1 100%; padding-left: 26px; }
+
+/* Experimental three.js hall floor (views/floor3d.ts). */
+.floor3d-toggle[aria-pressed="true"] {
+  background: #5b3fd1;
+  border-color: #5b3fd1;
+  color: #fff;
+}
+.floor3d-scene .zoom-cluster { display: none; }
+.floor3d-stage { perspective: none; transform-style: flat; }
+.floor3d-host {
+  position: absolute;
+  inset: 0;
+  background: #0d1117;
+  overflow: hidden;
+  touch-action: none;
+}
+.floor3d-canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.floor3d-badge {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(91, 63, 209, 0.85);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.floor3d-tip {
+  position: absolute;
+  z-index: 2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid #39465a;
+  color: #e6edf3;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.floor3d-note { margin: 0; padding: 24px; color: #e6edf3; }
