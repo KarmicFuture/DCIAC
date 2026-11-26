@@ -1782,6 +1782,145 @@ export function thermalOverlay(pod) {
   return { svg, scale, volumes: thermalVolumes(pod, fit, spots) };
 }
 
+/* ---------- Heat map: clouds of heat and cold spots ----------
+   Every number comes from the same readings the racks and CDUs show, so a
+   Simulate scenario (CDU failure, heat-rejection trip, feeder loss) moves the
+   clouds as it plays: exhaust grows the hot clouds, hot inlets push them over
+   the racks into the cold aisle, and a failing CDU loses its cold spot. */
+
+export type HeatCloud = {
+  id: string;
+  kind: "hot" | "cold";
+  name: string;
+  x: number;
+  y: number;
+  r: number;
+  c: number;
+  strength: number;
+  spill: number;
+  failed?: boolean;
+};
+
+function cloudHash(id: string) {
+  let h = 0;
+  for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 9973;
+  return h;
+}
+
+function coolerStrength(entity) {
+  if (!entity || !entity.load) return 0;
+  const flow = clamp((entity.load.power || 0) / 60, 0, 1);
+  const chill = clamp((48 - (entity.load.temp || 34)) / 14, 0, 1);
+  return flow * chill;
+}
+
+export function heatCloudModel(pod): HeatCloud[] {
+  const fit = pod && pod.fit;
+  if (!fit) return [];
+  const rows = {};
+  (fit.rows || []).forEach((row) => { rows[row.id] = row; });
+  const aisles = {};
+  (fit.aisles || []).forEach((aisle) => { aisles[aisle.id] = aisle; });
+  const clouds: HeatCloud[] = [];
+  (pod.racks || []).forEach((rack) => {
+    if (rack.kind === "Power") return;
+    const air = rackAir(rack);
+    if (!air) return;
+    const row = rows[rack.row];
+    const hot = row && aisles[row.hot];
+    const cold = row && aisles[row.cold];
+    const cx = rack.x + rack.w / 2;
+    const cy = rack.y + rack.d / 2;
+    const hotY = hot ? hot.y + hot.h / 2 : cy;
+    const coldY = cold ? cold.y + cold.h / 2 : cy;
+    const heat = clamp((air.exhaust - 30) / 15, 0, 1);
+    // Inlet above 24 °C means exhaust is spilling back over the rack into the cold aisle.
+    const spill = clamp((air.inlet - 24) / 3, 0, 1);
+    const hotAt = hotY + (coldY - hotY) * spill * 0.7;
+    clouds.push({
+      id: "hot-" + rack.id,
+      kind: "hot",
+      name: "Rack " + rack.id + " exhaust",
+      x: cx,
+      y: cy + (hotAt - cy) * (0.55 + 0.35 * heat),
+      r: rack.w * (0.9 + 1.7 * heat + 0.6 * spill),
+      c: air.exhaust,
+      strength: heat,
+      spill: spill,
+    });
+    const chill = clamp((26 - air.inlet) / 5.5, 0, 1);
+    if (chill > 0.04) {
+      clouds.push({
+        id: "cold-" + rack.id,
+        kind: "cold",
+        name: "Rack " + rack.id + " inlet",
+        x: cx,
+        y: cy + (coldY - cy) * 0.7,
+        r: rack.w * (0.5 + 1.0 * chill),
+        c: air.inlet,
+        strength: chill,
+        spill: 0,
+      });
+    }
+  });
+  (pod.boxes || []).forEach((box) => {
+    const entity = entityById(box.id);
+    if (!entity || entity.kind !== "Cooling" || !entity.load) return;
+    const cool = coolerStrength(entity);
+    const x = box.x + (box.w || 48) / 2;
+    const y = box.y + (box.d || 48) / 2;
+    const size = Math.max(box.w || 48, box.d || 48);
+    if (cool > 0.04) {
+      clouds.push({ id: "cold-" + box.id, kind: "cold", name: entity.name + " supply", x, y, r: size * (0.8 + 1.4 * cool), c: 20.5, strength: cool, spill: 0 });
+    } else {
+      // A CDU that has stopped cooling becomes a warm patch: hall return air, no supply.
+      const c = Math.min(40, Math.max(30, (entity.load.temp || 48) - 10));
+      clouds.push({ id: "hot-" + box.id, kind: "hot", name: entity.name + " (not cooling)", x, y, r: size * 1.2, c, strength: clamp((c - 30) / 10, 0.3, 1), spill: 0, failed: true } as HeatCloud);
+    }
+  });
+  return clouds;
+}
+
+export function heatCloudsHtml(pod) {
+  const clouds = heatCloudModel(pod);
+  if (!clouds.length) return { svg: "", scale: "" };
+  const hot = clouds.filter((cloud) => cloud.kind === "hot").sort((a, b) => b.c - a.c);
+  const cold = clouds.filter((cloud) => cloud.kind === "cold").sort((a, b) => b.strength - a.strength);
+  const failedCdu = hot.filter((cloud) => cloud.failed);
+  const spill = hot.filter((cloud) => cloud.spill > 0.2).length;
+  const parts = clouds.map((cloud) => {
+    const h = cloudHash(cloud.id);
+    const amp = 3 + 9 * cloud.strength;
+    const dx = ((h % 7) - 3) / 3 * amp;
+    const dy = (cloud.kind === "hot" ? -1 : 1) * (1 + (h % 3)) / 3 * amp;
+    const opacity = (cloud.kind === "hot" ? 0.2 + 0.42 * cloud.strength : 0.18 + 0.4 * cloud.strength).toFixed(2);
+    const color = cloud.kind === "hot" ? airColor(Math.max(cloud.c, 30)) : airColor(Math.min(cloud.c, 22));
+    const puff = cloud.r * 0.42;
+    return '<g class="cloud" data-kind="' + cloud.kind + '" data-id="' + esc(cloud.id) + '" data-c="' + cloud.c.toFixed(1) +
+      '" data-strength="' + cloud.strength.toFixed(2) + '" data-x="' + cloud.x.toFixed(1) + '" data-y="' + cloud.y.toFixed(1) +
+      '" data-r="' + cloud.r.toFixed(1) + '" style="--dx:' + dx.toFixed(1) + "px;--dy:" + dy.toFixed(1) + "px;--t:" + (6 + (h % 5)) +
+      "s;--d:-" + (h % 6) + 's" fill="' + color + '" opacity="' + opacity + '"><title>' + esc(cloud.name) + " " + cloud.c.toFixed(1) + " °C</title>" +
+      '<circle cx="' + cloud.x.toFixed(1) + '" cy="' + cloud.y.toFixed(1) + '" r="' + cloud.r.toFixed(1) + '"/>' +
+      '<circle cx="' + (cloud.x - puff).toFixed(1) + '" cy="' + (cloud.y + puff * 0.3).toFixed(1) + '" r="' + (cloud.r * 0.7).toFixed(1) + '"/>' +
+      '<circle cx="' + (cloud.x + puff).toFixed(1) + '" cy="' + (cloud.y - puff * 0.25).toFixed(1) + '" r="' + (cloud.r * 0.62).toFixed(1) + '"/>' +
+      '<circle cx="' + (cloud.x + puff * 0.2).toFixed(1) + '" cy="' + (cloud.y + puff * 0.9).toFixed(1) + '" r="' + (cloud.r * 0.48).toFixed(1) + '"/></g>';
+  }).join("");
+  const hottest = hot[0];
+  const coolest = cold[0];
+  const summary = (hottest ? "Hottest: " + hottest.name + " " + hottest.c.toFixed(1) + " °C. " : "") +
+    (failedCdu.length ? failedCdu.map((cloud) => cloud.name).join(", ") + ". " : "") +
+    (spill ? spill + " hot cloud" + (spill === 1 ? "" : "s") + " spreading toward the cold aisle. " : "") +
+    (coolest ? "Coldest spot: " + coolest.name + "." : "No cold spots: cooling is not reaching the racks.");
+  const svg = '<svg class="heat-clouds" role="img" aria-label="' + esc("Heat map. " + summary) + '" viewBox="0 0 ' + pod.w + " " + pod.h +
+    '" preserveAspectRatio="none"><defs><filter id="heat-cloud-blur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="' +
+    Math.max(10, Math.round(pod.w / 48)) + '"/></filter></defs><g filter="url(#heat-cloud-blur)">' + parts + "</g></svg>";
+  const scale = '<div class="thermal-scale heat-scale" id="heat-map-status" aria-live="polite"><i aria-hidden="true"></i><span>' +
+    (hottest ? "<b>" + esc(hottest.name + " · " + hottest.c.toFixed(1) + " °C") + "</b>" : "") +
+    esc("Heat map · " + hot.length + " hot, " + cold.length + " cold" + (failedCdu.length ? " · " + failedCdu.map((cloud) => cloud.name).join(", ") : "")) +
+    "</span></div>";
+  return { svg, scale };
+}
+
 function airAt(fit, x: number, y: number, hac: boolean, room: number) {
   const aisle = (fit.aisles || []).find((band) => x >= band.x && x <= band.x + band.w && y >= band.y && y <= band.y + band.h);
   if (!aisle) return room;
@@ -1879,7 +2018,9 @@ export function renderHall() {
   const open = podById(state.floor.podId) || PODS[0];
   if (runtime.walk && runtime.walk.podId === open.id) return renderPov(open);
   const report = impact(runtime.sim);
-  const overlay = thermalOverlay(open);
+  // The heat map takes the place of the thermal overlay while it is on.
+  const clouds = state.heatMap ? heatCloudsHtml(open) : { svg: "", scale: "" };
+  const overlay = state.heatMap ? { svg: "", scale: clouds.scale, volumes: "" } : thermalOverlay(open);
   const pods = [open].map((pod) => {
     const racks = pod.racks.map((rack) => {
       const facing = (rack.row || "").slice(-1) === "s" ? "face-south" : "face-north";
@@ -1906,7 +2047,7 @@ export function renderHall() {
     const current = state.floor.level === "pod" && state.floor.podId === pod.id ? " current" : "";
     return '<div class="pod' + current + (overlay.svg ? " thermal-on" : "") + '" data-act="floor-pod" data-pod="' + pod.id + '" style="--x:' + pod.x +
       "px;--y:" + pod.y + "px;--w:" + pod.w + "px;--h:" + pod.h + 'px"><i class="pod-plate"></i><span class="pod-letter">' +
-      esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + (overlay.volumes || "") + rowBuses(pod) + racks + boxes + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
+      esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + (overlay.volumes || "") + rowBuses(pod) + racks + boxes + clouds.svg + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
   const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
   return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
