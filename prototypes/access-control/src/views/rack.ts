@@ -106,7 +106,7 @@ export function deviceFaces(d) {
     esc(d.short || d.name) + '</b><span>Intake</span></span><i class="bay-led" style="background:' +
     (d.bmc === "down" ? "#8a3030" : "#1f6b45") + '"></i></button><p class="fine">Servers pull ' + t.supply.toFixed(1) +
     " °C supply. Inlet here is " + t.inlet.toFixed(1) + ' °C.</p></figure><figure class="server-face"><figcaption>Rear · hot aisle exhaust</figcaption><button type="button" class="bezel rear" data-act="floor-part" data-server="' +
-    d.id + '" data-part="exhaust"><span class="psu"></span><span class="psu"></span><span class="nic"></span><span class="exhaust"></span></button><p class="fine">Exhaust leaves at ' +
+    d.id + '" data-part="exhaust" aria-label="' + esc(d.short || d.name) + ' rear exhaust"><span class="psu"></span><span class="psu"></span><span class="nic"></span><span class="exhaust"></span></button><p class="fine">Exhaust leaves at ' +
     t.exhaust.toFixed(0) + " °C" + (t.hac ? " into the contained hot aisle." : " into the open hall.") + "</p></figure></div>" +
     '<div class="part-row">' + part("bmc", "BMC") + part("feed", "DC feed") + "</div>";
 }

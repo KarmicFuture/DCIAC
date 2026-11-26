@@ -53,6 +53,11 @@ function groupHeading(group, tabs) {
 function topbarTitle() {
   if (OPERATE_VIEWS.indexOf(state.view) >= 0) return groupHeading("Operate", OPERATE_TABS);
   if (PLAN_VIEWS.indexOf(state.view) >= 0) return groupHeading("Plan", PLAN_TABS);
+  if (state.view === "floor" && state.floor && state.floor.rackId &&
+      ["rack", "server", "part", "elevation"].indexOf(state.floor.level) >= 0) {
+    // On a phone the breadcrumbs sit below the 3D rack, so the top bar names the rack.
+    return "Floor · " + state.floor.rackId;
+  }
   return VIEW_TITLE[state.view] || "Access";
 }
 

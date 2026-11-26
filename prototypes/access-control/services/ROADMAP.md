@@ -57,7 +57,8 @@ About 6,000 lines of domain logic run in the browser today. Each move keeps the 
 
 These apply every day, for every slice:
 
-- The full Python suite, plus `services.test_services`.
+- The full Python suite, plus the 900 service checks (`services.test_services`, `services.test_matrix`).
+- The 450 usability tests (`e2e/usability.spec.js`). Shrinking its `KNOWN_SMALL` debt list counts as an improvement; growing it doesn't.
 - The full Playwright suite against `serve.py` and against the services.
 - `e2e/ux-guard.spec.js` at desktop and iPhone widths. A layout regression fails the run just like a broken feature.
 - The guard grows with the product: when a view is added, it goes on the guard's list.
