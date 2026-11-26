@@ -781,6 +781,39 @@ def work_covers(conn, work_id, device_id):
     return any(task["asset_id"] in (device_id, "", None) for task in tasks)
 
 
+# DI-1 leak rope on Rack A14 (src/data/outlets.ts LEAK): Outlet 1 feeds tray-01, Outlet 2 feeds tray-02.
+LEAK_ID = "di-1"
+LEAK_OUTLETS = {1: "tray-01", 2: "tray-02"}
+LEAK_LOCATION = "Rack A14 · cold-plate rope · rear of U38–U40"
+
+
+def leak_asserted(conn):
+    """DI-1 is in alarm when its latest reading says so. A reading of 0 clears it."""
+    row = conn.execute(
+        "SELECT value FROM metric WHERE device_id = ? AND name = 'leak' ORDER BY id DESC LIMIT 1",
+        (LEAK_ID,),
+    ).fetchone()
+    return bool(row and (row["value"] or 0) >= 1)
+
+
+def leak_interlock(conn, op, device_id, outlet):
+    """The same rule the web app applies: while DI-1 is in alarm, its outlets may only be shed."""
+    if op in ("off", "lock"):
+        return ""
+    try:
+        outlet = int(outlet or 0)
+    except (TypeError, ValueError):
+        outlet = 0
+    bound = op == "all" or outlet in LEAK_OUTLETS or device_id in LEAK_OUTLETS.values()
+    if not bound or not leak_asserted(conn):
+        return ""
+    if op == "all":
+        return "Whole-PDU control is locked by the DI-1 leak interlock. Outlet 1 and Outlet 2 stay off until the leak clears."
+    n = outlet if outlet in LEAK_OUTLETS else next(k for k, v in LEAK_OUTLETS.items() if v == device_id)
+    return ("Outlet " + str(n) + " is locked by the DI-1 leak interlock. DI-1 is asserted at " + LEAK_LOCATION +
+            ". " + LEAK_OUTLETS[n] + " stays off until the leak clears. Shedding it (off) is still allowed.")
+
+
 def allow_action(conn, user, kind, reason, work_id, device_id, maintenance):
     if not reason or len(reason.strip()) < 3:
         return "A reason is required."
@@ -1378,6 +1411,9 @@ def handle(method, path, headers, body, user, role):
     if method == "POST" and path == "/api/v1/actions/outlet":
         if role == "ReadOnly":
             return 403, {"error": "Read only cannot change assets."}
+        interlock = leak_interlock(conn, (body or {}).get("op") or "cycle", (body or {}).get("deviceId") or "", (body or {}).get("outlet"))
+        if interlock:
+            return 409, {"error": interlock, "interlock": "DI-1"}
         reason = allow_action(conn, user, "outlet", (body or {}).get("reason") or "", (body or {}).get("workOrderId") or "", (body or {}).get("deviceId") or "", bool((body or {}).get("maintenance")))
         if reason:
             return 403, {"error": reason}

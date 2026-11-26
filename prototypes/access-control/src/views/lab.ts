@@ -117,7 +117,8 @@ export async function postLabReadings() {
     samples.push({ deviceId: d.id, name: "serial", value: d.watchDeny ? 0 : 1, unit: "up" });
     samples.push({ deviceId: d.id, name: "power", value: d.bmc === "up" ? 40 : 0, unit: "%" });
   });
-  if (state.leak) samples.push({ deviceId: "di-1", name: "leak", value: 1, unit: "state" });
+  // DI-1 always reports, so a quiet reading clears the server-side leak interlock.
+  samples.push({ deviceId: "di-1", name: "leak", value: state.leak ? 1 : 0, unit: "state" });
   if (state.rm1048 !== "healthy") samples.push({ deviceId: "rm1048", name: "power", value: 0, unit: "%" });
   try {
     const response = await fetch("/api/v1/collect", {

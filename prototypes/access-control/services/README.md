@@ -84,14 +84,15 @@ The gateway answers `GET /api/v1/openapi.json` with the merged contract for all 
 - the outlet work-order gate and reason requirement
 - the 60-per-minute action limit
 - the audit log
+- the DI-1 leak interlock: while DI-1's latest reading is 1, `control` answers 409 to anything but shedding Outlet 1 or Outlet 2, and to whole-PDU control
 
-The leak and power interlocks and the power-control confirmation dialog are not among them. They still run only in the web app (see Known limits).
+The outlet policy (RM1048 ownership while a BMC is up, unbound outlets) and the power-control confirmation dialog still run only in the web app (see Known limits).
 
 ## Known limits (to remove in the roadmap)
 
 | Risk | Today | Fix |
 |---|---|---|
-| **Interlocks are browser-only** | The DI-1 leak interlock, the outlet policy, and the power-control confirmations run in the web app (`src/domain/leak.ts`, `outlet-policy.ts`). `/api/v1/actions/outlet` checks role, reason, work order, and rate, but **not** the leak interlock. Another platform calling the API directly bypasses the interlock. | Roadmap phase 2, item 1: move the interlock and outlet policy into `control` before any other platform gets power control |
+| **Outlet policy is browser-only** | The DI-1 leak interlock now runs in `control` too. The rest of the outlet policy (RM1048 owns Control while a BMC is up, unbound outlets need a maintenance window) and the power-control confirmations still run only in the web app (`src/domain/outlet-policy.ts`). | Roadmap phase 2, item 1 (second half): move the outlet policy into `control` before any other platform gets power control |
 | Demo identity headers | The web app sends `X-Dciac-User` and `X-Dciac-Role`, and services trust them, as `serve.py` always did. Anyone who can reach the gateway can claim Administrator. Keep the gateway on a private network until this is fixed. | Gateway verifies bearer tokens and stamps identity, then set `DCIAC_DEMO_HEADERS=0` |
 | Cross-service writes | `power` writes alarms, `workorders` writes assets at verify, `capacity` creates work orders, and every service appends to the audit log | Events (outbox) or API calls; the audit log becomes an append-only API |
 | Rate limit in memory | `control` must run as one replica | Move the limiter into the database or Redis |

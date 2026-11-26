@@ -110,7 +110,8 @@ Mark items done here in the same pull request that finishes them.
 1. Fix any failing test, console error, or broken layout on desktop or iPhone width.
 1a. Platform: take the first unchecked item in `services/ROADMAP.md` (backend hardening, then
    Kubernetes, then moving browser logic into services). Shipped 2026-11-25: phase 1, nine services
-   plus a gateway, Docker Compose, contract tests, and the UX guard.
+   plus a gateway, Docker Compose, contract tests, and the UX guard. Shipped 2026-11-26: phase 2 item 1, first half
+   (the DI-1 leak interlock runs in `control`); the outlet policy is next.
 2. ~~Fleet view: a summary across halls and racks showing alarms, power, and capacity at a glance.~~
    *Done.* Shipped 2026-11-19: Operate › Fleet (`#/fleet`) lists every hall with open
    alarms, IT power, headroom, and hot-rack counts. Shipped 2026-11-20: "Show racks" on each

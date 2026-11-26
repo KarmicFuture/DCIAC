@@ -133,6 +133,32 @@ class DcimTest(unittest.TestCase):
         status, body = api.dispatch("POST", "/api/v1/actions/console", {}, b'{"deviceId":"tray-01","failover":true}')
         self.assertEqual(status, 200, body)
 
+    def test_leak_interlock_refuses_power_on_for_the_di1_outlets(self):
+        def outlet(body):
+            return api.dispatch("POST", "/api/v1/actions/outlet", OPERATOR, json.dumps(body).encode())
+
+        def leak(value):
+            status, body = api.dispatch("POST", "/api/v1/collect", {}, json.dumps({"source": "lab", "samples": [{"deviceId": "di-1", "name": "leak", "value": value, "unit": "state"}]}).encode())
+            self.assertEqual(status, 201, body)
+
+        cycle = {"op": "cycle", "outlet": 1, "deviceId": "tray-01", "reason": "maintenance window", "maintenance": True}
+        self.assertEqual(outlet(cycle)[0], 200, "DI-1 has never reported, so the outlet is free")
+        leak(1)
+        for body in (cycle, dict(cycle, op="on"), dict(cycle, outlet=2, deviceId="tray-02"), {"op": "cycle", "deviceId": "tray-02", "reason": "WO-1", "maintenance": True}, {"op": "all", "reason": "window", "maintenance": True}):
+            status, reply = outlet(body)
+            self.assertEqual(status, 409, body)
+            self.assertEqual(reply["interlock"], "DI-1")
+            self.assertIn("DI-1 leak interlock", reply["error"])
+        self.assertEqual(outlet(dict(cycle, op="off"))[0], 200, "shedding a leak outlet is always allowed")
+        self.assertEqual(outlet(dict(cycle, outlet=3, deviceId="tray-03"))[0], 200, "outlets off the rope are unaffected")
+        status, reply = api.dispatch("POST", "/api/v1/actions/outlet", {"x-dciac-user": "ro", "x-dciac-role": "ReadOnly"}, json.dumps(cycle).encode())
+        self.assertEqual(status, 403, "role check still comes first")
+        rows = api.dispatch("GET", "/api/v1/audit", ADMIN, b"")[1]["audit"]
+        self.assertIn(("outlet off", "tray-01"), [(row["action"], row["assetId"]) for row in rows])
+        self.assertNotIn(("outlet cycle", "tray-02"), [(row["action"], row["assetId"]) for row in rows], "a refused action is never logged as done")
+        leak(0)
+        self.assertEqual(outlet(cycle)[0], 200, "a quiet DI-1 reading releases the interlock")
+
     def test_feeder_failure_raises_an_alarm(self):
         status, body = api.dispatch("POST", "/api/v1/power/fail", {}, b'{"nodeId":"grid-1","mode":"nameplate"}')
         self.assertEqual(status, 200, body)
