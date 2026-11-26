@@ -38,7 +38,8 @@ Run the browser suite against the services: start `run_local.py` first, then `np
 Tests:
 
 ```bash
-python3 -m unittest services.test_services
+python3 -m unittest services.test_services services.test_matrix   # 900 service checks
+npx playwright test e2e/usability.spec.js                          # 450 usability tests
 ```
 
 ## Service catalog
