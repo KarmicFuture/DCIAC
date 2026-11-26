@@ -192,6 +192,7 @@ export interface AppState {
   containment: string;
   /* Hall floor paints inlet and return as a thermal map. */
   thermalMap: boolean;
+  heatMap: boolean;
   theme: string;
   collapsed: Record<string, boolean>;
   scenePop: boolean;

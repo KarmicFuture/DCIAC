@@ -415,42 +415,6 @@ main { padding: var(--s5) var(--s6) var(--s7); min-width: 0; }
   border-color: var(--amber);
   color: #fff;
 }
-.heat-path {
-  position: fixed;
-  z-index: 32;
-  left: 16px;
-  bottom: 16px;
-  width: min(560px, calc(100vw - 32px));
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--panel);
-  box-shadow: 0 8px 28px rgba(26, 26, 26, 0.16);
-}
-.heat-path-count { color: var(--muted); font-size: var(--text-sm); margin: 2px 0 8px; }
-.heat-path-steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  list-style: none;
-  margin: 0 0 8px;
-  padding: 0;
-}
-.heat-path-steps li {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  font-size: var(--text-sm);
-}
-.heat-path-steps li[aria-current="step"] {
-  background: var(--amber);
-  border-color: var(--amber);
-  color: #fff;
-}
-.heat-path-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.heat-path-actions .act { min-height: 40px; }
 .view { display: flex; flex-direction: column; gap: var(--s4); }
 .top { display: flex; justify-content: space-between; gap: var(--s4); align-items: flex-end; }
 .pills, .actions, .row-actions, .toggle, .media-row { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; }
@@ -2003,6 +1967,30 @@ button.act.launch.primary small { color: #d9d0c6; }
   overflow: visible;
 }
 .thermal-map rect[data-tone="cold"] { opacity: 0.72; }
+/* Heat map (Heat path): blurred clouds floating just above the racks. */
+.heat-clouds {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: translateZ(118px);
+  pointer-events: none;
+  overflow: visible;
+}
+.heat-clouds .cloud {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: heat-cloud-drift var(--t, 8s) ease-in-out var(--d, 0s) infinite;
+}
+.heat-clouds .cloud[data-kind="cold"] { mix-blend-mode: multiply; }
+@keyframes heat-cloud-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(var(--dx, 0), var(--dy, 0)) scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .heat-clouds .cloud { animation: none; }
+}
 .thermal-map rect[data-tone="hot"] { opacity: 0.88; }
 .thermal-map .thermal-spot { opacity: 0.9; }
 .thermal-air {
@@ -3487,6 +3475,17 @@ button.act.launch.primary small { color: #d9d0c6; }
   .shell[data-view="floor"]:has([data-floor-level="site"]) .page-head,
   .shell[data-view="floor"]:has([data-floor-level="hall"]) .page-head,
   .shell[data-view="floor"]:has(.floor-fill) [data-slot="toast"]:empty { display: none; }
+  /* A toast over the full-bleed floor sits top right, under Pop out and clear of the
+     Simulate bar. In "head" (not in this grid) it made an implicit column and squeezed
+     the 3D floor to the toast's width. */
+  .shell[data-view="floor"]:has(.floor-fill) [data-slot="toast"]:not(:empty) {
+    grid-area: scene;
+    align-self: start;
+    justify-self: end;
+    z-index: 7;
+    width: min(420px, 40%);
+    margin: 196px 16px 0 0;
+  }
   .shell[data-view="floor"]:has(.floor-fill) [data-slot="alarm"] {
     display: block;
     grid-area: scene;

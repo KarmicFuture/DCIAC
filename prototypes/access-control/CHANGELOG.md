@@ -2,6 +2,11 @@
 
 ## 2026-11-25
 
+Heat path is now a heat map. Turning it on opens the hall floor with soft, drifting clouds of heat over the hot aisle and blue cold spots where supply air reaches the racks and around the CDU. The clouds come from the same readings as the racks and CDUs, so a Simulate scenario moves them as it plays. In a CDU failure, rack heat grows and spreads over the racks toward the cold aisle, the cold spots shrink, and the CDU's blue patch turns warm. Reset settles everything back. While the heat map is on, it replaces the thermal overlay. The step-by-step heat tour is gone. Clouds hold still when reduced motion is set.
+
+- Fix: a toast on the full-screen hall floor squeezed the 3D floor into a narrow column. It now sits
+  top right over the scene, under Pop out and clear of the Simulate bar.
+
 DCIAC runs as microservices. The backend is split into nine services behind a gateway: identity, inventory, connectivity, power, control, capacity, work orders, monitoring, and reporting. Each has its own API contract and health checks. `docker compose -f services/docker-compose.yml up --build` starts the whole stack, so another platform can host it. The web app, the API paths, and the data are the same. The full browser suite passes against the services as it does against `serve.py`. See `services/README.md` and `services/ROADMAP.md`.
 
 - Safety is unchanged and tested through the gateway: role checks, the outlet work-order gate and
