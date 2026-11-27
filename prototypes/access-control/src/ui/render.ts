@@ -285,6 +285,7 @@ function restoreFloorDrawerFocus() {
 
 let floor3dUsed = false;
 let rackGlUsed = false;
+let worldGlUsed = false;
 
 // three.js loads only once someone turns on Experimental, in its own chunk.
 function syncFloor3dLazy() {
@@ -293,6 +294,13 @@ function syncFloor3dLazy() {
     import("../views/floor3d").then((mod) => mod.syncFloor3d()).catch(() => {
       const host = document.getElementById("floor3d-host");
       if (host) host.setAttribute("data-floor3d", "unsupported");
+    });
+  }
+  if (worldGlUsed || document.getElementById("world-gl-host")) {
+    worldGlUsed = true;
+    import("../views/worldgl").then((mod) => mod.syncWorldGl()).catch(() => {
+      const host = document.getElementById("world-gl-host");
+      if (host) host.setAttribute("data-worldgl", "unsupported");
     });
   }
   if (rackGlUsed || document.getElementById("rack3d-host")) {
@@ -480,6 +488,7 @@ export function onClick(event) {
   else if (act === "heat-path") toggleHeat();
   else if (act === "floor-3d") toggleFloor3d();
   else if (act === "rack-gl") toggleRackGl();
+  else if (act === "plan-gl") { runtime.gl = !runtime.gl; state.focusField = "plan-gl-toggle"; render(); }
   else if (act === "lab-open" || act === "simulate") {
     state.labOpen = false;
     state.menuOpen = false;
