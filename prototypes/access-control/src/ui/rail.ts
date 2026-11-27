@@ -2,7 +2,7 @@ import { briefingButton } from "../domain/briefing";
 import { heatPathButton } from "../domain/heat-path";
 import { state } from "../state";
 import { esc } from "./format";
-import { themeButton, wordmark } from "./shell";
+import { headButtons, themeButton, wordmark } from "./shell";
 import { askAllowed, askOpen } from "./ask";
 
 export const OPERATE_VIEWS = ["rack", "map", "control", "sessions", "oneline", "fleet"];
@@ -84,13 +84,13 @@ function viewTabs(tabs, group) {
 export function operateHead() {
   const heading = esc(groupHeading("Operate", OPERATE_TABS));
   return '<div class="page-head"><div class="top"><div><h1>' + heading + "</h1>" + viewTabs(OPERATE_TABS, "Operate") +
-    "</div>" + themeButton() + "</div></div>";
+    "</div>" + headButtons() + "</div></div>";
 }
 
 export function planHead() {
   const heading = esc(groupHeading("Plan", PLAN_TABS));
   return '<div class="page-head"><div class="top"><div><h1>' + heading + "</h1>" + viewTabs(PLAN_TABS, "Plan") +
-    "</div>" + themeButton() + "</div></div>";
+    "</div>" + headButtons() + "</div></div>";
 }
 
 export function topbar() {

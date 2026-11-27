@@ -68,7 +68,7 @@ test("Experimental draws the rack with three.js in Operate and on the floor, and
   await page.locator('[data-user="dsvs.operator"]').click();
   await expect(page.locator(".rack3d-panel .r3-world")).toBeVisible();
 
-  const toggle = page.locator("#rack-gl-toggle");
+  const toggle = page.locator("#head-gl-toggle");
   await expect(toggle).toHaveAccessibleName("Experimental");
   await expect(toggle).toHaveAttribute("aria-pressed", "false");
   await toggle.click();
@@ -85,10 +85,16 @@ test("Experimental draws the rack with three.js in Operate and on the floor, and
   await page.locator('.rack3d-panel [data-act="rack-view"][data-rack-view="front"]').click();
 
   // Clicking a device in the 3D rack selects it, the same as the CSS rack.
-  const before = await page.evaluate(() => location.hash);
+  // Two clicks at different heights pick two different devices.
+  await page.waitForTimeout(300);
   const box = await host.locator("canvas").boundingBox();
   await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.3);
-  await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(before);
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/rack\/A14\/.+/);
+  const upper = await page.evaluate(() => location.hash);
+  await page.waitForTimeout(300);
+  const after = await host.locator("canvas").boundingBox();
+  await page.mouse.click(after.x + after.width / 2, after.y + after.height * 0.5);
+  await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(upper);
   expect(await page.evaluate(() => location.hash)).toMatch(/^#\/rack\/A14\/.+/);
 
   // Experimental is one switch: the hall floor is three.js now too, and so is the rack
@@ -131,7 +137,7 @@ test("Experimental draws Outside and the Plan site with three.js, and clicks sti
 
   // Plan: the same switch is on there, and a click on a hall opens its timeline.
   await page.goto("/#/plan", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("#plan-gl-toggle")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#head-gl-toggle")).toHaveAttribute("aria-pressed", "true");
   await page.locator('[data-act="build-stage"]').nth(5).click();
   await expect(host).toHaveAttribute("data-kind", "plan");
   await expect(host).toHaveAttribute("data-worldgl", "ready");
@@ -143,8 +149,67 @@ test("Experimental draws Outside and the Plan site with three.js, and clicks sti
 
   // Off again: the standard scene is back.
   await page.goto("/#/plan", { waitUntil: "domcontentloaded" });
-  await page.locator("#plan-gl-toggle").click();
+  await page.locator("#head-gl-toggle").click();
   await expect(page.locator("#world-gl-host")).toHaveCount(0);
   await expect(page.locator(".build-scene .world")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Experimental turns the non-drawing views into a dashboard of cards", async ({ page }) => {
+  const errors = [];
+  page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
+  page.on("pageerror", (err) => errors.push(String(err)));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/#/control", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-user="dsvs.operator"]').click();
+  await expect(page.locator(".dash-strip")).toHaveCount(0);
+  const flat = await page.locator(".view .panel").first().evaluate((el) => getComputedStyle(el).boxShadow);
+
+  await page.locator("#head-gl-toggle").click();
+  await expect(page.locator(".shell")).toHaveAttribute("data-experimental", "on");
+  await expect(page.locator("#head-gl-toggle")).toBeFocused();
+  // Live tiles under the heading, each a named button that opens its view.
+  const tiles = page.locator(".dash-strip .dash-tile");
+  await expect(tiles).toHaveCount(5);
+  await expect(tiles.first()).toContainText("Open alarms");
+  await expect(page.locator(".dash-strip")).toHaveJSProperty("previousElementSibling.className", "page-head");
+  // Cards pop out: deeper shadow than the standard panel, and the view is a grid.
+  const deep = await page.locator(".view .panel").first().evaluate((el) => getComputedStyle(el).boxShadow);
+  expect(deep).not.toBe(flat);
+  expect(deep.split("rgba").length).toBeGreaterThan(3);
+  expect(await page.locator(".view").evaluate((el) => getComputedStyle(el).display)).toBe("grid");
+  // A small card leans toward the pointer.
+  const tile = tiles.nth(1);
+  const box = await tile.boundingBox();
+  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.2);
+  await expect.poll(() => tile.evaluate((el) => el.style.getPropertyValue("--ry"))).not.toBe("");
+  // Tiles open their view.
+  await page.locator('.dash-tile[data-view="sessions"]').click();
+  await expect.poll(() => page.evaluate(() => location.hash)).toBe("#/sessions");
+  await expect(page.locator(".dash-strip .dash-tile")).toHaveCount(5);
+
+  // Drawings stay drawings: the one-line becomes three.js, with no dashboard tiles.
+  await page.locator('[data-act="nav"][data-view="oneline"]').first().click();
+  await expect(page.locator(".dash-strip")).toHaveCount(0);
+  const host = page.locator("#oneline-gl-host");
+  await expect(host).toHaveAttribute("data-onelinegl", "ready");
+  await expect(host).toHaveAttribute("role", "img");
+  // Feeders A and B, modules A to D, two battery zones, and every hall are clickable.
+  expect(Number(await host.getAttribute("data-nodes"))).toBeGreaterThanOrEqual(16);
+  expect(Number(await host.getAttribute("data-segments"))).toBeGreaterThan(20);
+  const canvas = host.locator("canvas");
+  const a = await canvas.screenshot();
+  await page.waitForTimeout(600);
+  expect(Buffer.compare(a, await canvas.screenshot())).not.toBe(0);
+
+  // On a phone the dashboard still fits without sideways scroll.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => { location.hash = "#/fleet"; });
+  await expect(page.locator(".dash-strip .dash-tile")).toHaveCount(5);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
+
+  await page.locator("#head-gl-toggle").click();
+  await expect(page.locator(".shell")).toHaveAttribute("data-experimental", "off");
+  await expect(page.locator(".dash-strip")).toHaveCount(0);
   expect(errors).toEqual([]);
 });

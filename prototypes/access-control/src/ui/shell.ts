@@ -1,6 +1,6 @@
 import { ACS_PORTS, devices } from "../data/devices";
 import { maintenanceOpen } from "../domain/audit";
-import { state } from "../state";
+import { runtime, state } from "../state";
 import { esc } from "./format";
 import { render } from "./schedule";
 import { renderAudit } from "../views/audit";
@@ -18,12 +18,24 @@ import { renderOneline } from "../views/oneline";
 import { renderFleet } from "../views/fleet";
 import { renderSimulate } from "../views/lab";
 import { OPERATE_VIEWS, PLAN_VIEWS, operateHead, planHead } from "./rail";
+import { dashStripHtml } from "./dashboard";
 
 export function go(view) {
   state.view = view;
   state.toast = "";
   state.menuOpen = false;
   render();
+}
+
+/* The page-head controls: NOC theme and the Experimental switch (three.js views and the
+   dashboard layout). */
+export function headButtons() {
+  return '<div class="head-buttons">' + glButton("head-gl-toggle") + themeButton() + "</div>";
+}
+
+export function glButton(id: string) {
+  return '<button type="button" class="act floor3d-toggle" id="' + id + '" data-act="plan-gl" aria-pressed="' + (runtime.gl ? "true" : "false") +
+    '" title="Experimental: three.js views and dashboard cards">Experimental</button>';
 }
 
 export function themeButton() {
@@ -58,6 +70,30 @@ export function fruSummary(editable) {
 }
 
 export function viewHtml() {
+  const html = viewBody();
+  const strip = dashStripHtml();
+  if (!strip) return html;
+  // The dashboard tiles go right under the page heading.
+  const at = html.indexOf('<div class="page-head"');
+  if (at < 0) return strip + html;
+  const end = closingDiv(html, at);
+  return end < 0 ? strip + html : html.slice(0, end) + strip + html.slice(end);
+}
+
+// Index just past the </div> that closes the <div> opened at `from`.
+function closingDiv(html: string, from: number) {
+  const tag = /<div\b|<\/div>/g;
+  tag.lastIndex = from;
+  let depth = 0;
+  let m;
+  while ((m = tag.exec(html))) {
+    depth += m[0] === "</div>" ? -1 : 1;
+    if (depth === 0) return m.index + 6;
+  }
+  return -1;
+}
+
+function viewBody() {
   if (state.view === "manage") return renderManage();
   if (state.view === "floor") return renderFloor();
   if (state.view === "simulate") return renderSimulate();

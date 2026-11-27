@@ -2,7 +2,7 @@ import { fmt } from "../domain/audit";
 import { state } from "../state";
 import { getAuditFilter } from "../ui/ask";
 import { esc } from "../ui/format";
-import { pills, themeButton } from "../ui/shell";
+import { headButtons, pills } from "../ui/shell";
 
 const FILTERS = [["all", "All"], ["manual", "Manual"], ["ask", "via Ask"]];
 
@@ -19,6 +19,6 @@ export function renderAudit() {
   const chips = '<div class="audit-filter" role="group" aria-label="Filter the log">' + FILTERS.map(([id, label]) =>
     '<button type="button" class="act" data-act="audit-filter" data-filter="' + id + '" aria-pressed="' + (filter === id) + '">' + label + "</button>").join("") + "</div>";
   return '<div class="page-head"><div class="top"><div><h1>Audit</h1>' +
-    '<p class="sub">Every console session and every outlet or DI act is logged with the identity on the act. Questions and actions from Ask are tagged “via Ask”.</p></div>' + themeButton() + "</div>" +
+    '<p class="sub">Every console session and every outlet or DI act is logged with the identity on the act. Questions and actions from Ask are tagged “via Ask”.</p></div>' + headButtons() + "</div>" +
     pills() + '</div><section class="panel"><h2>Log</h2>' + chips + table + "</section>";
 }
