@@ -827,8 +827,7 @@ function startTour(id: string) {
 /* Demos and tours spotlight the standard floor and rack, so they leave the
    experimental three.js views first. */
 function leaveExperimental() {
-  runtime.floor3d = false;
-  runtime.rackGl = false;
+  runtime.gl = false;
 }
 
 export function startDemo(id) {

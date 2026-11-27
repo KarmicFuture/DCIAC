@@ -255,13 +255,13 @@ function rackTools() {
   const view = viewAngles();
   const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
     (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("") +
-    '<button type="button" class="act floor3d-toggle" id="rack-gl-toggle" data-act="rack-gl" aria-pressed="' + (runtime.rackGl ? "true" : "false") +
-    '" title="Experimental 3D rack drawn with three.js">Experimental</button>';
+    '<button type="button" class="act floor3d-toggle" id="rack-gl-toggle" data-act="rack-gl" aria-pressed="' + (runtime.gl ? "true" : "false") +
+    '" title="Experimental: every 3D view drawn with three.js">Experimental</button>';
   return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>";
 }
 
 export function toggleRackGl() {
-  runtime.rackGl = !runtime.rackGl;
+  runtime.gl = !runtime.gl;
   state.focusField = "rack-gl-toggle";
   render();
 }
@@ -427,7 +427,7 @@ export function rackViewHtml(rackId, ctx = "floor") {
   const note = model.pdus.length
     ? (live ? "Rack PDU sockets show live outlet state. From the Rear view, click a lit socket to open it on Control." : "Rack PDUs show their ports. This rack has no live outlet readings.")
     : "No rack PDU is recorded on this rack.";
-  const scene = runtime.rackGl
+  const scene = runtime.gl
     ? rackGlHtml(rackId, ctx, "Rack " + rackId, model.units, model.pdus)
     : rackSceneHtml("Rack " + rackId, model.units, model.pdus);
   return '<div class="rack3d" data-rack3d="' + esc(rackId) + '">' + scene + R3_LEGEND +

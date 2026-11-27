@@ -3989,3 +3989,9 @@ nav .ask-nav[aria-expanded="true"] { background: #2a2a2a; border-color: #3a3a3a;
 
 /* Experimental three.js rack (views/rackgl.ts) uses the rack stage's size. */
 .rack-gl-stage { perspective: none; background: #0d1117; cursor: default; }
+
+/* Experimental three.js site and plan (views/worldgl.ts). The standard world stays in
+   the page as the geometry source and the controls clicks land on, but is not shown. */
+.gl-source { display: none !important; }
+.gl-scene .zoom-cluster { display: none; }
+.build-scene.gl-scene .floor3d-stage { position: relative; height: 100%; min-height: 420px; }

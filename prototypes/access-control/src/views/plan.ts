@@ -1,9 +1,9 @@
 import { BUILD_END, BUILD_START, STAGES, formatDay, monthCells, monthsOfPlan, spanDays, stageOn, yardShown } from "../domain/buildplan";
 import { PLANT, PODS, YARD } from "../data/pods";
-import { state } from "../state";
+import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { renderHallTimeline } from "./planhall";
-import { boxHtml, cameraTransform, feedHtml, itemPoint, siteFeedHtml, sitePipesHtml, yardById } from "./floor";
+import { boxHtml, cameraTransform, feedHtml, itemPoint, siteFeedHtml, sitePipesHtml, worldGlHtml, yardById } from "./floor";
 
 function hallsOf(indexes) {
   return indexes.map((index) => PODS[index]).filter((hall) => hall && hall.site);
@@ -67,10 +67,13 @@ function sceneHtml(stage) {
   const slab = stage.grass ? "grass-slab" : "yard-slab";
   const it = stage.live.length * PLANT.hallItMw;
   const hint = it ? it + " MW · " + stage.live.length + " halls" : "0 MW";
-  return '<div class="scene thermal site-scene build-scene"><div class="stage"><div class="world" style="transform:' + cameraTransform() +
-    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab ' + slab + '"></div>' +
-    pads + shells + live + gear + services +
-    '</div></div><div class="legend"><span class="swatch s-' + stage.id + '"></span><span>' + esc(stage.name) + '</span><span class="legend-hint">' + esc(hint) + "</span></div></div>";
+  const inner = '<div class="slab ' + slab + '"></div>' + pads + shells + live + gear + services;
+  const world = runtime.gl
+    ? worldGlHtml("plan", "Experimental 3D view of the site on " + formatDay(state.buildDate) + ": " + stage.name + ". " + hint +
+      ". Drag to orbit, scroll to zoom, click a hall to open its timeline.", inner)
+    : '<div class="stage"><div class="world" style="transform:' + cameraTransform() +
+      ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg">' + inner + "</div></div>";
+  return '<div class="scene thermal site-scene build-scene' + (runtime.gl ? " gl-scene" : "") + '">' + world + '<div class="legend"><span class="swatch s-' + stage.id + '"></span><span>' + esc(stage.name) + '</span><span class="legend-hint">' + esc(hint) + "</span></div></div>";
 }
 
 function calendarHtml(currentIso) {
@@ -100,7 +103,8 @@ function barHtml(current) {
 }
 
 function hallPicks() {
-  return '<div class="hall-picks" role="group" aria-label="Open a hall timeline"><span class="fine">Hall timeline</span>' +
+  return '<div class="hall-picks" role="group" aria-label="Open a hall timeline"><button type="button" class="act floor3d-toggle" id="plan-gl-toggle" data-act="plan-gl" aria-pressed="' +
+    (runtime.gl ? "true" : "false") + '" title="Experimental: every 3D view drawn with three.js">Experimental</button><span class="fine">Hall timeline</span>' +
     PODS.map((pod) => '<button type="button" class="act" data-act="build-open" data-pod="' + esc(pod.id) + '">' + esc(pod.name) + "</button>").join("") +
     "</div>";
 }

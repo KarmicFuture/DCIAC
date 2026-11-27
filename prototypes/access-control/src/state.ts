@@ -8,8 +8,8 @@ export const runtime = {
   orbit: null as any,
   carry: null as any,
   walk: null as any,
-  floor3d: false,
-  rackGl: false,
+  // Experimental: draw every 3D view with three.js (floor, outside, plan, rack).
+  gl: false,
   elevDrag: null as any,
   powerPanels: {} as any,
   networkRack: null as any,

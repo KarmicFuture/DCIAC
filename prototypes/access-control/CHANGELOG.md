@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-27 (experimental)
+
+Experimental is now one switch for every 3D view. Turn it on from the floor, the rack, or Plan, and Floor › Outside, the hall floor, the rack (in Operate and from the floor), and the Plan site scene all draw with three.js until you turn it off again.
+
+- **Outside:** the halls, the power yard, the feeders, and the cooling pipes are drawn in 3D. Halls show lit windows. Power flows along the feeders as moving lights. Cool supply runs blue through the pipes and warm return runs orange. Cooler fans spin. A failed feeder or pipe in a Simulate scenario turns red and stops flowing, and the gear it hits glows red. Click a hall or a piece of yard gear to open it, as on the standard view.
+- **Plan:** the site for the chosen build day, from grass field to 100 MW. Pads and shells are see-through until the hall is live. Click a hall to open its timeline.
+- Both scenes are drawn from the standard scene itself, which stays in the page out of sight. They show the same halls, gear, and lines, and a click lands on the same control the standard scene uses.
+- Walk through needs the standard floor, so it is hidden while Experimental is on.
+
 ## 2026-11-26 (experimental)
 
 The hall floor has an **Experimental** button. It swaps the CSS floor for a live 3D hall drawn with three.js: dark racks with glowing fronts that use the usual alarm colors, aisles tinted hot and cold, the CDUs, and moving air. Warm particles rise off the hot aisle, and cool particles sink at the rack inlets and around the CDUs. The air comes from the same heat-cloud readings as Heat path, so a Simulate scenario changes it within two seconds. Racks with an alarm pulse, and priority 1 pulses fastest. Drag to orbit, scroll to zoom, hover a rack to see its name and state, and click a rack to open it. The view turns slowly until you touch it. It holds still when reduced motion is set. Pressing the button again brings the normal floor back.
