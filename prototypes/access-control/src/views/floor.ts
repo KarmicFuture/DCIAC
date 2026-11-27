@@ -360,7 +360,7 @@ export function onPointerDown(event) {
   }
   if (state.view !== "floor") return;
   // The experimental three.js floor runs its own orbit controls.
-  if (event.target.closest(".floor3d-host")) return;
+  if (event.target.closest(".floor3d-host, .gl-host")) return;
   if (event.target.closest(".lib, .hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, button, a, input, select")) return;
   const box = floorBoxAt(event);
   const record = box ? floorRecord(box) : null;

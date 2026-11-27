@@ -58,3 +58,44 @@ test("Experimental fits an iPhone-width screen without sideways scroll", async (
   expect(sideways).toBeLessThanOrEqual(1);
   await expect(page.locator("#floor3d-host canvas")).toBeVisible();
 });
+
+test("Experimental draws the rack with three.js in Operate and on the floor, and a click selects a device", async ({ page }) => {
+  const errors = [];
+  page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
+  page.on("pageerror", (err) => errors.push(String(err)));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/#/rack", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-user="dsvs.operator"]').click();
+  await expect(page.locator(".rack3d-panel .r3-world")).toBeVisible();
+
+  const toggle = page.locator("#rack-gl-toggle");
+  await expect(toggle).toHaveAccessibleName("Experimental");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  const host = page.locator(".rack3d-panel #rack3d-host");
+  await expect(host).toHaveAttribute("data-rackgl", "ready");
+  await expect(host).toHaveAttribute("role", "img");
+  await expect(host).toHaveAttribute("data-units", "10");
+  await expect(page.locator(".rack3d-panel .r3-world")).toHaveCount(0);
+  // The keyboard path to the same outlets stays under the 3D rack.
+  await expect(page.locator(".rack3d-panel .r3-pdu-table tbody tr")).toHaveCount(11);
+  // The view presets still aim the camera.
+  await page.locator('.rack3d-panel [data-act="rack-view"][data-rack-view="rear"]').click();
+  await expect(page.locator('.rack3d-panel [data-act="rack-view"][data-rack-view="rear"]')).toHaveAttribute("aria-pressed", "true");
+  await page.locator('.rack3d-panel [data-act="rack-view"][data-rack-view="front"]').click();
+
+  // Clicking a device in the 3D rack selects it, the same as the CSS rack.
+  const before = await page.evaluate(() => location.hash);
+  const box = await host.locator("canvas").boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.3);
+  await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(before);
+  expect(await page.evaluate(() => location.hash)).toMatch(/^#\/rack\/A14\/.+/);
+
+  // The rack opened from the floor is the same view, so it is three.js too.
+  await page.goto("/#/floor/hall", { waitUntil: "domcontentloaded" });
+  await page.locator('.rackbox[data-act="floor-rack"][data-rack="A14"] .ftop').click({ force: true });
+  await expect(page.locator(".scene.rack-scene #rack3d-host")).toHaveAttribute("data-rackgl", "ready");
+  await page.locator(".scene.rack-scene #rack-gl-toggle").click();
+  await expect(page.locator(".scene.rack-scene .r3-world")).toBeVisible();
+  expect(errors).toEqual([]);
+});

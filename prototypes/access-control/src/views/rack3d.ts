@@ -10,12 +10,12 @@ import { conditionTone } from "./floor";
    the rear rail. The PDU here only shows state. Switching an outlet still happens on
    Control, with its role, interlock, and confirmation checks. */
 
-const U_PX = 11;
-const RACK_U = 42;
-const CAB_W = 200;
-const CAB_D = 280;
-const DEV_W = 160;
-const DEV_D = 236;
+export const U_PX = 11;
+export const RACK_U = 42;
+export const CAB_W = 200;
+export const CAB_D = 280;
+export const DEV_W = 160;
+export const DEV_D = 236;
 
 export const RACK_VIEWS = [
   ["front", "Front", -24, -8],
@@ -23,6 +23,10 @@ export const RACK_VIEWS = [
   ["side", "Side", -90, -6],
   ["rear", "Rear", -200, -8],
 ];
+
+export function rackAngles() {
+  return viewAngles();
+}
 
 function viewAngles() {
   if (state.rackView === "custom") return { id: "custom", yaw: state.rackYaw, pitch: state.rackPitch };
@@ -70,7 +74,7 @@ function showAngles(stage) {
 export function rackPointerDown(event) {
   const stage = event.target.closest && event.target.closest(".r3-stage");
   if (!stage || event.button !== 0) return false;
-  if (event.target.closest("button")) return false;
+  if (event.target.closest("button, .gl-host")) return false;
   const now = viewAngles();
   spin = { id: event.pointerId, x: event.clientX, y: event.clientY, yaw: now.yaw, pitch: now.pitch, moved: false };
   stage.setPointerCapture(event.pointerId);
@@ -247,12 +251,34 @@ export const R3_LEGEND = '<div class="r3-legend"><span><span class="r3-dot on"><
   '<span><span class="r3-dot cycling"></span>Cycling</span><span><span class="r3-dot locked"></span>Locked</span>' +
   '<span><span class="r3-dot idle"></span>No live reading</span></div>';
 
+function rackTools() {
+  const view = viewAngles();
+  const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
+    (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("") +
+    '<button type="button" class="act floor3d-toggle" id="rack-gl-toggle" data-act="rack-gl" aria-pressed="' + (runtime.rackGl ? "true" : "false") +
+    '" title="Experimental 3D rack drawn with three.js">Experimental</button>';
+  return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>";
+}
+
+export function toggleRackGl() {
+  runtime.rackGl = !runtime.rackGl;
+  state.focusField = "rack-gl-toggle";
+  render();
+}
+
+/* Experimental: views/rackgl.ts draws the same rack model into this host with three.js. */
+function rackGlHtml(rackId: string, ctx: string, name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
+  const sockets = pdus.reduce((n, pdu) => n + pdu.sockets.length, 0);
+  const label = "Experimental 3D view of " + name + ". " + units.length + " devices" + (sockets ? ", " + sockets + " PDU sockets" : "") +
+    ". Drag to orbit, scroll to zoom, click a device to open it. The table below lists the same outlets by keyboard.";
+  return rackTools() + '<div class="r3-stage rack-gl-stage"><div id="rack3d-host" class="floor3d-host gl-host" role="img" aria-label="' + esc(label) +
+    '" data-rack="' + esc(rackId) + '" data-ctx="' + esc(ctx) + '" data-rackgl="loading"><span class="floor3d-badge">Experimental · three.js</span></div></div>';
+}
+
 /* Any rack in 3D: the view buttons and the stage. */
 export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
   const view = viewAngles();
-  const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
-    (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("");
-  return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>" +
+  return rackTools() +
     '<div class="r3-stage" tabindex="0" id="r3-stage" data-focus-key="r3-stage" role="img" aria-label="' + esc(name) +
     ' in 3D. Drag to rotate, or use the arrow keys."><div class="r3-world" data-view="' + view.id + '" style="transform:' + worldTransform(view.yaw, view.pitch) + '">' +
     cabinet(name) + uScale() + units.map(unitBox).join("") + pdus.map(pduBox).join("") + "</div></div>";
@@ -401,7 +427,10 @@ export function rackViewHtml(rackId, ctx = "floor") {
   const note = model.pdus.length
     ? (live ? "Rack PDU sockets show live outlet state. From the Rear view, click a lit socket to open it on Control." : "Rack PDUs show their ports. This rack has no live outlet readings.")
     : "No rack PDU is recorded on this rack.";
-  return '<div class="rack3d" data-rack3d="' + esc(rackId) + '">' + rackSceneHtml("Rack " + rackId, model.units, model.pdus) + R3_LEGEND +
+  const scene = runtime.rackGl
+    ? rackGlHtml(rackId, ctx, "Rack " + rackId, model.units, model.pdus)
+    : rackSceneHtml("Rack " + rackId, model.units, model.pdus);
+  return '<div class="rack3d" data-rack3d="' + esc(rackId) + '">' + scene + R3_LEGEND +
     '<p class="fine r3-note">' + esc(note) + "</p>" + (live ? pduTable(ctx) : "") + "</div>";
 }
 
