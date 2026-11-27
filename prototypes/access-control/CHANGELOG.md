@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-11-27
+
+The one-line now runs all the way to the end point, and it works like a live control room.
+
+- **Utility to server.** After Hall 1, the diagram continues through the Hall 1 busway to rack PDUs A and B on A14, down both PDU rails to each of the 11 outlets, and on to the server on each outlet.
+  - The servers are the GPU trays, the SN2201 switch, and the DC power shelf. An empty outlet shows as Unbound.
+  - An outlet that is off greys out its server. An outlet locked by the DI-1 leak interlock turns red. A cycling outlet pulses.
+- **Scoreboard over the diagram.** It shows:
+  - Grid health as a 0–100 ring with a grade (S to D)
+  - Live IT load
+  - Redundancy (2N, N, or Lost)
+  - A14 outlets on
+  - A fault-free timer that restarts whenever a Simulate scenario runs
+  - Six achievements (Dual feed, No P1, Cool head, Full rack, Dry floor, Survivor), each with a hint for unlocking it
+- **Live in place.**
+  - Every node carries a thin load bar.
+  - Energized conductors show current flowing.
+  - Values tick every second without redrawing the diagram.
+- **Details fly out on the right.** Clicking any node (feeder, transformer, module, battery, hall, busway, rack PDU, outlet, or server) opens a panel. It shows:
+  - Status, and a health ring
+  - Live load, temperature, GPU and memory gauges, with the kW drawn against the rating
+  - The chain it is fed from, where each step can be clicked to walk up the chain
+  - What it feeds, and its open alarms
+  - Its risk in a running scenario
+  - Open on the floor, Open Control (for outlets and PDUs), and Break this… (Simulate) where it applies
+- **Keyboard and phone.**
+  - Enter on a focused node opens the panel and focuses Close. Escape closes it and returns focus to the node.
+  - On a phone the panel is a bottom sheet.
+- **In Experimental,** the 3D board shows the whole chain, and a click in 3D opens the same panel.
+- **Changed:** clicking a hall on the one-line now opens its details instead of jumping to the floor. Open on the floor is the first button in the panel. Fleet's hall links still go straight to the floor.
+
 ## 2026-11-27 (outlet policy on the server)
 
 The server now holds two more of the web app's outlet rules. Outside a named maintenance window, `/api/v1/actions/outlet` refuses any action on Outlet 6, which feeds no device, and refuses whole-PDU control, with a 409 that says why (`"policy": "maintenance-window"`). A covering work order is not enough for either, the same as in the web app. A script or another platform can no longer cycle every outlet on rack PDU A14 with only a work order number.

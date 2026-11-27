@@ -38,6 +38,10 @@ function buildEdgeTone(ids: string[]) {
   return needs.every(builtOn) ? "live" : "future";
 }
 import { openFloorServer, openPod } from "./floor";
+import { deviceById } from "../data/devices";
+import { outlets } from "../data/outlets";
+import { outletState } from "./rack3d";
+import { olFlyoutHtml, olHudHtml } from "./oneline-live";
 
 type Pt = { x: number; y: number };
 
@@ -122,18 +126,32 @@ function batt(at: Pt, tone: string) {
     '<line x1="4" y1="-8" x2="4" y2="8" /><line x1="10" y1="-14" x2="10" y2="14" /></g>';
 }
 
-function deviceBox(at: Pt, label: string, sub: string, tone: string, serverId: string, w = 108) {
+function picked(id: string) {
+  return runtime.olPick === id ? " picked" : "";
+}
+
+/* Every node on the diagram opens its details in the fly-out on the right. */
+function deviceBox(at: Pt, label: string, sub: string, tone: string, serverId: string, w = 108, h = 44) {
   const x = at.x - w / 2;
-  const y = at.y - 22;
-  return '<g class="ol-node ' + tone + '" data-act="oneline-open" data-server="' + esc(serverId) + '" role="button" tabindex="0">' +
-    '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="44" rx="4" />' +
-    '<text class="ol-label" x="' + at.x + '" y="' + (at.y - 2) + '">' + esc(label) + "</text>" +
-    '<text class="ol-sub" x="' + at.x + '" y="' + (at.y + 14) + '">' + esc(sub) + "</text></g>";
+  const y = at.y - h / 2;
+  return '<g class="ol-node ' + tone + picked(serverId) + '" data-act="ol-pick" data-server="' + esc(serverId) + '" role="button" tabindex="0" aria-label="' +
+    esc(label + (sub ? ", " + sub : "") + ". Show details") + '">' +
+    '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="4" />' +
+    '<rect class="ol-load" data-load-for="' + esc(serverId) + '" x="' + (x + 4) + '" y="' + (y + h - 5) + '" width="' + loadWidth(serverId, w - 8) + '" height="2.5" rx="1" />' +
+    '<text class="ol-label" x="' + at.x + '" y="' + (at.y - (h < 40 ? 0 : 2)) + '">' + esc(label) + "</text>" +
+    '<text class="ol-sub" x="' + at.x + '" y="' + (at.y + (h < 40 ? 10 : 14)) + '">' + esc(sub) + "</text></g>";
+}
+
+function loadWidth(id: string, full: number) {
+  const entity = entityById(id);
+  const pct = entity && entity.load ? Math.max(0, Math.min(100, entity.load.power || 0)) : 0;
+  return (full * pct / 100).toFixed(1);
 }
 
 function hallTap(at: Pt, hall, tone: string, sub = PLANT.hallItMw + " MW IT") {
-  const act = buildStage ? "oneline-build-hall" : "oneline-hall";
-  return '<g class="ol-hall ' + tone + '" data-act="' + act + '" data-pod="' + esc(hall.id) + '" role="button" tabindex="0">' +
+  const act = buildStage ? "oneline-build-hall" : "ol-pick";
+  return '<g class="ol-hall ' + tone + picked(hall.id) + '" data-act="' + act + '" data-pod="' + esc(hall.id) + '" data-server="' + esc(hall.id) + '" role="button" tabindex="0" aria-label="' +
+    esc(hall.name + ", " + sub + (buildStage ? ". Open its timeline" : ". Show details")) + '">' +
     '<rect class="ol-hit" x="' + (at.x - 12) + '" y="' + (at.y - 14) + '" width="160" height="30" />' +
     '<circle cx="' + at.x + '" cy="' + at.y + '" r="6" />' +
     '<text class="ol-label" x="' + (at.x + 14) + '" y="' + (at.y + 4) + '">' + esc(hall.name) + "</text>" +
@@ -158,7 +176,7 @@ function diagramSvg(report: SimImpact) {
   const busX = 640;
   const busTop = 70;
   const busBottom = hallStartY + Math.max(halls.length - 1, 0) * hallGap + 24;
-  const height = Math.max(420, busBottom + 70);
+  const height = Math.max(520, busBottom + 70);
 
   const aY = 110;
   const bY = 220;
@@ -188,7 +206,7 @@ function diagramSvg(report: SimImpact) {
 
   let body = "";
   body += '<text class="ol-title" x="48" y="36">Facility power · one-line</text>';
-  body += '<text class="ol-sub" x="48" y="54">Utility to hall busway · click a node to open it on the floor</text>';
+  body += '<text class="ol-sub" x="48" y="54" style="text-anchor:start">Utility to every server in Rack A14 · click any node for its live details</text>';
 
   // Utility stem
   const stem = buildStage ? buildEdgeTone(["grid-1"]) : "live";
@@ -238,7 +256,7 @@ function diagramSvg(report: SimImpact) {
   ], edgeTone(["batt-a"], report), "batt-a");
   body += batt(battAy, nodeTone("batt-1", report));
   body += '<text class="ol-sub" x="' + (battAy.x + 28) + '" y="' + (battAy.y + 4) + '">Batt A</text>';
-  body += '<g data-act="oneline-open" data-server="batt-1" role="button" tabindex="0" aria-label="Battery A"><rect class="ol-hit" x="' +
+  body += '<g data-act="ol-pick" data-server="batt-1" role="button" tabindex="0" aria-label="Battery A. Show details"><rect class="ol-hit" x="' +
     (battAy.x - 18) + '" y="' + (battAy.y - 18) + '" width="70" height="36" /></g>';
 
   body += poly([
@@ -248,7 +266,7 @@ function diagramSvg(report: SimImpact) {
   ], edgeTone(["batt-b"], report), "batt-b");
   body += batt(battBy, nodeTone("batt-2", report));
   body += '<text class="ol-sub" x="' + (battBy.x + 28) + '" y="' + (battBy.y + 4) + '">Batt B</text>';
-  body += '<g data-act="oneline-open" data-server="batt-2" role="button" tabindex="0" aria-label="Battery B"><rect class="ol-hit" x="' +
+  body += '<g data-act="ol-pick" data-server="batt-2" role="button" tabindex="0" aria-label="Battery B. Show details"><rect class="ol-hit" x="' +
     (battBy.x - 18) + '" y="' + (battBy.y - 18) + '" width="70" height="36" /></g>';
 
   // Main bus riser
@@ -256,6 +274,7 @@ function diagramSvg(report: SimImpact) {
   body += '<text class="ol-sub" x="' + (busX - 8) + '" y="' + (busTop - 10) + '" text-anchor="end">MV bus</text>';
 
   // Hall taps
+  let endTone = "";
   halls.forEach((hall, index) => {
     const y = hallStartY + index * hallGap;
     const feedId = "feed-hall-" + hall.id;
@@ -267,13 +286,19 @@ function diagramSvg(report: SimImpact) {
       body += line({ x: busX, y }, { x: hallX - 8, y }, feedTone, feedId);
       body += breaker({ x: hallX - 28, y }, feedTone);
       body += hallTap({ x: hallX, y }, hall, hallTone, phase.id === "live" ? PLANT.hallItMw + " MW IT" : phase.name);
+      if (hall.managed || index === 0) endTone = endTone || (phase.id === "live" ? "live" : "future");
       return;
     }
     const tone = report.active && report.failedFeeds.indexOf(feedId) >= 0 ? "failed" : hallEdge;
+    if (hall.managed || index === 0) endTone = endTone || tone;
     body += line({ x: busX, y }, { x: hallX - 8, y }, tone, feedId);
     body += breaker({ x: hallX - 28, y }, tone);
     body += hallTap({ x: hallX, y }, hall, nodeTone(hall.id, report) === "dim" && !report.affected[hall.id] ? tone : (report.affected[hall.id] ? "hit" : tone));
   });
+
+  // The managed hall, on to every outlet and server in rack A14.
+  const managed = Math.max(0, halls.findIndex((hall) => hall.managed));
+  body += endPointSvg(hallStartY + managed * hallGap, endTone || "live", report);
 
   // Legend
   const legendY = height - 28;
@@ -282,7 +307,7 @@ function diagramSvg(report: SimImpact) {
       '<line class="ol-line live" x1="0" y1="0" x2="28" y2="0" /><text class="ol-sub" x="34" y="4" style="text-anchor:start">Energized</text>' +
       '<line class="ol-line dead" x1="120" y1="0" x2="148" y2="0" /><text class="ol-sub" x="154" y="4" style="text-anchor:start">Built, no load</text>' +
       '<line class="ol-line future" x1="260" y1="0" x2="288" y2="0" /><text class="ol-sub" x="294" y="4" style="text-anchor:start">Not yet built</text></g>';
-    return '<svg class="ol-svg" viewBox="0 0 980 ' + height + '" role="img" aria-label="Facility power one-line diagram on ' +
+    return '<svg class="ol-svg" viewBox="0 0 ' + OL_W + " " + height + '" role="img" aria-label="Facility power one-line diagram on ' +
       esc(formatDay(state.buildDate)) + '">' + body + "</svg>";
   }
   body += '<g class="ol-legend" transform="translate(48 ' + legendY + ')">' +
@@ -293,8 +318,58 @@ function diagramSvg(report: SimImpact) {
     '<g class="ol-xfmr live" transform="translate(430 0)"><circle cx="-6" r="8" /><circle cx="6" r="8" /></g>' +
     '<text class="ol-sub" x="448" y="4">Transformer</text></g>';
 
-  return '<svg class="ol-svg" viewBox="0 0 980 ' + height + '" role="img" aria-label="Facility power one-line diagram">' +
+  return '<svg class="ol-svg" viewBox="0 0 ' + OL_W + " " + height + '" role="img" aria-label="Facility power one-line diagram, from the utility to every server in rack A14">' +
     body + "</svg>";
+}
+
+const OL_W = 1560;
+
+/* Hall 1 busway → rack PDUs A and B → each outlet of rack PDU A14 → the server on it.
+   Rack A14 is dual-corded: every outlet taps both PDU rails. */
+function endPointSvg(hallY: number, branch: string, report: SimImpact) {
+  const future = branch === "future";
+  const bus: Pt = { x: 1000, y: hallY };
+  const pduA: Pt = { x: 990, y: 210 };
+  const pduB: Pt = { x: 990, y: 340 };
+  const railA = 1112;
+  const railB = 1128;
+  const outletX = 1200;
+  const deviceX = 1372;
+  const top = 72;
+  const gap = 36;
+  const busTone = future ? "future" : (branch === "failed" ? "failed" : nodeToneOr("bus-a", report, branch));
+  const feed = future ? "future" : (branch === "failed" ? "failed" : branch);
+  let out = "";
+  out += line({ x: 902, y: hallY }, { x: bus.x - 55, y: hallY }, feed, "feed-hall-end");
+  out += deviceBox(bus, "Hall 1 busway", "16 MW · 415 V", busTone, "bus-a", 110);
+  out += line({ x: bus.x - 10, y: hallY + 22 }, { x: pduA.x - 10, y: pduA.y - 18 }, feed, "rpdu-a");
+  out += poly([{ x: bus.x + 55, y: hallY }, { x: 1074, y: hallY }, { x: 1074, y: pduB.y }, { x: pduB.x + 48, y: pduB.y }], feed, "rpdu-b");
+  out += breaker({ x: pduA.x - 10, y: (hallY + 22 + pduA.y - 18) / 2 }, feed);
+  out += deviceBox(pduA, "rPDU A", "A14 · 120 kW", feed, "pdu-A14-a", 96, 36);
+  out += deviceBox(pduB, "rPDU B", "A14 · 120 kW", feed, "pdu-A14-b", 96, 36);
+  const last = top + (outlets.length - 1) * gap;
+  out += poly([{ x: pduA.x + 48, y: pduA.y }, { x: railA, y: pduA.y }], feed, "rail-a") + line({ x: railA, y: top }, { x: railA, y: last }, feed, "rail-a");
+  out += poly([{ x: pduB.x + 48, y: pduB.y + 8 }, { x: railB, y: pduB.y + 8 }], feed, "rail-b") + line({ x: railB, y: top }, { x: railB, y: last }, feed, "rail-b");
+  out += '<text class="ol-sub" x="' + railA + '" y="' + (top - 14) + '">A</text><text class="ol-sub" x="' + railB + '" y="' + (top - 14) + '">B</text>';
+  outlets.forEach((o, i) => {
+    const y = top + i * gap;
+    const s = future ? "future" : outletState(o);
+    const tone = future ? "future" : (feed === "failed" ? "failed" : (s === "off" ? "dead" : (s === "locked" ? "failed" : (s === "cycling" ? "hit" : feed))));
+    const word = s === "locked" ? "Locked · DI-1" : (s === "cycling" ? "Cycling" : (s === "off" ? "Off" : "On"));
+    out += line({ x: railA, y: y - 4 }, { x: outletX - 36, y: y - 4 }, tone);
+    out += line({ x: railB, y: y + 4 }, { x: outletX - 36, y: y + 4 }, tone);
+    out += deviceBox({ x: outletX, y }, "Outlet " + o.n, word, tone, "outlet-" + o.n, 72, 30);
+    const d = o.deviceId ? deviceById(o.deviceId) : null;
+    const dTone = future ? "future" : (!d ? "dead" : (tone === "dead" || tone === "failed" ? "dead" : nodeToneOr(d.id, report, tone)));
+    out += line({ x: outletX + 36, y }, { x: deviceX - 66, y }, d ? tone : "dead");
+    out += deviceBox({ x: deviceX, y }, d ? d.name : "Unbound", d ? (d.kind + " · U" + d.u) : "No device", dTone, d ? d.id : "unbound-" + o.n, 132, 30);
+  });
+  return out;
+}
+
+function nodeToneOr(id: string, report: SimImpact, fallback: string) {
+  const tone = nodeTone(id, report);
+  return tone === "live" ? fallback : tone;
 }
 
 export function openOnelineNode(serverId: string) {
@@ -338,7 +413,7 @@ export function renderOneline() {
       '<div class="oneline-head"><div><h2>One-line · build timeline</h2>' + buildSummary(buildStage) + "</div>" +
       '<div class="oneline-actions">' + toggle + "</div></div>" +
       stageBarHtml(buildStage) +
-      sheet(diagramSvg(report), false, "on " + formatDay(state.buildDate)) + "</div>";
+      sheet(diagramSvg(report), false, "on " + formatDay(state.buildDate)) + olFlyoutHtml(report) + "</div>";
     buildStage = null;
     return html;
   }
@@ -347,7 +422,7 @@ export function renderOneline() {
     '<div class="oneline-actions">' + toggle +
     '<button type="button" class="act" data-act="oneline-site">Outside floor</button>' +
     '<button type="button" class="act" data-act="sim-open">Simulate</button>' +
-    "</div></div>" + sheet(diagramSvg(report), report.active, "") + "</div>";
+    "</div></div>" + olHudHtml(report) + sheet(diagramSvg(report), report.active, "") + olFlyoutHtml(report) + "</div>";
 }
 
 /* Experimental: views/onelinegl.ts draws the diagram with three.js. The SVG stays in the

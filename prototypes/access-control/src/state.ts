@@ -10,6 +10,9 @@ export const runtime = {
   walk: null as any,
   // Experimental: draw every 3D view with three.js (floor, outside, plan, rack).
   gl: false,
+  // The node whose details show in the one-line fly-out.
+  olPick: "",
+  olCalmSince: 0,
   elevDrag: null as any,
   powerPanels: {} as any,
   networkRack: null as any,

@@ -4,6 +4,9 @@ async function signInFloor(page, hash = "/#/floor/hall") {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(hash, { waitUntil: "domcontentloaded" });
   const user = page.locator('[data-user="dsvs.operator"]');
+  // Wait for the first paint: the sign-in screen or an already signed-in app. Checking
+  // the count straight after load raced the first render and could skip sign-in.
+  await expect(user.or(page.locator(".shell"))).toBeVisible();
   if (await user.count()) await user.click();
   await expect(page.locator("#app")).not.toContainText("Loading the asset repository");
 }

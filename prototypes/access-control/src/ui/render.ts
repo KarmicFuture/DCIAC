@@ -1,6 +1,7 @@
 import { html, render as litRender } from "lit-html";
 import { rackKey, rackSwallowsClick, setRackPreset, toggleRackGl } from "../views/rack3d";
 import { tiltCard } from "./dashboard";
+import { closeOlFlyout } from "../views/oneline-live";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import { assertWorld, deviceById } from "../data/devices";
 import {
@@ -520,6 +521,8 @@ export function onClick(event) {
     runtime.sim.paused = false;
     fireEvent(el.dataset.event || "", el.dataset.target || "", { stay: true });
   }
+  else if (act === "ol-pick") { runtime.olPick = el.dataset.server || el.dataset.pod || ""; state.focusField = "ol-fly-close"; render(); }
+  else if (act === "ol-close") { closeOlFlyout(); render(); }
   else if (act === "oneline-open") openOnelineNode(el.dataset.server || "");
   else if (act === "oneline-hall") openOnelineHall(el.dataset.pod || "");
   else if (act === "fleet-racks") { toggleFleetRacks(el.dataset.pod || ""); render(); }
@@ -842,6 +845,14 @@ export function onKeyDown(event) {
   if (event.key === "Escape") {
     const typing = event.target.closest && event.target.closest("input, textarea, select");
     if (typing) return;
+    if (state.view === "oneline" && runtime.olPick) {
+      const back = runtime.olPick;
+      closeOlFlyout();
+      render();
+      const node = document.querySelector('.ol-svg [data-act="ol-pick"][data-server="' + back + '"]') as HTMLElement | null;
+      if (node && node.focus) node.focus({ preventScroll: true });
+      return;
+    }
     if (state.view === "floor" && (state.libraryOpen || state.inspectorOpen || state.floorListOpen || state.plan.selected || state.plan.preview)) {
       state.libraryOpen = false;
       closeFloorDetail();
@@ -852,7 +863,9 @@ export function onKeyDown(event) {
   }
   if ((event.key === "Enter" || event.key === " ") && event.target.matches && event.target.matches("[role='button'][data-act]")) {
     event.preventDefault();
-    event.target.click();
+    // SVG controls (the one-line nodes) have no click(); send the same bubbling click.
+    if (typeof event.target.click === "function") event.target.click();
+    else event.target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     return;
   }
   const zone = event.target.closest ? event.target.closest("[data-kvm]") : null;

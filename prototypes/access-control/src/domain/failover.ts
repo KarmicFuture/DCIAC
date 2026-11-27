@@ -6,6 +6,7 @@ import { runtime, state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
 import { updateFloorMeters } from "../views/floor";
+import { updateOnelineLive } from "../views/oneline-live";
 
 export function waiting(d) {
   return !!(d && d.bmc === "down" && d.serialReadyAt && Date.now() < d.serialReadyAt);
@@ -160,6 +161,10 @@ export function stepCapacity() {
   if (state.user && state.view === "floor" && !runtime.sim.stay) {
     if (dirty) render();
     else updateFloorMeters();
+  }
+  if (state.user && state.view === "oneline") {
+    if (dirty) render();
+    else updateOnelineLive();
   }
 }
 
