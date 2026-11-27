@@ -409,6 +409,14 @@ class StackTest(unittest.TestCase):
         self.assertEqual(self.call("POST", "/api/v1/collect", reading(0), OPERATOR)[0], 201)
         self.assertEqual(self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)[0], 200)
 
+    def test_outlet_policy_is_enforced_by_control(self):
+        action = {"op": "cycle", "outlet": 6, "reason": "policy test", "workOrderId": "WO-77"}
+        status, body, _ = self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)
+        self.assertEqual((status, body.get("policy")), (409, "maintenance-window"), body)
+        status, body, _ = self.call("POST", "/api/v1/actions/outlet", {"op": "all", "reason": "policy test"}, OPERATOR)
+        self.assertEqual((status, body.get("policy")), (409, "maintenance-window"), body)
+        self.assertEqual(self.call("POST", "/api/v1/actions/outlet", dict(action, maintenance=True), OPERATOR)[0], 200)
+
     def test_web_app_is_served_at_both_roots(self):
         for path in ("/", "/DCIAC/", "/DCIAC/index.html"):
             with urllib.request.urlopen("http://127.0.0.1:%d%s" % (self.gateway_port, path), timeout=10) as reply:

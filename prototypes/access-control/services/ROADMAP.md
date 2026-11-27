@@ -23,7 +23,8 @@ One item per daily run, in order:
 
 1. **Interlocks on the server.** Move the DI-1 leak interlock and the outlet policy (`leak.ts`, `outlet-policy.ts`) into `control`, so `/actions/outlet` refuses a power action that the web app would refuse. Until this ships, no other platform gets power control through the API. The web app keeps its own checks and confirmation dialog too.
    - [x] Shipped 2026-11-26: the DI-1 leak interlock. `/actions/outlet` answers 409 to switching on or cycling Outlet 1 or 2, or whole-PDU control, while DI-1's latest reading is 1. Shedding (off) stays allowed.
-   - [ ] Still to do: the outlet policy (RM1048 owns Control while a BMC is up; unbound outlets need a maintenance window).
+   - [x] Shipped 2026-11-27: the maintenance-window rules. Outside a named window, `/actions/outlet` answers 409 (`"policy": "maintenance-window"`) to any action on unbound Outlet 6 and to whole-PDU control, even with a covering work order.
+   - [ ] Still to do: RM1048 owns Control while a BMC is up. The server needs each BMC's and RM1048's state from readings first (Lab › Post readings sends RM1048 only when it is dark).
 2. **CI.** A GitHub Actions workflow that:
    - builds both images
    - runs `docker compose up`

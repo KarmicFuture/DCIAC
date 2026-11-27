@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-27 (outlet policy on the server)
+
+The server now holds two more of the web app's outlet rules. Outside a named maintenance window, `/api/v1/actions/outlet` refuses any action on Outlet 6, which feeds no device, and refuses whole-PDU control, with a 409 that says why (`"policy": "maintenance-window"`). A covering work order is not enough for either, the same as in the web app. A script or another platform can no longer cycle every outlet on rack PDU A14 with only a work order number.
+
+- With the window open, both are allowed as before. Bound outlets with a covering work order are unaffected.
+- Role checks and the DI-1 leak interlock still come first, and a refused action is never written to the audit log as done.
+- A test checks that the server's outlet bindings match `src/data/outlets.ts`, so the two lists can't drift apart.
+- Still in the web app only: RM1048 owns Control while a device's BMC is up. Next on the roadmap.
+
 ## 2026-11-27 (experimental, part 2)
 
 Experimental now reaches every view.
