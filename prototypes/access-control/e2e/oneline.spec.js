@@ -31,6 +31,9 @@ test("one-line diagram shows dual feeders and opens a hall", async ({ page }) =>
   await expect(page.locator(".ol-svg")).toContainText("Feeder A");
   await expect(page.locator(".ol-svg")).toContainText("Feeder B");
   await expect(page.locator(".ol-svg")).toContainText("MV bus");
+  // A hall opens its details in the fly-out; from there it opens on the floor.
   await page.locator(".ol-hall[data-pod]").first().click();
+  await expect(page.locator("#ol-fly")).toBeVisible();
+  await page.locator('#ol-fly [data-act="oneline-hall"]').click();
   await expect(page.locator(".shell")).toHaveAttribute("data-view", "floor");
 });

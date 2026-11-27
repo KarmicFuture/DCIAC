@@ -259,8 +259,15 @@ function build(g: OnelineGl, svg: SVGSVGElement) {
     if (tone === "hit" || tone === "failed" || tone === "hot") g.pulses.push(mat);
     const edge = new THREE.LineSegments(new THREE.EdgesGeometry(box.geometry), new THREE.LineBasicMaterial({ color: TONE[tone] || TONE.live }));
     box.add(edge);
+    if (/\bpicked\b/.test(el.getAttribute("class") || "")) {
+      const ring = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + 10, 34, d + 10)), new THREE.LineBasicMaterial({ color: "#8b6cff" }));
+      ring.position.copy(box.position);
+      g.world.add(ring);
+    }
     const tag = label(t.main, t.sub);
-    tag.position.set(p.x, 52, p.z);
+    // The outlet and server rows are tight; their labels sit lower and smaller.
+    if (d < 40) tag.scale.multiplyScalar(0.62);
+    tag.position.set(p.x, d < 40 ? 36 : 52, p.z);
     g.world.add(tag);
   });
   svg.querySelectorAll("g.ol-hall").forEach((el) => {
@@ -284,7 +291,7 @@ function build(g: OnelineGl, svg: SVGSVGElement) {
     g.world.add(tag);
   });
   // The battery hit areas are their own controls in the SVG.
-  svg.querySelectorAll('g[data-act="oneline-open"]:not(.ol-node)').forEach((el) => {
+  svg.querySelectorAll('g[data-act="ol-pick"]:not(.ol-node):not(.ol-hall)').forEach((el) => {
     const r = el.querySelector("rect");
     if (!r) return;
     const p = P(attr(r, "x") + attr(r, "width") / 2, attr(r, "y") + attr(r, "height") / 2);

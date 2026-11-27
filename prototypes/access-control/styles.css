@@ -4094,3 +4094,104 @@ nav .ask-nav[aria-expanded="true"] { background: #2a2a2a; border-color: #3a3a3a;
   }
 }
 .head-buttons { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; justify-content: flex-end; }
+
+/* ── One-line as a live control room (views/oneline-live.ts) ─────────────────────────── */
+.ol-svg { min-width: 1100px; }
+.ol-hud-score > div { display: flex; flex-direction: column; gap: 2px; }
+.ol-load { fill: #3ddc97; pointer-events: none; transition: width 0.8s ease; }
+.ol-node.hot .ol-load, .ol-node.failed .ol-load { fill: #d64545; }
+.ol-node.warm .ol-load, .ol-node.hit .ol-load { fill: #e08a2e; }
+.ol-node.dead rect:not(.ol-load), .ol-node.dead .ol-label { opacity: 0.55; }
+.ol-node.picked rect:not(.ol-load), .ol-hall.picked circle { stroke: #6d4cff; stroke-width: 3; }
+.ol-node:focus-visible rect:not(.ol-load), .ol-hall:focus-visible circle { stroke: var(--focus); stroke-width: 3; }
+.oneline-sheet:not(.oneline-gl) .ol-line.live { stroke-dasharray: 10 6; animation: ol-flow 1.2s linear infinite; }
+.oneline-sheet:not(.oneline-gl) .ol-line.hit { stroke-dasharray: 6 6; animation: ol-flow 2.4s linear infinite; }
+@keyframes ol-flow { to { stroke-dashoffset: -16; } }
+
+.ol-hud {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.ol-hud > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  min-width: 0;
+}
+.ol-hud .ol-hud-score { flex-direction: row; align-items: center; gap: 10px; }
+.ol-hud-label { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.ol-stat b, .ol-grade { font-size: 22px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.ol-stat.ok b { color: #1f8a55; }
+.ol-stat.warn b { color: #b5651d; }
+.ol-stat.bad b { color: #b3261e; }
+.ol-ring { width: 64px; height: 64px; flex: none; }
+.ol-ring-bg { fill: none; stroke: color-mix(in srgb, var(--line) 80%, transparent); stroke-width: 7; }
+.ol-ring-fg { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+.ol-ring.ok .ol-ring-fg { stroke: #2fb36d; }
+.ol-ring.warn .ol-ring-fg { stroke: #e08a2e; }
+.ol-ring.bad .ol-ring-fg { stroke: #d64545; }
+.ol-ring text { font-size: 20px; font-weight: 700; text-anchor: middle; fill: var(--ink); }
+.ol-xp ul { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 4px 0 0; padding: 0; }
+.ol-xp-bar { height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--line) 80%, transparent); overflow: hidden; }
+.ol-xp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #6d4cff, #2fb36d); }
+.ol-badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px dashed var(--line); color: var(--muted); }
+.ol-badge.got { border-style: solid; border-color: #c9a227; color: var(--ink); background: color-mix(in srgb, #f5d76e 28%, var(--panel)); }
+.ol-badge span[aria-hidden] { margin-right: 4px; color: #c9a227; }
+
+.ol-fly {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(400px, 100vw);
+  overflow-y: auto;
+  padding: 18px 18px 24px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 48px -18px rgba(20, 16, 10, 0.45);
+  animation: ol-fly-in 0.22s ease-out;
+}
+@keyframes ol-fly-in { from { transform: translateX(40px); opacity: 0; } }
+.olf-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.olf-head h3 { margin: 2px 0 6px; font-size: 20px; }
+.olf-kind { margin: 0; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.olf-close { min-width: 40px; min-height: 40px; font-size: 22px; line-height: 1; }
+.olf-status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+.olf-status.ok { background: color-mix(in srgb, #2fb36d 18%, var(--panel)); color: #1f6e45; }
+.olf-status.warn { background: color-mix(in srgb, #e08a2e 20%, var(--panel)); color: #8a4a12; }
+.olf-status.bad { background: color-mix(in srgb, #d64545 18%, var(--panel)); color: #8a1f1f; }
+.olf-status.idle { background: color-mix(in srgb, var(--line) 60%, var(--panel)); color: var(--muted); }
+.olf-score { display: flex; align-items: center; gap: 12px; margin: 14px 0 6px; }
+.olf-score p { margin: 2px 0 0; }
+.olf-sec { margin-top: 14px; }
+.olf-sec h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+.olf-gauge { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
+.olf-bar { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--line) 80%, transparent); overflow: hidden; }
+.olf-bar i { display: block; height: 100%; border-radius: 4px; background: #2fb36d; transition: width 0.8s ease; }
+.olf-gauge.warn .olf-bar i { background: #e08a2e; }
+.olf-gauge.bad .olf-bar i { background: #d64545; }
+.olf-gauge b { font-variant-numeric: tabular-nums; }
+.olf-path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; }
+.olf-path .linkish { min-height: 24px; }
+.olf-alarms { margin: 0; padding-left: 18px; }
+.olf-alarms li.olf-pri-1 b { color: #b3261e; }
+.olf-alarms li.olf-pri-2 b { color: #b5651d; }
+.olf-risk { margin-top: 12px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, #e08a2e 16%, var(--panel)); }
+.olf-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.ol-hud .ol-xp { grid-column: 1 / -1; }
+.ol-hud .ol-hud-score { min-width: 0; }
+@media (max-width: 767px) {
+  .ol-fly { top: auto; max-height: 75vh; width: 100vw; border-left: 0; border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -18px 48px -18px rgba(20, 16, 10, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oneline-sheet .ol-line { animation: none !important; }
+  .ol-fly { animation: none; }
+}
