@@ -91,11 +91,60 @@ test("Experimental draws the rack with three.js in Operate and on the floor, and
   await expect.poll(() => page.evaluate(() => location.hash)).not.toBe(before);
   expect(await page.evaluate(() => location.hash)).toMatch(/^#\/rack\/A14\/.+/);
 
-  // The rack opened from the floor is the same view, so it is three.js too.
+  // Experimental is one switch: the hall floor is three.js now too, and so is the rack
+  // opened from it, because that is the same rack view.
   await page.goto("/#/floor/hall", { waitUntil: "domcontentloaded" });
-  await page.locator('.rackbox[data-act="floor-rack"][data-rack="A14"] .ftop').click({ force: true });
+  await expect(page.locator("#floor3d-host")).toHaveAttribute("data-floor3d", "ready");
+  await page.goto("/#/floor/pod-a/A14", { waitUntil: "domcontentloaded" });
   await expect(page.locator(".scene.rack-scene #rack3d-host")).toHaveAttribute("data-rackgl", "ready");
   await page.locator(".scene.rack-scene #rack-gl-toggle").click();
   await expect(page.locator(".scene.rack-scene .r3-world")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Experimental draws Outside and the Plan site with three.js, and clicks still open what they open", async ({ page }) => {
+  const errors = [];
+  page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
+  page.on("pageerror", (err) => errors.push(String(err)));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/#/floor", { waitUntil: "domcontentloaded" });
+  await page.locator('[data-user="dsvs.operator"]').click();
+  await expect(page.locator(".hud-mission")).toContainText("Outside");
+
+  // Outside: every hall and piece of yard gear, and the feeders and pipes, from the same world.
+  const standard = await page.locator(".site-scene .world .rackbox").count();
+  const lines = await page.locator(".site-scene .world .feed, .site-scene .world .pipe").count();
+  await page.locator("#floor3d-toggle").click();
+  const host = page.locator("#world-gl-host");
+  await expect(host).toHaveAttribute("data-worldgl", "ready");
+  await expect(host).toHaveAttribute("data-kind", "site");
+  await expect(host).toHaveAttribute("role", "img");
+  expect(Number(await host.getAttribute("data-boxes"))).toBe(standard);
+  expect(Number(await host.getAttribute("data-lines"))).toBe(lines);
+  await expect(host.locator("canvas")).toBeVisible();
+  await expect(page.locator(".gl-source")).toBeHidden();
+  const a = await host.locator("canvas").screenshot();
+  await page.waitForTimeout(600);
+  expect(Buffer.compare(a, await host.locator("canvas").screenshot())).not.toBe(0);
+  // Walk through needs the standard floor, so it steps aside in Experimental.
+  await expect(page.locator('[data-act="floor-walk"]')).toHaveCount(0);
+
+  // Plan: the same switch is on there, and a click on a hall opens its timeline.
+  await page.goto("/#/plan", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("#plan-gl-toggle")).toHaveAttribute("aria-pressed", "true");
+  await page.locator('[data-act="build-stage"]').nth(5).click();
+  await expect(host).toHaveAttribute("data-kind", "plan");
+  await expect(host).toHaveAttribute("data-worldgl", "ready");
+  await expect.poll(async () => Number(await host.getAttribute("data-boxes"))).toBeGreaterThan(4);
+  await page.waitForTimeout(400);
+  const box = await host.locator("canvas").boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/^#\/plan\/hall-/);
+
+  // Off again: the standard scene is back.
+  await page.goto("/#/plan", { waitUntil: "domcontentloaded" });
+  await page.locator("#plan-gl-toggle").click();
+  await expect(page.locator("#world-gl-host")).toHaveCount(0);
+  await expect(page.locator(".build-scene .world")).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -353,7 +353,7 @@ export function onPointerDown(event) {
   if (!state.user || event.button !== 0) return;
   if (state.view === "plan") {
     const scene = event.target.closest && event.target.closest(".build-scene");
-    if (!scene || event.target.closest("button, a")) return;
+    if (!scene || event.target.closest("button, a, .gl-host")) return;
     runtime.orbit = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, chassis: false };
     scene.setPointerCapture(event.pointerId);
     return;
@@ -1057,7 +1057,7 @@ export function legendPop(body) {
 export function hudHtml(legend) {
   const outside = state.floor.level === "site";
   const walking = runtime.walk && state.floor.level === "hall";
-  const walkBtn = outside || walking
+  const walkBtn = outside || walking || runtime.gl
     ? ""
     : '<button type="button" class="act walk-start" data-act="floor-walk">Walk through</button>';
   const listBtn = walking
@@ -1071,7 +1071,7 @@ export function hudHtml(legend) {
     walkBtn + listBtn + addBtn +
     (outside || walking ? "" : '<button type="button" class="act" data-act="thermal-map" aria-pressed="' + (state.thermalMap ? "true" : "false") + '">Thermal</button>') +
     heatPathButton(false) +
-    (outside || walking ? "" : '<button type="button" class="act floor3d-toggle" id="floor3d-toggle" data-act="floor-3d" aria-pressed="' + (runtime.floor3d ? "true" : "false") + '" title="Experimental 3D hall drawn with three.js">Experimental</button>') +
+    (walking ? "" : '<button type="button" class="act floor3d-toggle" id="floor3d-toggle" data-act="floor-3d" aria-pressed="' + (runtime.gl ? "true" : "false") + '" title="Experimental: every 3D view drawn with three.js">Experimental</button>') +
     '<button type="button" class="act" data-act="sim-open" aria-pressed="' + (runtime.sim.barOpen ? "true" : "false") + '">Simulate</button>' +
     (legend || "") + '<div class="zoom-cluster" role="group" aria-label="Pan"><button type="button" data-act="floor-pan" data-dir="left" aria-label="Pan left">←</button><button type="button" data-act="floor-pan" data-dir="right" aria-label="Pan right">→</button><button type="button" data-act="floor-pan" data-dir="up" aria-label="Pan up">↑</button><button type="button" data-act="floor-pan" data-dir="down" aria-label="Pan down">↓</button></div><div class="zoom-cluster" role="group" aria-label="Orbit"><button type="button" data-act="floor-orbit" data-dir="left" aria-label="Orbit left">↺</button><button type="button" data-act="floor-orbit" data-dir="right" aria-label="Orbit right">↻</button><button type="button" data-act="floor-orbit" data-dir="up" aria-label="Orbit up">⤒</button><button type="button" data-act="floor-orbit" data-dir="down" aria-label="Orbit down">⤓</button></div><div class="zoom-cluster" role="group" aria-label="Zoom"><button type="button" data-act="floor-zoom" data-dir="in" aria-label="Zoom in">+</button><button type="button" data-act="floor-zoom" data-dir="out" aria-label="Zoom out">−</button><button type="button" data-act="floor-zoom" data-dir="reset" aria-label="Reset view">Reset</button></div></div></div>' +
     (runtime.sim.barOpen ? simBarHtml() : "");
@@ -2053,7 +2053,7 @@ export function renderHall() {
       esc(pod.letter) + "</span>" + fitHtml(pod, report) + overlay.svg + (overlay.volumes || "") + rowBuses(pod) + racks + boxes + clouds.svg + walkerHtml(pod) + podFeeds(pod, report) + "</div>";
   }).join("");
   const legend = legendPop('<span class="pri-mark pri-0">—</span><span>Nominal</span><span class="pri-mark pri-3">3</span><span>Rise</span><span class="pri-mark pri-2">2</span><span>Hot / RDP</span><span class="pri-mark pri-1">1</span><span>BMC / leak</span>');
-  if (runtime.floor3d) return renderHall3d(open, legend, overlay.scale);
+  if (runtime.gl) return renderHall3d(open, legend, overlay.scale);
   return '<div class="scene thermal' + (runtime.walk ? " walking" : "") + '">' + hudHtml(legend) + '<div class="stage"><div class="world' +
     (report.active ? " sim-active" : "") + '" data-lod="' + floorLod() + '" style="transform:' + cameraTransform() +
     ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab"></div>' + pods + planBoxes("floor") +
@@ -2070,8 +2070,8 @@ function renderHall3d(pod, legend, scale) {
 }
 
 export function toggleFloor3d() {
-  runtime.floor3d = !runtime.floor3d;
-  if (runtime.floor3d) stopWalk(true, false);
+  runtime.gl = !runtime.gl;
+  if (runtime.gl) stopWalk(true, false);
   state.focusField = "floor3d-toggle";
   render();
 }
@@ -2086,10 +2086,23 @@ export function renderSite() {
     server: item.id, klass: (item.klass || "") + (pulsing(item.id) ? " is-pulse" : ""), cap: item.name, color: item.klass === "heat-yard" ? "#2f4a3c" : (item.klass === "core-block" ? "#1c1c1c" : "#3a342e"), leds: [],
   }, report)).join("");
   const legend = legendPop('<span class="feed-key cable"></span><span>Grid feeder</span><span class="pipe-key supply"></span><span>Supply pipe</span><span class="pipe-key return"></span><span>Return pipe</span>');
+  const inner = '<div class="slab yard-slab"></div>' + shell + gear + futureYardHtml() + planBoxes("yard") +
+    siteFeedHtml(undefined, report) + sitePipesHtml(undefined, undefined, report);
+  if (runtime.gl) {
+    return '<div class="scene thermal site-scene gl-scene">' + hudHtml(legend) + worldGlHtml("site", "Experimental 3D view of the site: " + PODS.length +
+      " halls, the power yard, feeders, and cooling pipes. Drag to orbit, scroll to zoom, click a hall or a piece of yard gear to open it.", inner, report.active) + "</div>";
+  }
   return '<div class="scene thermal site-scene">' + hudHtml(legend) + '<div class="stage"><div class="world' +
     (report.active ? " sim-active" : "") + '" style="transform:' + cameraTransform() +
-    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg"><div class="slab yard-slab"></div>' + shell + gear + futureYardHtml() + planBoxes("yard") +
-    siteFeedHtml(undefined, report) + sitePipesHtml(undefined, undefined, report) + "</div></div></div>";
+    ";--pitch:" + state.floor.pitch + "deg;--yaw:" + state.floor.yaw + 'deg">' + inner + "</div></div></div>";
+}
+
+/* Experimental: views/worldgl.ts draws this world with three.js. The CSS world stays in
+   the page, hidden, as the source of geometry and as the controls a click lands on. */
+export function worldGlHtml(kind: string, label: string, inner: string, simActive?: boolean) {
+  return '<div class="stage floor3d-stage"><div id="world-gl-host" class="floor3d-host gl-host" role="img" aria-label="' + esc(label) +
+    '" data-kind="' + esc(kind) + '" data-worldgl="loading"><div class="world gl-source' + (simActive ? " sim-active" : "") + '" aria-hidden="true">' + inner +
+    '</div><span class="floor3d-badge">Experimental · three.js</span></div></div>';
 }
 
 function unitKind(item) {
