@@ -814,6 +814,27 @@ def leak_interlock(conn, op, device_id, outlet):
             ". " + LEAK_OUTLETS[n] + " stays off until the leak clears. Shedding it (off) is still allowed.")
 
 
+# Rack PDU A14 bindings (src/data/outlets.ts). Outlet 6 feeds no device.
+OUTLET_DEVICES = {1: "tray-01", 2: "tray-02", 3: "tray-03", 4: "sn2201", 5: "pshelf", 6: None,
+                  7: "tray-04", 8: "tray-05", 9: "tray-06", 10: "tray-07", 11: "tray-08"}
+
+
+def outlet_policy(op, outlet, maintenance):
+    """The web app's maintenance-window rules (outlet-policy.ts): whole-PDU control and unbound
+    outlets stay locked until a named maintenance window is open. A work order alone is not enough."""
+    if maintenance:
+        return ""
+    if op == "all":
+        return "Whole-PDU control stays disabled until a named maintenance window is open. Plant-wide trip is not the policy."
+    try:
+        outlet = int(outlet or 0)
+    except (TypeError, ValueError):
+        outlet = 0
+    if outlet in OUTLET_DEVICES and OUTLET_DEVICES[outlet] is None:
+        return "Outlet " + str(outlet) + " is unbound. Control stays disabled until a maintenance window is open."
+    return ""
+
+
 def allow_action(conn, user, kind, reason, work_id, device_id, maintenance):
     if not reason or len(reason.strip()) < 3:
         return "A reason is required."
@@ -1414,6 +1435,9 @@ def handle(method, path, headers, body, user, role):
         interlock = leak_interlock(conn, (body or {}).get("op") or "cycle", (body or {}).get("deviceId") or "", (body or {}).get("outlet"))
         if interlock:
             return 409, {"error": interlock, "interlock": "DI-1"}
+        policy = outlet_policy((body or {}).get("op") or "cycle", (body or {}).get("outlet"), bool((body or {}).get("maintenance")))
+        if policy:
+            return 409, {"error": policy, "policy": "maintenance-window"}
         reason = allow_action(conn, user, "outlet", (body or {}).get("reason") or "", (body or {}).get("workOrderId") or "", (body or {}).get("deviceId") or "", bool((body or {}).get("maintenance")))
         if reason:
             return 403, {"error": reason}

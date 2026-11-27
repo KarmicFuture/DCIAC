@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import tempfile
 import unittest
 
@@ -158,6 +159,33 @@ class DcimTest(unittest.TestCase):
         self.assertNotIn(("outlet cycle", "tray-02"), [(row["action"], row["assetId"]) for row in rows], "a refused action is never logged as done")
         leak(0)
         self.assertEqual(outlet(cycle)[0], 200, "a quiet DI-1 reading releases the interlock")
+
+    def test_outlet_policy_keeps_unbound_outlets_and_whole_pdu_behind_a_window(self):
+        def outlet(body):
+            return api.dispatch("POST", "/api/v1/actions/outlet", OPERATOR, json.dumps(body).encode())
+
+        status, body = api.dispatch("POST", "/api/v1/work-orders", ADMIN, json.dumps({"id": "WO-61", "kind": "Power cycle", "state": "In progress", "reason": "WO-61"}).encode())
+        self.assertEqual(status, 201, body)
+        gated = {"op": "cycle", "reason": "WO-61", "workOrderId": "WO-61"}
+        for request, words in ((dict(gated, outlet=6), "Outlet 6 is unbound"), (dict(gated, outlet=6, op="off"), "Outlet 6 is unbound"),
+                               (dict(gated, op="all"), "Whole-PDU control")):
+            status, reply = outlet(request)
+            self.assertEqual((status, reply.get("policy")), (409, "maintenance-window"), request)
+            self.assertIn(words, reply["error"])
+        self.assertEqual(outlet(dict(gated, outlet=9, deviceId="tray-06"))[0], 200, "a bound outlet with a covering work order is allowed")
+        windowed = {"reason": "maintenance window", "maintenance": True}
+        self.assertEqual(outlet(dict(windowed, op="cycle", outlet=6))[0], 200, "an open window releases the unbound outlet")
+        self.assertEqual(outlet(dict(windowed, op="all"))[0], 200, "an open window releases whole-PDU control")
+        status, reply = api.dispatch("POST", "/api/v1/actions/outlet", {"x-dciac-user": "ro", "x-dciac-role": "ReadOnly"}, json.dumps(dict(gated, outlet=6)).encode())
+        self.assertEqual(status, 403, "role check still comes first")
+        rows = api.dispatch("GET", "/api/v1/audit", ADMIN, b"")[1]["audit"]
+        self.assertEqual(len([row for row in rows if row["action"] == "outlet all"]), 1, "a refused action is never logged as done")
+
+    def test_server_outlet_bindings_match_the_web_app(self):
+        from server.dcim import OUTLET_DEVICES
+        source = open(os.path.join(os.path.dirname(__file__), "..", "src", "data", "outlets.ts")).read()
+        found = {int(n): (None if dev == "null" else dev.strip('"')) for n, dev in re.findall(r"n: (\d+), deviceId: (null|\"[^\"]+\")", source)}
+        self.assertEqual(found, OUTLET_DEVICES)
 
     def test_feeder_failure_raises_an_alarm(self):
         status, body = api.dispatch("POST", "/api/v1/power/fail", {}, b'{"nodeId":"grid-1","mode":"nameplate"}')
