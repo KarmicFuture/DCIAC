@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-26 (experimental)
+
+The hall floor has an **Experimental** button. It swaps the CSS floor for a live 3D hall drawn with three.js: dark racks with glowing fronts that use the usual alarm colors, aisles tinted hot and cold, the CDUs, and moving air. Warm particles rise off the hot aisle, and cool particles sink at the rack inlets and around the CDUs. The air comes from the same heat-cloud readings as Heat path, so a Simulate scenario changes it within two seconds. Racks with an alarm pulse, and priority 1 pulses fastest. Drag to orbit, scroll to zoom, hover a rack to see its name and state, and click a rack to open it. The view turns slowly until you touch it. It holds still when reduced motion is set. Pressing the button again brings the normal floor back.
+
+- three.js loads only when someone turns Experimental on, in its own file, so the normal floor loads no slower.
+- If the browser can't draw WebGL, the view says so instead of failing.
+
+The rack view has the same **Experimental** button. It draws the rack with three.js from the same model as the 3D rack: each device at its U with a status LED, the selected device lit blue, and the rack PDU on the rear rail with every socket colored by state. Cycling sockets blink, and leak-locked sockets pulse red. Air flows through each powered device, cold at the front door and warm out the rear, faster on busier devices. Devices on an outlet that is off go dark and move no air. Front, Angle, Side and Rear still aim the camera. Clicking a device or a lit socket does what it does in the standard rack. Outlet changes still go to Control and its confirmations. Operate › Rack and the rack opened from the floor are one view, so the button works in both.
+
+- The read-only PDU table stays under the 3D rack, as the keyboard route to the same outlets.
+- Demos and tours turn the Experimental views off first, so their spotlights land on the standard floor and rack.
+
 ## 2026-11-25
 
 Heat path is now a heat map. Turning it on opens the hall floor with soft, drifting clouds of heat over the hot aisle and blue cold spots where supply air reaches the racks and around the CDU. The clouds come from the same readings as the racks and CDUs, so a Simulate scenario moves them as it plays. In a CDU failure, rack heat grows and spreads over the racks toward the cold aisle, the cold spots shrink, and the CDU's blue patch turns warm. Reset settles everything back. While the heat map is on, it replaces the thermal overlay. The step-by-step heat tour is gone. Clouds hold still when reduced motion is set.

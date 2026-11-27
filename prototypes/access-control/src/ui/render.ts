@@ -1,5 +1,5 @@
 import { html, render as litRender } from "lit-html";
-import { rackKey, rackSwallowsClick, setRackPreset } from "../views/rack3d";
+import { rackKey, rackSwallowsClick, setRackPreset, toggleRackGl } from "../views/rack3d";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import { assertWorld, deviceById } from "../data/devices";
 import {
@@ -33,7 +33,7 @@ import { bindRender, render } from "./schedule";
 import { go, viewHtml } from "./shell";
 import { rail, tabbar, topbar } from "./rail";
 import { toastHtml } from "./toast";
-import { applyCamera, closeFloorDetail, floorDetailOpen, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, orbitFloor, panFloor, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
+import { applyCamera, closeFloorDetail, toggleFloor3d, floorDetailOpen, floorSerial, focusFloorAlarm, goFloor, nudgePlan, onDragEnd, onDragOver, onDragStart, onDrop, onPointerDown, onPointerMove, onPointerUp, onWheel, openFeed, openFloorServer, openPart, openPlan, openPod, openRack, openRow, paintHeat, pickDrill, orbitFloor, panFloor, removePlan, startWalk, stepWalk, stopWalk, toggleWalk, zoomFloor } from "../views/floor";
 import { openOnelineHall, openOnelineNode, openOnelineSite } from "../views/oneline";
 import { drillOpenHall, setFleetDrill, toggleFleetRacks } from "../views/fleet";
 import { advanceBriefing, briefingHtml, skipBriefing, startBriefing } from "../domain/briefing";
@@ -283,6 +283,27 @@ function restoreFloorDrawerFocus() {
   else drawer.focus({ preventScroll: true });
 }
 
+let floor3dUsed = false;
+let rackGlUsed = false;
+
+// three.js loads only once someone turns on Experimental, in its own chunk.
+function syncFloor3dLazy() {
+  if (floor3dUsed || document.getElementById("floor3d-host")) {
+    floor3dUsed = true;
+    import("../views/floor3d").then((mod) => mod.syncFloor3d()).catch(() => {
+      const host = document.getElementById("floor3d-host");
+      if (host) host.setAttribute("data-floor3d", "unsupported");
+    });
+  }
+  if (rackGlUsed || document.getElementById("rack3d-host")) {
+    rackGlUsed = true;
+    import("../views/rackgl").then((mod) => mod.syncRackGl()).catch(() => {
+      const host = document.getElementById("rack3d-host");
+      if (host) host.setAttribute("data-rackgl", "unsupported");
+    });
+  }
+}
+
 function paint() {
   const root = document.getElementById("app");
   if (!root) return;
@@ -314,6 +335,7 @@ function paint() {
   restoreFloorDrawerFocus();
   applyCamera();
   paintHeat();
+  syncFloor3dLazy();
   placeDemoHighlights();
   syncHash();
   saveWorld();
@@ -333,7 +355,7 @@ export function syncFields() {
 export function onClick(event) {
   if (rackSwallowsClick()) return;
   let el = event.target.closest("[data-act]");
-  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour, .ask-panel")) {
+  if (state.user && state.view === "floor" && !event.target.closest(".hud, .sim-bar, .sim-dock, .sim-timeline, .sim-stripe, .legend, .inspector, .lib, .page-head, .alarm-banner, .watch-panel, .rail, .topbar, .tabbar, .menu-back, .walk-bar, .elev-scene, .gl-host, .lab, .scene-popbar, .panel-bar, .briefing, .demo-tour, .ask-panel")) {
     const picked = pickDrill(event.clientX, event.clientY);
     if (picked) el = picked;
   }
@@ -456,6 +478,8 @@ export function onClick(event) {
   else if (act === "briefing-next") advanceBriefing();
   else if (act === "briefing-skip") skipBriefing();
   else if (act === "heat-path") toggleHeat();
+  else if (act === "floor-3d") toggleFloor3d();
+  else if (act === "rack-gl") toggleRackGl();
   else if (act === "lab-open" || act === "simulate") {
     state.labOpen = false;
     state.menuOpen = false;
