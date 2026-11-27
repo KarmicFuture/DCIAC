@@ -399,6 +399,16 @@ class StackTest(unittest.TestCase):
         self.assertEqual(statuses[:60], [200] * 60)
         self.assertEqual(statuses[60], 403)
 
+    def test_leak_interlock_is_enforced_by_control(self):
+        reading = lambda v: {"source": "lab", "samples": [{"deviceId": "di-1", "name": "leak", "value": v, "unit": "state"}]}
+        action = {"op": "cycle", "outlet": 2, "deviceId": "tray-02", "reason": "leak test", "maintenance": True}
+        self.assertEqual(self.call("POST", "/api/v1/collect", reading(1), OPERATOR)[0], 201)
+        status, body, _ = self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)
+        self.assertEqual((status, body.get("interlock")), (409, "DI-1"), body)
+        self.assertEqual(self.call("POST", "/api/v1/actions/outlet", dict(action, op="off"), OPERATOR)[0], 200)
+        self.assertEqual(self.call("POST", "/api/v1/collect", reading(0), OPERATOR)[0], 201)
+        self.assertEqual(self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)[0], 200)
+
     def test_web_app_is_served_at_both_roots(self):
         for path in ("/", "/DCIAC/", "/DCIAC/index.html"):
             with urllib.request.urlopen("http://127.0.0.1:%d%s" % (self.gateway_port, path), timeout=10) as reply:

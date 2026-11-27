@@ -21,6 +21,15 @@ The rack view has the same **Experimental** button. It draws the rack with three
 - The read-only PDU table stays under the 3D rack, as the keyboard route to the same outlets.
 - Demos and tours turn the Experimental views off first, so their spotlights land on the standard floor and rack.
 
+## 2026-11-26
+
+The DI-1 leak interlock now holds on the server, not only in the web app. While DI-1 reports a leak, `/api/v1/actions/outlet` refuses to switch on or power-cycle Outlet 1 (GPU tray 01) or Outlet 2 (GPU tray 02), and refuses whole-PDU control, with a 409 that names the interlock. Shedding those outlets (off) is still allowed, and other outlets are unaffected. A script or another platform calling the API can no longer restart a tray that sits on a leaking cold-plate rope.
+
+- The server reads DI-1 from its latest reading (`/api/v1/collect` or `/api/v1/metrics`, device `di-1`, metric `leak`). A reading of 0 releases the interlock.
+- Lab › Post readings now always sends DI-1, so a quiet DI-1 clears the server's interlock.
+- Role checks still come first, and a refused action is never written to the audit log as done.
+- Still in the web app only: the rest of the outlet policy (RM1048 ownership while a BMC is up, unbound outlets). Next on the roadmap.
+
 ## 2026-11-25
 
 Heat path is now a heat map. Turning it on opens the hall floor with soft, drifting clouds of heat over the hot aisle and blue cold spots where supply air reaches the racks and around the CDU. The clouds come from the same readings as the racks and CDUs, so a Simulate scenario moves them as it plays. In a CDU failure, rack heat grows and spreads over the racks toward the cold aisle, the cold spots shrink, and the CDU's blue patch turns warm. Reset settles everything back. While the heat map is on, it replaces the thermal overlay. The step-by-step heat tour is gone. Clouds hold still when reduced motion is set.
