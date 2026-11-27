@@ -338,7 +338,7 @@ export function renderOneline() {
       '<div class="oneline-head"><div><h2>One-line · build timeline</h2>' + buildSummary(buildStage) + "</div>" +
       '<div class="oneline-actions">' + toggle + "</div></div>" +
       stageBarHtml(buildStage) +
-      '<div class="oneline-sheet">' + diagramSvg(report) + "</div></div>";
+      sheet(diagramSvg(report), false, "on " + formatDay(state.buildDate)) + "</div>";
     buildStage = null;
     return html;
   }
@@ -347,6 +347,17 @@ export function renderOneline() {
     '<div class="oneline-actions">' + toggle +
     '<button type="button" class="act" data-act="oneline-site">Outside floor</button>' +
     '<button type="button" class="act" data-act="sim-open">Simulate</button>' +
-    "</div></div>" +
-    '<div class="oneline-sheet' + (report.active ? " sim-active" : "") + '">' + diagramSvg(report) + "</div></div>";
+    "</div></div>" + sheet(diagramSvg(report), report.active, "") + "</div>";
+}
+
+/* Experimental: views/onelinegl.ts draws the diagram with three.js. The SVG stays in the
+   host, hidden, as the geometry source and the controls a 3D click lands on. */
+function sheet(svg: string, simActive: boolean, when: string) {
+  const klass = "oneline-sheet" + (simActive ? " sim-active" : "");
+  if (!runtime.gl) return '<div class="' + klass + '">' + svg + "</div>";
+  const label = "Experimental 3D one-line diagram" + (when ? " " + when : "") + ": utility feeders, breakers, transformers, power modules, batteries, the MV bus and every hall. " +
+    "Moving light shows energized conductors. Drag to orbit, scroll to zoom, click a node or hall to open it.";
+  return '<div class="' + klass + ' oneline-gl"><div id="oneline-gl-host" class="floor3d-host gl-host" role="img" aria-label="' + esc(label) +
+    '" data-onelinegl="loading"><div class="gl-source" aria-hidden="true">' + svg + '</div><span class="floor3d-badge">Experimental · three.js</span></div></div>' +
+    '<p class="fine ol-gl-legend"><span class="ol-key live"></span>Energized <span class="ol-key hit"></span>At risk <span class="ol-key failed"></span>Open / failed <span class="ol-key future"></span>Not yet built</p>';
 }

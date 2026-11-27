@@ -7,6 +7,7 @@ import { resetSimulation, simBarHtml } from "../domain/events";
 import { state } from "../state";
 import { esc } from "../ui/format";
 import { render } from "../ui/schedule";
+import { glButton } from "../ui/shell";
 import { powerHtml } from "./power";
 
 export function toggleMaint() {
@@ -153,8 +154,8 @@ export function renderSimulate() {
   const noc = state.theme === "noc";
   return '<div class="page-head"><div class="top"><div><h1>Simulate</h1>' +
     '<p class="sub">Capacity and redundancy faults against the live campus model.</p></div>' +
-    '<button type="button" class="act theme-toggle" data-act="theme" aria-pressed="' + (noc ? "true" : "false") +
-    '">NOC theme</button></div></div>' + simBody();
+    '<div class="head-buttons">' + glButton("head-gl-toggle") + '<button type="button" class="act theme-toggle" data-act="theme" aria-pressed="' + (noc ? "true" : "false") +
+    '">NOC theme</button></div></div></div>' + simBody();
 }
 
 export function lab() {

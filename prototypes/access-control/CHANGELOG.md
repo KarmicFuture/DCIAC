@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-11-27 (experimental, part 2)
+
+Experimental now reaches every view.
+
+- **Where the switch is:** every page heading (Operate, Plan, Audit, Manage, Simulate) has an **Experimental** button next to NOC theme. The floor and the rack opened from it keep their own buttons. It is one switch everywhere.
+- **Dashboard views:** Control, Sessions, Port map, Fleet, Audit, Manage, Models, DCIM, and Simulate read as a dashboard.
+  - A row of live tiles sits under the heading: open alarms (with the P1 count), IT load, outlets on, live sessions, and DI-1 leak state. Each tile opens its view, and a tile with a P1 alarm or a leak glows red.
+  - The panels sit in a card grid. Tables and port grids span the full width.
+- **Cards on every view:**
+  - Cards are rounded, cast a layered shadow, and have a lit top edge.
+  - Every card lifts toward you on hover or keyboard focus.
+  - Small cards also lean a few degrees toward the pointer.
+  - Cards that hold a 3D scene only lift their shadow, so dragging the scene stays steady.
+  - Nothing tilts when reduced motion is set or on touch screens.
+- **One-line in three.js:**
+  - The diagram becomes a 3D board: a utility tower, the feeders, breakers, transformer coils, power modules, battery strings, the MV bus, and all ten halls, each labeled.
+  - Moving light runs along every energized conductor. At-risk conductors and nodes pulse orange, and open or failed ones turn red and go dark, so a Simulate scenario shows on the board.
+  - Click a node or a hall to open it on the floor, as on the standard diagram. The build timeline works too.
+
 ## 2026-11-27 (experimental)
 
 Experimental is now one switch for every 3D view. Turn it on from the floor, the rack, or Plan, and Floor › Outside, the hall floor, the rack (in Operate and from the floor), and the Plan site scene all draw with three.js until you turn it off again.

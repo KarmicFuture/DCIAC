@@ -103,8 +103,7 @@ function barHtml(current) {
 }
 
 function hallPicks() {
-  return '<div class="hall-picks" role="group" aria-label="Open a hall timeline"><button type="button" class="act floor3d-toggle" id="plan-gl-toggle" data-act="plan-gl" aria-pressed="' +
-    (runtime.gl ? "true" : "false") + '" title="Experimental: every 3D view drawn with three.js">Experimental</button><span class="fine">Hall timeline</span>' +
+  return '<div class="hall-picks" role="group" aria-label="Open a hall timeline"><span class="fine">Hall timeline</span>' +
     PODS.map((pod) => '<button type="button" class="act" data-act="build-open" data-pod="' + esc(pod.id) + '">' + esc(pod.name) + "</button>").join("") +
     "</div>";
 }

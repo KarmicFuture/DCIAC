@@ -1,5 +1,6 @@
 import { html, render as litRender } from "lit-html";
 import { rackKey, rackSwallowsClick, setRackPreset, toggleRackGl } from "../views/rack3d";
+import { tiltCard } from "./dashboard";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import { assertWorld, deviceById } from "../data/devices";
 import {
@@ -286,6 +287,7 @@ function restoreFloorDrawerFocus() {
 let floor3dUsed = false;
 let rackGlUsed = false;
 let worldGlUsed = false;
+let onelineGlUsed = false;
 
 // three.js loads only once someone turns on Experimental, in its own chunk.
 function syncFloor3dLazy() {
@@ -294,6 +296,13 @@ function syncFloor3dLazy() {
     import("../views/floor3d").then((mod) => mod.syncFloor3d()).catch(() => {
       const host = document.getElementById("floor3d-host");
       if (host) host.setAttribute("data-floor3d", "unsupported");
+    });
+  }
+  if (onelineGlUsed || document.getElementById("oneline-gl-host")) {
+    onelineGlUsed = true;
+    import("../views/onelinegl").then((mod) => mod.syncOnelineGl()).catch(() => {
+      const host = document.getElementById("oneline-gl-host");
+      if (host) host.setAttribute("data-onelinegl", "unsupported");
     });
   }
   if (worldGlUsed || document.getElementById("world-gl-host")) {
@@ -329,7 +338,7 @@ function paint() {
   runtime.lastRenderedView = viewKey;
   syncAskUser();
   recordFloorDrawerFocus();
-  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"} data-ask=${askOpen() ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${askOpen() ? html`<aside id="ask-panel" class="ask-panel" aria-labelledby="ask-title">${unsafeHTML(askHeadHtml())}${unsafeHTML(askLogHtml())}${unsafeHTML(askFormHtml())}</aside>` : ""}${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
+  litRender(html`${unsafeHTML('<a class="skip" href="#content">Skip to content</a>')}<div class="shell" data-screen="app" data-view=${state.view} data-experimental=${runtime.gl ? "on" : "off"} data-demo=${state.demoId || ""} data-menu=${state.menuOpen ? "open" : "closed"} data-ask=${askOpen() ? "open" : "closed"}>${unsafeHTML(rail())}<main id="content" tabindex="-1">${unsafeHTML(topbar())}<div data-slot="alarm" aria-live="polite" aria-atomic="false">${unsafeHTML(alarmBanner())}</div><div data-slot="toast" aria-live="polite" aria-atomic="true">${unsafeHTML(toastHtml())}</div><div class="view">${unsafeHTML(viewHtml())}</div>${unsafeHTML(tabbar())}</main>${askOpen() ? html`<aside id="ask-panel" class="ask-panel" aria-labelledby="ask-title">${unsafeHTML(askHeadHtml())}${unsafeHTML(askLogHtml())}${unsafeHTML(askFormHtml())}</aside>` : ""}${unsafeHTML(state.labOpen ? lab() : "")}${unsafeHTML(demoCoachHtml())}${unsafeHTML(briefingHtml())}<div data-slot="confirm">${unsafeHTML(outletConfirmHtml())}</div></div>`, root);
   updateAlarmClocks();
   askAfterPaint();
   if (viewChanged) window.scrollTo(0, 0);
@@ -488,7 +497,7 @@ export function onClick(event) {
   else if (act === "heat-path") toggleHeat();
   else if (act === "floor-3d") toggleFloor3d();
   else if (act === "rack-gl") toggleRackGl();
-  else if (act === "plan-gl") { runtime.gl = !runtime.gl; state.focusField = "plan-gl-toggle"; render(); }
+  else if (act === "plan-gl") { runtime.gl = !runtime.gl; state.focusField = el.id || "plan-gl-toggle"; render(); }
   else if (act === "lab-open" || act === "simulate") {
     state.labOpen = false;
     state.menuOpen = false;
@@ -894,6 +903,7 @@ export async function boot() {
   document.body.addEventListener("keydown", onKeyDown);
   document.body.addEventListener("pointerdown", onPointerDown);
   document.body.addEventListener("pointermove", onPointerMove);
+  document.body.addEventListener("pointermove", tiltCard, { passive: true });
   document.body.addEventListener("pointerup", onPointerUp);
   document.body.addEventListener("pointercancel", onPointerUp);
   document.body.addEventListener("wheel", onWheel, { passive: false });

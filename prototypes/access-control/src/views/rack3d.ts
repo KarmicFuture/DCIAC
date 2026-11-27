@@ -251,12 +251,13 @@ export const R3_LEGEND = '<div class="r3-legend"><span><span class="r3-dot on"><
   '<span><span class="r3-dot cycling"></span>Cycling</span><span><span class="r3-dot locked"></span>Locked</span>' +
   '<span><span class="r3-dot idle"></span>No live reading</span></div>';
 
-function rackTools() {
+function rackTools(ctx = "floor") {
   const view = viewAngles();
   const views = '<span class="r3-hint fine">Drag to rotate</span>' + RACK_VIEWS.map((row) => '<button type="button" class="act" data-act="rack-view" data-rack-view="' + row[0] + '"' +
     (row[0] === view.id ? ' aria-pressed="true"' : "") + ">" + row[1] + "</button>").join("") +
-    '<button type="button" class="act floor3d-toggle" id="rack-gl-toggle" data-act="rack-gl" aria-pressed="' + (runtime.gl ? "true" : "false") +
-    '" title="Experimental: every 3D view drawn with three.js">Experimental</button>';
+    // Operate › Rack has the switch in its page heading; the rack opened from the floor needs its own.
+    (ctx === "operate" ? "" : '<button type="button" class="act floor3d-toggle" id="rack-gl-toggle" data-act="rack-gl" aria-pressed="' + (runtime.gl ? "true" : "false") +
+    '" title="Experimental: every 3D view drawn with three.js">Experimental</button>');
   return '<div class="r3-tools" role="group" aria-label="Rack view">' + views + "</div>";
 }
 
@@ -271,14 +272,14 @@ function rackGlHtml(rackId: string, ctx: string, name: string, units: Rack3dUnit
   const sockets = pdus.reduce((n, pdu) => n + pdu.sockets.length, 0);
   const label = "Experimental 3D view of " + name + ". " + units.length + " devices" + (sockets ? ", " + sockets + " PDU sockets" : "") +
     ". Drag to orbit, scroll to zoom, click a device to open it. The table below lists the same outlets by keyboard.";
-  return rackTools() + '<div class="r3-stage rack-gl-stage"><div id="rack3d-host" class="floor3d-host gl-host" role="img" aria-label="' + esc(label) +
+  return rackTools(ctx) + '<div class="r3-stage rack-gl-stage"><div id="rack3d-host" class="floor3d-host gl-host" role="img" aria-label="' + esc(label) +
     '" data-rack="' + esc(rackId) + '" data-ctx="' + esc(ctx) + '" data-rackgl="loading"><span class="floor3d-badge">Experimental · three.js</span></div></div>';
 }
 
 /* Any rack in 3D: the view buttons and the stage. */
-export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[]) {
+export function rackSceneHtml(name: string, units: Rack3dUnit[], pdus: Rack3dPdu[], ctx = "floor") {
   const view = viewAngles();
-  return rackTools() +
+  return rackTools(ctx) +
     '<div class="r3-stage" tabindex="0" id="r3-stage" data-focus-key="r3-stage" role="img" aria-label="' + esc(name) +
     ' in 3D. Drag to rotate, or use the arrow keys."><div class="r3-world" data-view="' + view.id + '" style="transform:' + worldTransform(view.yaw, view.pitch) + '">' +
     cabinet(name) + uScale() + units.map(unitBox).join("") + pdus.map(pduBox).join("") + "</div></div>";
@@ -429,7 +430,7 @@ export function rackViewHtml(rackId, ctx = "floor") {
     : "No rack PDU is recorded on this rack.";
   const scene = runtime.gl
     ? rackGlHtml(rackId, ctx, "Rack " + rackId, model.units, model.pdus)
-    : rackSceneHtml("Rack " + rackId, model.units, model.pdus);
+    : rackSceneHtml("Rack " + rackId, model.units, model.pdus, ctx);
   return '<div class="rack3d" data-rack3d="' + esc(rackId) + '">' + scene + R3_LEGEND +
     '<p class="fine r3-note">' + esc(note) + "</p>" + (live ? pduTable(ctx) : "") + "</div>";
 }

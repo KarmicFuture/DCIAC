@@ -2,7 +2,7 @@ import { deviceById, devices } from "../data/devices";
 import { outletByN } from "../data/outlets";
 import { state } from "../state";
 import { esc } from "../ui/format";
-import { pills, themeButton } from "../ui/shell";
+import { headButtons, pills } from "../ui/shell";
 import { boxHtml } from "./floor";
 
 export function futureOn() {
@@ -184,7 +184,7 @@ export function renderManage() {
   const picker = managedDevices().map((item) => '<button type="button" data-act="manage-device" data-device="' + item.id + '"' +
     (item.id === d.id ? ' aria-pressed="true"' : "") + ">" + esc(item.name) + "</button>").join("");
   const layer = stackNodes().find((node) => node.id === state.manage.layer) || stackNodes()[0];
-  return '<div class="page-head"><div class="top"><div><h1>Data center management</h1><p class="sub">Grid to chip, including the BMC. Now is the live system. Future is the planned state of the whole site.</p></div>' + themeButton() + "</div>" +
+  return '<div class="page-head"><div class="top"><div><h1>Data center management</h1><p class="sub">Grid to chip, including the BMC. Now is the live system. Future is the planned state of the whole site.</p></div>' + headButtons() + "</div>" +
     pills() + "</div>" + horizonHtml() + chainHtml() + '<div class="manage-grid"><section class="panel"><div class="panel-head"><h2>' +
     esc(layer.name) + "</h2><p class=\"fine\">" + esc(layer.detail) + "</p></div>" +
     (state.manage.layer === "bmc" || state.manage.layer === "chip" || state.manage.layer === "tray" ? '<div class="device-pick">' + picker + "</div>" : "") +
