@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-26 (experimental)
+
+The hall floor has an **Experimental** button. It swaps the CSS floor for a live 3D hall drawn with three.js: dark racks with glowing fronts that use the usual alarm colors, aisles tinted hot and cold, the CDUs, and moving air. Warm particles rise off the hot aisle, and cool particles sink at the rack inlets and around the CDUs. The air comes from the same heat-cloud readings as Heat path, so a Simulate scenario changes it within two seconds. Racks with an alarm pulse, and priority 1 pulses fastest. Drag to orbit, scroll to zoom, hover a rack to see its name and state, and click a rack to open it. The view turns slowly until you touch it. It holds still when reduced motion is set. Pressing the button again brings the normal floor back.
+
+- three.js loads only when someone turns Experimental on, in its own file, so the normal floor loads no slower.
+- If the browser can't draw WebGL, the view says so instead of failing.
+
+The rack view has the same **Experimental** button. It draws the rack with three.js from the same model as the 3D rack: each device at its U with a status LED, the selected device lit blue, and the rack PDU on the rear rail with every socket colored by state. Cycling sockets blink, and leak-locked sockets pulse red. Air flows through each powered device, cold at the front door and warm out the rear, faster on busier devices. Devices on an outlet that is off go dark and move no air. Front, Angle, Side and Rear still aim the camera. Clicking a device or a lit socket does what it does in the standard rack. Outlet changes still go to Control and its confirmations. Operate › Rack and the rack opened from the floor are one view, so the button works in both.
+
+- The read-only PDU table stays under the 3D rack, as the keyboard route to the same outlets.
+- Demos and tours turn the Experimental views off first, so their spotlights land on the standard floor and rack.
+
 ## 2026-11-26
 
 The DI-1 leak interlock now holds on the server, not only in the web app. While DI-1 reports a leak, `/api/v1/actions/outlet` refuses to switch on or power-cycle Outlet 1 (GPU tray 01) or Outlet 2 (GPU tray 02), and refuses whole-PDU control, with a 409 that names the interlock. Shedding those outlets (off) is still allowed, and other outlets are unaffected. A script or another platform calling the API can no longer restart a tray that sits on a leaking cold-plate rope.

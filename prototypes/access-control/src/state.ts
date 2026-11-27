@@ -8,6 +8,8 @@ export const runtime = {
   orbit: null as any,
   carry: null as any,
   walk: null as any,
+  floor3d: false,
+  rackGl: false,
   elevDrag: null as any,
   powerPanels: {} as any,
   networkRack: null as any,

@@ -808,6 +808,7 @@ function startTour(id: string) {
   if (!state.user || state.user.role !== "Operator") return;
   const tour = TOURS[id];
   if (!tour) return;
+  leaveExperimental();
   if (currentTour()) currentTour()!.tidy();
   state.offerBriefing = false;
   state.briefingStep = -1;
@@ -823,7 +824,15 @@ function startTour(id: string) {
   scheduleTourAdvance();
 }
 
+/* Demos and tours spotlight the standard floor and rack, so they leave the
+   experimental three.js views first. */
+function leaveExperimental() {
+  runtime.floor3d = false;
+  runtime.rackGl = false;
+}
+
 export function startDemo(id) {
+  leaveExperimental();
   if (TOURS[id]) {
     startTour(id);
     return;
