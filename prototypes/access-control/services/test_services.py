@@ -417,6 +417,17 @@ class StackTest(unittest.TestCase):
         self.assertEqual((status, body.get("policy")), (409, "maintenance-window"), body)
         self.assertEqual(self.call("POST", "/api/v1/actions/outlet", dict(action, maintenance=True), OPERATOR)[0], 200)
 
+    def test_rm1048_ownership_is_enforced_by_control(self):
+        order = {"id": "WO-78", "kind": "Power cycle", "state": "In progress", "deviceId": "tray-08", "reason": "WO-78"}
+        self.assertEqual(self.call("POST", "/api/v1/work-orders", order, ADMIN)[0], 201)
+        bmc = lambda v: {"source": "lab", "samples": [{"deviceId": "tray-08", "name": "bmc", "value": v, "unit": "up"}]}
+        action = {"op": "cycle", "outlet": 11, "deviceId": "tray-08", "reason": "WO-78", "workOrderId": "WO-78"}
+        self.assertEqual(self.call("POST", "/api/v1/collect", bmc(1), OPERATOR)[0], 201)
+        status, body, _ = self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)
+        self.assertEqual((status, body.get("policy")), (409, "rm1048-owns"), body)
+        self.assertEqual(self.call("POST", "/api/v1/collect", bmc(0), OPERATOR)[0], 201)
+        self.assertEqual(self.call("POST", "/api/v1/actions/outlet", action, OPERATOR)[0], 200)
+
     def test_web_app_is_served_at_both_roots(self):
         for path in ("/", "/DCIAC/", "/DCIAC/index.html"):
             with urllib.request.urlopen("http://127.0.0.1:%d%s" % (self.gateway_port, path), timeout=10) as reply:
