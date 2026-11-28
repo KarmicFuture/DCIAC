@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-28 (RM1048 ownership on the server)
+
+The server now holds the last of the web app's outlet rules. While the RM1048 rack manager is healthy and a device's BMC is up, RM1048 owns power control for that device's outlet. Outside a named maintenance window, `/api/v1/actions/outlet` now refuses those requests with a 409 that says why (`"policy": "rm1048-owns"`), even with a covering work order. A script or another platform can no longer power-cycle a tray behind RM1048's back.
+
+- The server learns state from readings. Each device reports `bmc` (1 up, 0 down) and RM1048 reports `plane` (1 healthy, 0 dark). Simulate › Post readings now sends both.
+- A dark BMC or a dark RM1048 plane hands the outlet to ACS, the same as in the web app. An open maintenance window lifts the hold.
+- Until a device has reported its BMC at least once, the server leaves the decision to the web app, which still checks first.
+- Role checks, the DI-1 leak interlock, and the maintenance-window rules still come first, and a refused action is never written to the audit log as done.
+
 ## 2026-11-27
 
 The one-line now runs all the way to the end point, and it works like a live control room.

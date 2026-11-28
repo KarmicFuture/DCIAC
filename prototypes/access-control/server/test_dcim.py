@@ -181,6 +181,35 @@ class DcimTest(unittest.TestCase):
         rows = api.dispatch("GET", "/api/v1/audit", ADMIN, b"")[1]["audit"]
         self.assertEqual(len([row for row in rows if row["action"] == "outlet all"]), 1, "a refused action is never logged as done")
 
+    def test_rm1048_owns_control_while_a_reported_bmc_is_up(self):
+        def outlet(body):
+            return api.dispatch("POST", "/api/v1/actions/outlet", OPERATOR, json.dumps(body).encode())
+
+        def post(samples):
+            status, body = api.dispatch("POST", "/api/v1/collect", {}, json.dumps({"source": "lab", "samples": samples}).encode())
+            self.assertEqual(status, 201, body)
+
+        status, body = api.dispatch("POST", "/api/v1/work-orders", ADMIN, json.dumps({"id": "WO-62", "kind": "Power cycle", "state": "In progress", "deviceId": "tray-07", "reason": "WO-62"}).encode())
+        self.assertEqual(status, 201, body)
+        cycle = {"op": "cycle", "outlet": 10, "deviceId": "tray-07", "reason": "WO-62", "workOrderId": "WO-62"}
+        self.assertEqual(outlet(cycle)[0], 200, "no BMC reading yet, so the server leaves the call to the web app")
+        post([{"deviceId": "tray-07", "name": "bmc", "value": 1, "unit": "up"}, {"deviceId": "rm1048", "name": "plane", "value": 1, "unit": "up"}])
+        for request in (cycle, dict(cycle, op="off"), {"op": "cycle", "deviceId": "tray-07", "reason": "WO-62", "workOrderId": "WO-62"}):
+            status, reply = outlet(request)
+            self.assertEqual((status, reply.get("policy")), (409, "rm1048-owns"), request)
+            self.assertIn("RM1048 owns Control for tray-07", reply["error"])
+        self.assertEqual(outlet(dict(cycle, maintenance=True, reason="maintenance window"))[0], 200, "a named window lifts the hold")
+        status, reply = api.dispatch("POST", "/api/v1/actions/outlet", {"x-dciac-user": "ro", "x-dciac-role": "ReadOnly"}, json.dumps(cycle).encode())
+        self.assertEqual(status, 403, "role check still comes first")
+        rows = api.dispatch("GET", "/api/v1/audit", ADMIN, b"")[1]["audit"]
+        self.assertEqual(len([row for row in rows if row["action"] == "outlet off"]), 0, "a refused action is never logged as done")
+        post([{"deviceId": "rm1048", "name": "plane", "value": 0, "unit": "up"}])
+        self.assertEqual(outlet(cycle)[0], 200, "a dark RM1048 plane hands Control to ACS")
+        post([{"deviceId": "rm1048", "name": "plane", "value": 1, "unit": "up"}])
+        self.assertEqual(outlet(cycle)[0], 409, "RM1048 healthy again")
+        post([{"deviceId": "tray-07", "name": "bmc", "value": 0, "unit": "up"}])
+        self.assertEqual(outlet(cycle)[0], 200, "a dark BMC fails over to ACS, including its outlet")
+
     def test_server_outlet_bindings_match_the_web_app(self):
         from server.dcim import OUTLET_DEVICES
         source = open(os.path.join(os.path.dirname(__file__), "..", "src", "data", "outlets.ts")).read()

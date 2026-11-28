@@ -835,6 +835,45 @@ def outlet_policy(op, outlet, maintenance):
     return ""
 
 
+RM1048_ID = "rm1048"
+
+
+def _latest(conn, device_id, name):
+    row = conn.execute(
+        "SELECT value FROM metric WHERE device_id = ? AND name = ? ORDER BY id DESC LIMIT 1",
+        (device_id, name),
+    ).fetchone()
+    return None if row is None else (row["value"] or 0)
+
+
+def rm1048_healthy(conn):
+    """RM1048 is healthy until a reading says its plane is dark (plane 0)."""
+    plane = _latest(conn, RM1048_ID, "plane")
+    return plane is None or plane >= 1
+
+
+def bmc_reported_up(conn, device_id):
+    """True only when the device's latest bmc reading is 1. No reading means the server does not know."""
+    value = _latest(conn, device_id, "bmc") if device_id else None
+    return value is not None and value >= 1
+
+
+def rm1048_ownership(conn, op, outlet, device_id, maintenance):
+    """The web app's ownership rule (outlet-policy.ts): while RM1048 is healthy and a device's BMC is up,
+    RM1048 owns Control for that device's outlet. A named maintenance window or a dark BMC lifts the hold."""
+    if maintenance or op == "all":
+        return ""
+    try:
+        outlet = int(outlet or 0)
+    except (TypeError, ValueError):
+        outlet = 0
+    device = OUTLET_DEVICES.get(outlet) or (device_id if device_id in OUTLET_DEVICES.values() else "")
+    if not device or not rm1048_healthy(conn) or not bmc_reported_up(conn, device):
+        return ""
+    return ("RM1048 owns Control for " + device + " while its BMC is up. Use RM1048, open a maintenance window, "
+            "or wait for the BMC to fail over to ACS.")
+
+
 def allow_action(conn, user, kind, reason, work_id, device_id, maintenance):
     if not reason or len(reason.strip()) < 3:
         return "A reason is required."
@@ -1438,6 +1477,9 @@ def handle(method, path, headers, body, user, role):
         policy = outlet_policy((body or {}).get("op") or "cycle", (body or {}).get("outlet"), bool((body or {}).get("maintenance")))
         if policy:
             return 409, {"error": policy, "policy": "maintenance-window"}
+        owner = rm1048_ownership(conn, (body or {}).get("op") or "cycle", (body or {}).get("outlet"), (body or {}).get("deviceId") or "", bool((body or {}).get("maintenance")))
+        if owner:
+            return 409, {"error": owner, "policy": "rm1048-owns"}
         reason = allow_action(conn, user, "outlet", (body or {}).get("reason") or "", (body or {}).get("workOrderId") or "", (body or {}).get("deviceId") or "", bool((body or {}).get("maintenance")))
         if reason:
             return 403, {"error": reason}

@@ -112,7 +112,8 @@ Mark items done here in the same pull request that finishes them.
    Kubernetes, then moving browser logic into services). Shipped 2026-11-25: phase 1, nine services
    plus a gateway, Docker Compose, contract tests, and the UX guard. Shipped 2026-11-26: phase 2 item 1, first half
    (the DI-1 leak interlock runs in `control`). Shipped 2026-11-27: phase 2 item 1, the maintenance-window
-   half of the outlet policy (unbound outlets and whole-PDU control). The RM1048 ownership rule is next.
+   half of the outlet policy (unbound outlets and whole-PDU control). Shipped 2026-11-28: the RM1048 ownership
+   rule, which finishes phase 2 item 1. CI (phase 2 item 2) is next.
 2. ~~Fleet view: a summary across halls and racks showing alarms, power, and capacity at a glance.~~
    *Done.* Shipped 2026-11-19: Operate › Fleet (`#/fleet`) lists every hall with open
    alarms, IT power, headroom, and hot-rack counts. Shipped 2026-11-20: "Show racks" on each

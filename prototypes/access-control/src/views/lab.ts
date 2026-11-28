@@ -117,10 +117,13 @@ export async function postLabReadings() {
     if (d.bmc === "up") samples.push({ deviceId: d.id, name: "inlet", value: 24, unit: "C" });
     samples.push({ deviceId: d.id, name: "serial", value: d.watchDeny ? 0 : 1, unit: "up" });
     samples.push({ deviceId: d.id, name: "power", value: d.bmc === "up" ? 40 : 0, unit: "%" });
+    // BMC and RM1048 state let the server apply the RM1048 ownership rule on /actions/outlet.
+    samples.push({ deviceId: d.id, name: "bmc", value: d.bmc === "up" ? 1 : 0, unit: "up" });
   });
   // DI-1 always reports, so a quiet reading clears the server-side leak interlock.
   samples.push({ deviceId: "di-1", name: "leak", value: state.leak ? 1 : 0, unit: "state" });
   if (state.rm1048 !== "healthy") samples.push({ deviceId: "rm1048", name: "power", value: 0, unit: "%" });
+  samples.push({ deviceId: "rm1048", name: "plane", value: state.rm1048 === "healthy" ? 1 : 0, unit: "up" });
   try {
     const response = await fetch("/api/v1/collect", {
       method: "POST",
